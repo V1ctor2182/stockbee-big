@@ -1,0 +1,24 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-FinBERT-部署"
+      name: "FinBERT 部署"
+      status: pending
+      completed_at: null
+    - id: "m2-Fin-E5-部署"
+      name: "Fin-E5 部署"
+      status: pending
+      completed_at: null
+    - id: "m3-LightGBM-训练推理"
+      name: "LightGBM 训练+推理"
+      status: pending
+      completed_at: null
+    - id: "m4-周度-refit-调度"
+      name: "周度 refit 调度"
+      status: pending
+      completed_at: null
+    - id: "m5-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

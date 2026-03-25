@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-周度审批流程"
+      name: "周度审批流程"
+      status: pending
+      completed_at: null
+    - id: "m2-Tier-2-15分钟超时"
+      name: "Tier-2 15分钟超时"
+      status: pending
+      completed_at: null
+    - id: "m3-审批-UI-基础"
+      name: "审批 UI 基础"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

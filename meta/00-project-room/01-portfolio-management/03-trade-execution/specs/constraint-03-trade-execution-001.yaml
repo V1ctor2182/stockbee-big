@@ -1,0 +1,19 @@
+spec_id: "constraint-03-trade-execution-001"
+type: constraint
+state: draft
+intent:
+  summary: "交易执行成功率 > 99.5%"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "PRD §4"
+relations: []
+anchors: []

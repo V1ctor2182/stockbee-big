@@ -1,0 +1,22 @@
+spec_id: "intent-07-realtime-monitoring-001"
+type: intent
+state: draft
+intent:
+  summary: "G1/G2/G3 新闻漏斗 + Tier-1/2/3 分层行动 + 风险控制"
+  detail: |
+    Phase 2 核心功能。实时监听新闻源，分级处理，自动响应。ATR×1.5 防守平仓。
+
+来源：PRD §3.8, Feature Hierarchy §7
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

@@ -1,0 +1,24 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-路由器实现"
+      name: "路由器实现"
+      status: pending
+      completed_at: null
+    - id: "m2-G1-G2-G3-管道"
+      name: "G1/G2/G3 管道"
+      status: pending
+      completed_at: null
+    - id: "m3-降级链"
+      name: "降级链"
+      status: pending
+      completed_at: null
+    - id: "m4-Batch-API-优化"
+      name: "Batch API 优化"
+      status: pending
+      completed_at: null
+    - id: "m5-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

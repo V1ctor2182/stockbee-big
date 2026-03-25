@@ -1,0 +1,24 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-信号整合逻辑"
+      name: "信号整合逻辑"
+      status: pending
+      completed_at: null
+    - id: "m2-决策-Prompt-模板"
+      name: "决策 Prompt 模板"
+      status: pending
+      completed_at: null
+    - id: "m3-LLM-调用解析"
+      name: "LLM 调用+解析"
+      status: pending
+      completed_at: null
+    - id: "m4-结构化输出"
+      name: "结构化输出"
+      status: pending
+      completed_at: null
+    - id: "m5-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

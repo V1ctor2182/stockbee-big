@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-决策存储"
+      name: "决策存储"
+      status: pending
+      completed_at: null
+    - id: "m2-市场状态归档"
+      name: "市场状态归档"
+      status: pending
+      completed_at: null
+    - id: "m3-语义检索-Fin-E5"
+      name: "语义检索 Fin-E5"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

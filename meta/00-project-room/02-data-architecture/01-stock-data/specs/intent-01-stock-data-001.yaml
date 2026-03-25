@@ -1,0 +1,23 @@
+spec_id: "intent-01-stock-data-001"
+type: intent
+state: draft
+intent:
+  summary: "三层金字塔架构，Parquet 列存 + SQLite 元数据"
+  detail: |
+    4000 只可投资美股，日线 OHLCV。四层漏斗避免幸存者偏差。Parquet 压缩率 8:1。
+
+来源：Tech Design §2.1-§2.2
+研究状态：研究完成 (research-stock-data-storage.md)
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

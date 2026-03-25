@@ -1,0 +1,19 @@
+spec_id: "constraint-03-model-system-001"
+type: constraint
+state: draft
+intent:
+  summary: "LLM 月度 API 成本 < $15"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "PRD §3.3"
+relations: []
+anchors: []

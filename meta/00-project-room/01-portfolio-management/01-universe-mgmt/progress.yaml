@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-四层漏斗筛选逻辑"
+      name: "四层漏斗筛选逻辑"
+      status: pending
+      completed_at: null
+    - id: "m2-月度重构调度"
+      name: "月度重构调度"
+      status: pending
+      completed_at: null
+    - id: "m3-U100-覆盖验证"
+      name: "U100 覆盖验证"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

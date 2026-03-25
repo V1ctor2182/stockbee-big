@@ -1,0 +1,23 @@
+spec_id: "intent-01-llm-routing-001"
+type: intent
+state: draft
+intent:
+  summary: "按任务选模型，G1/G2/G3 分级路由，降级链"
+  detail: |
+    G1 GPT-4.1 nano (<$1)，G2 Claude Sonnet 4 (<$2)，G3 GPT-4.1 (<$5)，SEC GPT-4.1 long (<$3)，宏观 Claude Sonnet 4 (<$4)。降级链：主模型→备选→缓存→禁用信号。
+
+来源：Tech Design §3.2
+研究状态：研究完成 (research-llm-selection.md)
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

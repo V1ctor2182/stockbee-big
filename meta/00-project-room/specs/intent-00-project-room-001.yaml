@@ -1,0 +1,22 @@
+spec_id: "intent-00-project-room-001"
+type: intent
+state: draft
+intent:
+  summary: "AI 驱动的美股量化交易系统，Long 7+Short 1 周度调仓"
+  detail: |
+    融合宏观分析、多因子评分、强化学习组合优化、LLM 新闻分析和人工审批机制，实现智能化的周度投资组合再平衡。核心策略：从 U100 精选宇宙中选股。
+
+来源：PRD §1 产品概述
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

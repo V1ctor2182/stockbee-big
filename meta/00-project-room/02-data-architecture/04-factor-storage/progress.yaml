@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-表达式引擎"
+      name: "表达式引擎"
+      status: pending
+      completed_at: null
+    - id: "m2-预计算-Parquet-存储"
+      name: "预计算 Parquet 存储"
+      status: pending
+      completed_at: null
+    - id: "m3-因子读取-API"
+      name: "因子读取 API"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

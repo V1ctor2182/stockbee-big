@@ -1,0 +1,23 @@
+spec_id: "intent-05-experience-buffer-001"
+type: intent
+state: draft
+intent:
+  summary: "Ring Buffer 50K，内存常驻，DQN/SAC 训练数据源"
+  detail: |
+    FIFO 覆盖策略，50K transition ≈ 35MB。可选 Priority Experience Replay (Phase 2)。
+
+来源：Tech Design §2.6
+研究状态：研究完成 (research-experience-buffer-20260317.md)
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

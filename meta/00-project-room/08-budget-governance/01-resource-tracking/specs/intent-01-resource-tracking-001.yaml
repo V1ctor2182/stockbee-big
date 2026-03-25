@@ -1,0 +1,20 @@
+spec_id: "intent-01-resource-tracking-001"
+type: intent
+state: draft
+intent:
+  summary: "API 配额、LLM 成本、交易数、CPU 监控"
+  detail: |
+    来源：Feature Hierarchy §8.1
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

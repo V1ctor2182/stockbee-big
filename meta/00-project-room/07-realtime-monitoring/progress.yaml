@@ -1,0 +1,24 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-实时数据源"
+      name: "实时数据源"
+      status: pending
+      completed_at: null
+    - id: "m2-新闻漏斗"
+      name: "新闻漏斗"
+      status: pending
+      completed_at: null
+    - id: "m3-分层行动"
+      name: "分层行动"
+      status: pending
+      completed_at: null
+    - id: "m4-风险控制"
+      name: "风险控制"
+      status: pending
+      completed_at: null
+    - id: "m5-集成测试"
+      name: "集成测试"
+      status: pending
+      completed_at: null
+  commits: []

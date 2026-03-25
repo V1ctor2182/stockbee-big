@@ -1,0 +1,19 @@
+spec_id: "constraint-01-universe-mgmt-002"
+type: constraint
+state: draft
+intent:
+  summary: "U100 每月自动重构"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "Feature Hierarchy §1.1"
+relations: []
+anchors: []

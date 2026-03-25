@@ -1,0 +1,20 @@
+spec_id: "intent-03-report-generation-001"
+type: intent
+state: draft
+intent:
+  summary: "日/周/月报告自动生成，交易日志"
+  detail: |
+    来源：Feature Hierarchy §10.3
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-Polygon.io-接入"
+      name: "Polygon.io 接入"
+      status: pending
+      completed_at: null
+    - id: "m2-SEC-EDGAR-接入"
+      name: "SEC EDGAR 接入"
+      status: pending
+      completed_at: null
+    - id: "m3-Nasdaq-RSS-接入"
+      name: "Nasdaq RSS 接入"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

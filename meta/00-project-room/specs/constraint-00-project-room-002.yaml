@@ -1,0 +1,19 @@
+spec_id: "constraint-00-project-room-002"
+type: constraint
+state: draft
+intent:
+  summary: "LLM API 成本 < $15/月"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "PRD §4"
+relations: []
+anchors: []

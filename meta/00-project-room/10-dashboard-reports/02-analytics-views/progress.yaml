@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-行业热力图"
+      name: "行业热力图"
+      status: pending
+      completed_at: null
+    - id: "m2-风格雷达图"
+      name: "风格雷达图"
+      status: pending
+      completed_at: null
+    - id: "m3-因子-IC-趋势"
+      name: "因子 IC 趋势"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

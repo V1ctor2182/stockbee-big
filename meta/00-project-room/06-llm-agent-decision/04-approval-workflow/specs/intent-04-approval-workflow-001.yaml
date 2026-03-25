@@ -1,0 +1,22 @@
+spec_id: "intent-04-approval-workflow-001"
+type: intent
+state: draft
+intent:
+  summary: "周度再平衡人工审批 + Tier-2 15分钟超时"
+  detail: |
+    Victor 为唯一审批者。周度再平衡无超时，展示收益预期和持仓变化。Tier-2 加速信号 15 分钟窗口，无响应自动拒绝。
+
+来源：Tech Design §5.3, Feature Hierarchy §6.4
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

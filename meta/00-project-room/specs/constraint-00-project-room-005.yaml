@@ -1,0 +1,19 @@
+spec_id: "constraint-00-project-room-005"
+type: constraint
+state: draft
+intent:
+  summary: "所有 LLM 输出必须经过验证层"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "PRD §3.4 CEO Review"
+relations: []
+anchors: []

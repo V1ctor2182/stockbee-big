@@ -1,0 +1,19 @@
+spec_id: "constraint-02-validation-layer-002"
+type: constraint
+state: draft
+intent:
+  summary: "偏离历史分配范围的决策触发告警"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "PRD §3.4"
+relations: []
+anchors: []

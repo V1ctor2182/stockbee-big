@@ -1,0 +1,22 @@
+spec_id: "intent-01-universe-mgmt-001"
+type: intent
+state: draft
+intent:
+  summary: "维护 U100 投资宇宙，月度重构，四层漏斗筛选"
+  detail: |
+    四层漏斗设计（8000→4000→500→100→8）。每月从广域宇宙中按流动性、行业均衡筛选到 U100。逆向 ETF 映射用于做空代理。
+
+来源：Feature Hierarchy §1.1, Tech Design §2.1
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

@@ -1,0 +1,23 @@
+spec_id: "intent-07-provider-arch-001"
+type: intent
+state: draft
+intent:
+  summary: "10 个 Provider + Registry，支持 backtest/live 切换"
+  detail: |
+    Calendar/Universe/MarketData/Factor/Fundamental/News/Macro/Sentiment/Broker/Cache 10 个 Provider。YAML 配置切换实现，3 层缓存（L1 内存 → L2 Parquet → L3 API）。
+
+来源：Tech Design §2.8
+研究状态：研究完成 (research-provider-design.md)
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

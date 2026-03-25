@@ -1,0 +1,23 @@
+spec_id: "intent-03-rl-algorithms-001"
+type: intent
+state: draft
+intent:
+  summary: "Phase 1: DQN+PPO; Phase 2: SAC+Ensemble"
+  detail: |
+    选股环境（DQN，100→8 离散决策）+ 权重环境（PPO，连续 softmax）。Walk-forward 验证防过拟合。Phase 2 升级 SAC + 集合策略应对制度切换。
+
+来源：Tech Design §3.4
+研究状态：待研究 (research-rl-algorithms.md 有初步方案)
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

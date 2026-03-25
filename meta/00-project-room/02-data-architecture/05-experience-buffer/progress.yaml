@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-Ring-Buffer-实现"
+      name: "Ring Buffer 实现"
+      status: pending
+      completed_at: null
+    - id: "m2-FIFO-覆盖策略"
+      name: "FIFO 覆盖策略"
+      status: pending
+      completed_at: null
+    - id: "m3-GPU-转移支持"
+      name: "GPU 转移支持"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

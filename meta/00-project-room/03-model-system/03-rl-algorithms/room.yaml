@@ -1,0 +1,15 @@
+room:
+  id: "03-rl-algorithms"
+  name: "强化学习算法"
+  parent: "03-model-system"
+  type: feature
+  lifecycle: backlog
+  priority: P0
+  phase: "2"
+  created_at: "2026-03-24"
+  updated_at: "2026-03-24"
+  prompt_test:
+    passable: false
+    last_tested: null
+    token_count: null
+  depends_on: ['02-data-architecture/05-experience-buffer', '01-portfolio-management/02-portfolio-construction']

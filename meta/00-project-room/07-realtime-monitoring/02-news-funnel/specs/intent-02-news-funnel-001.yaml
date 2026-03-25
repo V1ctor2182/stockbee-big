@@ -1,0 +1,22 @@
+spec_id: "intent-02-news-funnel-001"
+type: intent
+state: draft
+intent:
+  summary: "G1 快速过滤 → G2 LLM 分类 → G3 深度分析"
+  detail: |
+    G1 淘汰 95%，G2 淘汰 50-70%，G3 日限 10 篇。G2 输出触发公司知识图谱传播。
+
+来源：Tech Design §4.2, Feature Hierarchy §7.2
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

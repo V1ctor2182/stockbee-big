@@ -1,0 +1,22 @@
+spec_id: "intent-06-llm-agent-decision-001"
+type: intent
+state: draft
+intent:
+  summary: "LLM Agent 作为决策编排者，整合多信号源，经验证层后输出建议"
+  detail: |
+    CEO Review 发现的 CRITICAL GAP：LLM 直接驱动交易决策缺乏安全护栏。所有 LLM 输出必须经过验证层。Decision Loop 是护城河的种子。
+
+来源：PRD §3.4, Feature Hierarchy §6
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

@@ -1,0 +1,22 @@
+spec_id: "intent-02-degradation-001"
+type: intent
+state: draft
+intent:
+  summary: "70%/85%/95% 三级降级，成本预测"
+  detail: |
+    绿色 <$75 正常。黄色 70% FMP→Yahoo fallback。橙色 85% 禁用 G3。红色 95% 最小化运营。
+
+来源：Tech Design §8.2
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

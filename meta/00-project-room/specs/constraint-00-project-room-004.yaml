@@ -1,0 +1,19 @@
+spec_id: "constraint-00-project-room-004"
+type: constraint
+state: draft
+intent:
+  summary: "周度再平衡端到端 < 30 分钟"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "PRD §4"
+relations: []
+anchors: []

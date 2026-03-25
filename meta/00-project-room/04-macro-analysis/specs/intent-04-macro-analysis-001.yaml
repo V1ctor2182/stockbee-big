@@ -1,0 +1,22 @@
+spec_id: "intent-04-macro-analysis-001"
+type: intent
+state: draft
+intent:
+  summary: "19 FRED 指标驱动的经济周期判断 + 行业/风格 Tilt"
+  detail: |
+    MacroTiltEngine 将宏观信号转化为 soft bias 叠加在因子分数上。经济周期分类（扩张/过热/滞胀/衰退/复苏）准确率 > 70%。
+
+来源：PRD §3.5, Tech Design §3.5
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

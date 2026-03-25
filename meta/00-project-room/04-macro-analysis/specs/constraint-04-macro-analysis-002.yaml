@@ -1,0 +1,19 @@
+spec_id: "constraint-04-macro-analysis-002"
+type: constraint
+state: draft
+intent:
+  summary: "宏观 Tilt = 0.6 × 规则 + 0.4 × 传播图"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "PRD §3.5"
+relations: []
+anchors: []

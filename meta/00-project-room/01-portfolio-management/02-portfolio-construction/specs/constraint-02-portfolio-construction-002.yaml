@@ -1,0 +1,19 @@
+spec_id: "constraint-02-portfolio-construction-002"
+type: constraint
+state: draft
+intent:
+  summary: "同行业 ≤ 3 只（硬约束）"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "PRD §3.1"
+relations: []
+anchors: []

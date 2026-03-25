@@ -1,0 +1,16 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-美国假期表"
+      name: "美国假期表"
+      status: pending
+      completed_at: null
+    - id: "m2-提前调仓逻辑"
+      name: "提前调仓逻辑"
+      status: pending
+      completed_at: null
+    - id: "m3-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

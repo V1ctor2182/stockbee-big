@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-XGBoost-训练管道"
+      name: "XGBoost 训练管道"
+      status: pending
+      completed_at: null
+    - id: "m2-6-8-因子输入"
+      name: "6-8 因子输入"
+      status: pending
+      completed_at: null
+    - id: "m3-AB-对比等权"
+      name: "AB 对比等权"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

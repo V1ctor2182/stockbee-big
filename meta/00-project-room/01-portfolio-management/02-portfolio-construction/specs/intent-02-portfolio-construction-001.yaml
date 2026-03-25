@@ -1,0 +1,23 @@
+spec_id: "intent-02-portfolio-construction-001"
+type: intent
+state: draft
+intent:
+  summary: "生成 Long 7 + Short 1 投资组合，约束优化"
+  detail: |
+    整合多因子评分、宏观 Tilt、RL 权重优化，在行业/仓位/Beta 约束下构建最优组合。
+score_final = factor_score + 0.1 × propagation_score + 0.2 × tilt_sector + 0.1 × tilt_style
+
+来源：PRD §3.1, Tech Design §5.1
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

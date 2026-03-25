@@ -1,0 +1,19 @@
+spec_id: "constraint-02-small-models-002"
+type: constraint
+state: draft
+intent:
+  summary: "LightGBM 预测 IC > 0.03"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "PRD §3.3"
+relations: []
+anchors: []

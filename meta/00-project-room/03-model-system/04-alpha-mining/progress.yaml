@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-Alpha158-因子集"
+      name: "Alpha158 因子集"
+      status: pending
+      completed_at: null
+    - id: "m2-IC-ICIR-评估管道"
+      name: "IC/ICIR 评估管道"
+      status: pending
+      completed_at: null
+    - id: "m3-因子自动禁用降权"
+      name: "因子自动禁用降权"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

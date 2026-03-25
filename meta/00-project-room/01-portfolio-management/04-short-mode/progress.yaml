@@ -1,0 +1,16 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-三种做空模式配置"
+      name: "三种做空模式配置"
+      status: pending
+      completed_at: null
+    - id: "m2-回测区分模式表现"
+      name: "回测区分模式表现"
+      status: pending
+      completed_at: null
+    - id: "m3-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

@@ -1,0 +1,22 @@
+spec_id: "intent-02-validation-layer-001"
+type: intent
+state: draft
+intent:
+  summary: "Schema 验证 + 风控约束检查 + 异常检测 + Injection 防护"
+  detail: |
+    JSON Schema 验证结构正确。风控自动检查仓位/行业/Beta 约束。偏离历史分配范围触发告警。新闻文本清洗防 Prompt Injection。
+
+来源：PRD §3.4, Feature Hierarchy §6.2
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

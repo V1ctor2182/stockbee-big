@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-爬虫框架"
+      name: "爬虫框架"
+      status: pending
+      completed_at: null
+    - id: "m2-分析师报告解析"
+      name: "分析师报告解析"
+      status: pending
+      completed_at: null
+    - id: "m3-自动分类"
+      name: "自动分类"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

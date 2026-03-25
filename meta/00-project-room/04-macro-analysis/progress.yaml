@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-数据源接入"
+      name: "数据源接入"
+      status: pending
+      completed_at: null
+    - id: "m2-宏观评分"
+      name: "宏观评分"
+      status: pending
+      completed_at: null
+    - id: "m3-行业风格-Tilt"
+      name: "行业+风格 Tilt"
+      status: pending
+      completed_at: null
+    - id: "m4-集成测试"
+      name: "集成测试"
+      status: pending
+      completed_at: null
+  commits: []

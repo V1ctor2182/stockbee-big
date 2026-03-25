@@ -1,0 +1,22 @@
+spec_id: "intent-04-risk-controls-001"
+type: intent
+state: draft
+intent:
+  summary: "尾随止损 ATR×1.5 + 冷却期 + 头寸限制"
+  detail: |
+    价格下跌 > 3σ 自动平仓（不需审批）。Tier-1 加速上限 2 次/天，冷却期 30 分钟。
+
+来源：Tech Design §6.2, Feature Hierarchy §7.4
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

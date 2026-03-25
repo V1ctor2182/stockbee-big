@@ -1,0 +1,19 @@
+spec_id: "constraint-04-risk-controls-002"
+type: constraint
+state: draft
+intent:
+  summary: "加速冷却期 30 分钟"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "Tech Design §6.2"
+relations: []
+anchors: []

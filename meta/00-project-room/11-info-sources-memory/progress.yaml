@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-信息源接入"
+      name: "信息源接入"
+      status: pending
+      completed_at: null
+    - id: "m2-决策历史"
+      name: "决策历史"
+      status: pending
+      completed_at: null
+    - id: "m3-OpenClaw"
+      name: "OpenClaw"
+      status: pending
+      completed_at: null
+    - id: "m4-集成测试"
+      name: "集成测试"
+      status: pending
+      completed_at: null
+  commits: []

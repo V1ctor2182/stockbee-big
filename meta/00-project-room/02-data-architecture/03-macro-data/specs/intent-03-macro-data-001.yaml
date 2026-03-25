@@ -1,0 +1,23 @@
+spec_id: "intent-03-macro-data-001"
+type: intent
+state: draft
+intent:
+  summary: "19 个 FRED 指标，point-in-time 对齐无未来偏差"
+  detail: |
+    覆盖 8 个经济维度：利率(3)、就业(3)、物价(2)、增长(2)、信用(2)、流动性(2)、汇率(1)、商品(2)。每日计算 Z-score。
+
+来源：Tech Design §2.4, §3.5
+研究状态：研究完成 (research-macro-features.md)
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

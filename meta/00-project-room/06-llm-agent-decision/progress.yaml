@@ -1,0 +1,24 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-决策编排"
+      name: "决策编排"
+      status: pending
+      completed_at: null
+    - id: "m2-验证层"
+      name: "验证层"
+      status: pending
+      completed_at: null
+    - id: "m3-决策日志"
+      name: "决策日志"
+      status: pending
+      completed_at: null
+    - id: "m4-审批工作流"
+      name: "审批工作流"
+      status: pending
+      completed_at: null
+    - id: "m5-集成测试"
+      name: "集成测试"
+      status: pending
+      completed_at: null
+  commits: []

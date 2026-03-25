@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-Z-score-标准化"
+      name: "Z-score 标准化"
+      status: pending
+      completed_at: null
+    - id: "m2-经济周期分类5种"
+      name: "经济周期分类(5种)"
+      status: pending
+      completed_at: null
+    - id: "m3-日度评分输出"
+      name: "日度评分输出"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

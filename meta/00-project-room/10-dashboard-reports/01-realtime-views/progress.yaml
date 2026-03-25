@@ -1,0 +1,24 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-持仓展示"
+      name: "持仓展示"
+      status: pending
+      completed_at: null
+    - id: "m2-Beta-监控"
+      name: "Beta 监控"
+      status: pending
+      completed_at: null
+    - id: "m3-新闻队列"
+      name: "新闻队列"
+      status: pending
+      completed_at: null
+    - id: "m4-WebSocket-推送"
+      name: "WebSocket 推送"
+      status: pending
+      completed_at: null
+    - id: "m5-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

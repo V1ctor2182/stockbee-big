@@ -1,0 +1,19 @@
+spec_id: "constraint-06-llm-agent-decision-001"
+type: constraint
+state: draft
+intent:
+  summary: "LLM 输出经 JSON Schema 验证"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "PRD §3.4"
+relations: []
+anchors: []

@@ -1,0 +1,24 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-G1-快速过滤"
+      name: "G1 快速过滤"
+      status: pending
+      completed_at: null
+    - id: "m2-G2-LLM-分类"
+      name: "G2 LLM 分类"
+      status: pending
+      completed_at: null
+    - id: "m3-G3-深度分析"
+      name: "G3 深度分析"
+      status: pending
+      completed_at: null
+    - id: "m4-图谱传播触发"
+      name: "图谱传播触发"
+      status: pending
+      completed_at: null
+    - id: "m5-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

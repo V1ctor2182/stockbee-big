@@ -1,0 +1,19 @@
+spec_id: "constraint-03-trade-execution-002"
+type: constraint
+state: draft
+intent:
+  summary: "幂等执行（重试不重复下单）"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "PRD §3.1"
+relations: []
+anchors: []

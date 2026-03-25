@@ -1,0 +1,19 @@
+spec_id: "constraint-06-llm-agent-decision-002"
+type: constraint
+state: draft
+intent:
+  summary: "周度再平衡必须人工审批"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "PRD §3.4"
+relations: []
+anchors: []

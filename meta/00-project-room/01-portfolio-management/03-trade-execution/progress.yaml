@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-Alpaca-API-集成"
+      name: "Alpaca API 集成"
+      status: pending
+      completed_at: null
+    - id: "m2-幂等订单逻辑"
+      name: "幂等订单逻辑"
+      status: pending
+      completed_at: null
+    - id: "m3-交易日志记录"
+      name: "交易日志记录"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

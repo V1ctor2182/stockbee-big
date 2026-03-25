@@ -1,0 +1,20 @@
+spec_id: "intent-02-holiday-rebalance-001"
+type: intent
+state: draft
+intent:
+  summary: "美国假期检测，假期前提前再平衡"
+  detail: |
+    来源：Feature Hierarchy §9.2
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

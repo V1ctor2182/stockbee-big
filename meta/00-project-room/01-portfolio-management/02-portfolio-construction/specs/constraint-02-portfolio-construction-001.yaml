@@ -1,0 +1,19 @@
+spec_id: "constraint-02-portfolio-construction-001"
+type: constraint
+state: draft
+intent:
+  summary: "单股仓位 ≤ 20%（硬约束）"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "PRD §3.1"
+relations: []
+anchors: []

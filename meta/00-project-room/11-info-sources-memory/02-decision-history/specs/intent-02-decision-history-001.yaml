@@ -1,0 +1,22 @@
+spec_id: "intent-02-decision-history-001"
+type: intent
+state: draft
+intent:
+  summary: "过往决策存储，市场状态归档，决策智能分析"
+  detail: |
+    基于积累的 Decision Records 分析决策模式。Fin-E5 向量化存储，语义检索。
+
+来源：Feature Hierarchy §11.2
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

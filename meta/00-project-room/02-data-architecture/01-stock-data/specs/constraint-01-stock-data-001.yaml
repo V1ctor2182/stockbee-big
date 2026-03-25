@@ -1,0 +1,19 @@
+spec_id: "constraint-01-stock-data-001"
+type: constraint
+state: draft
+intent:
+  summary: "覆盖 ~4000 只可投资美股"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "PRD §3.2"
+relations: []
+anchors: []

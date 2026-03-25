@@ -1,0 +1,19 @@
+spec_id: "constraint-02-data-architecture-003"
+type: constraint
+state: draft
+intent:
+  summary: "10 个 Provider 抽象接口"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "Tech Design §2.8"
+relations: []
+anchors: []

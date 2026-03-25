@@ -1,0 +1,22 @@
+spec_id: "intent-04-short-mode-001"
+type: intent
+state: draft
+intent:
+  summary: "支持三种做空模式：融券/反向ETF/仅做多"
+  detail: |
+    CEO Review 发现：反向 ETF ≠ 个股做空，风险属性完全不同。配置文件中明确选择做空模式，回测时区分不同做空模式的表现差异。
+
+来源：PRD §3.7, Feature Hierarchy §1.4
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

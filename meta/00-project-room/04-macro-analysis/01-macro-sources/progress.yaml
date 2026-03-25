@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-FRED-API-接入"
+      name: "FRED API 接入"
+      status: pending
+      completed_at: null
+    - id: "m2-BLS-数据采集"
+      name: "BLS 数据采集"
+      status: pending
+      completed_at: null
+    - id: "m3-美联储-RSS-解析"
+      name: "美联储 RSS 解析"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

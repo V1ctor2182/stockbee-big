@@ -1,0 +1,23 @@
+spec_id: "intent-02-small-models-001"
+type: intent
+state: draft
+intent:
+  summary: "FinBERT 情绪 + Fin-E5 重要性 + LightGBM 收益预测"
+  detail: |
+    所有模型本地部署，GPU 加速推理。FinBERT <100ms，LightGBM <50ms。每周 refit 适应市场变化。
+
+来源：Tech Design §3.3
+研究状态：研究完成 (新闻小模型.md, 量化小模型.md)
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

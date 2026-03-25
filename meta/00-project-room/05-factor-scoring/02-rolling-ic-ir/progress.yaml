@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-252-日滚动窗口"
+      name: "252 日滚动窗口"
+      status: pending
+      completed_at: null
+    - id: "m2-ICIR-自动禁用逻辑"
+      name: "ICIR 自动禁用逻辑"
+      status: pending
+      completed_at: null
+    - id: "m3-因子权重动态调整"
+      name: "因子权重动态调整"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

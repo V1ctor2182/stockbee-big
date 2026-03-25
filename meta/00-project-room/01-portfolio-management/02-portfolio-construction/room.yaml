@@ -1,0 +1,15 @@
+room:
+  id: "02-portfolio-construction"
+  name: "投资组合构建"
+  parent: "01-portfolio-management"
+  type: feature
+  lifecycle: planning
+  priority: P0
+  phase: "1"
+  created_at: "2026-03-24"
+  updated_at: "2026-03-24"
+  prompt_test:
+    passable: false
+    last_tested: null
+    token_count: null
+  depends_on: ['05-factor-scoring', '04-macro-analysis/02-macro-scoring', '03-model-system/03-rl-algorithms']

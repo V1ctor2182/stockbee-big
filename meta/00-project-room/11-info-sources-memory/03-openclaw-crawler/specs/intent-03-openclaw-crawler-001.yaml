@@ -1,0 +1,23 @@
+spec_id: "intent-03-openclaw-crawler-001"
+type: intent
+state: draft
+intent:
+  summary: "分析师报告爬取，自动分类"
+  detail: |
+    BeautifulSoup + Playwright。
+
+来源：Feature Hierarchy §11.3
+研究状态：待研究 (openclaw部署design doc.md)
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

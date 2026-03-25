@@ -1,0 +1,19 @@
+spec_id: "constraint-06-llm-agent-decision-003"
+type: constraint
+state: draft
+intent:
+  summary: "所有 LLM 输入/输出记录日志"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "PRD §3.4"
+relations: []
+anchors: []

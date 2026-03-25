@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-Decision-Record-Schema"
+      name: "Decision Record Schema"
+      status: pending
+      completed_at: null
+    - id: "m2-SQLite-decision_log-表"
+      name: "SQLite decision_log 表"
+      status: pending
+      completed_at: null
+    - id: "m3-outcome-延迟填充"
+      name: "outcome 延迟填充"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

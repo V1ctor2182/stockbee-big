@@ -1,0 +1,15 @@
+room:
+  id: "02-rolling-ic-ir"
+  name: "滚动 IC/IR 评估"
+  parent: "05-factor-scoring"
+  type: feature
+  lifecycle: planning
+  priority: P1
+  phase: "1"
+  created_at: "2026-03-24"
+  updated_at: "2026-03-24"
+  prompt_test:
+    passable: false
+    last_tested: null
+    token_count: null
+  depends_on: ['05-factor-scoring/01-multi-factor-fusion', '02-data-architecture/04-factor-storage']

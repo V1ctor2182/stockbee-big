@@ -1,0 +1,16 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-Phase-1-MVP-跑通"
+      name: "Phase 1 MVP 跑通"
+      status: pending
+      completed_at: null
+    - id: "m2-Phase-2-增强完成"
+      name: "Phase 2 增强完成"
+      status: pending
+      completed_at: null
+    - id: "m3-Phase-3-开源发布"
+      name: "Phase 3 开源发布"
+      status: pending
+      completed_at: null
+  commits: []

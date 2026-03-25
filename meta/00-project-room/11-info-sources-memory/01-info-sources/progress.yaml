@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-NewsAPI-接入"
+      name: "NewsAPI 接入"
+      status: pending
+      completed_at: null
+    - id: "m2-Perigon-RSS"
+      name: "Perigon RSS"
+      status: pending
+      completed_at: null
+    - id: "m3-Polymarket-概率采集"
+      name: "Polymarket 概率采集"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

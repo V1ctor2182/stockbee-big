@@ -1,0 +1,16 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-会话管理"
+      name: "会话管理"
+      status: pending
+      completed_at: null
+    - id: "m2-假期调仓"
+      name: "假期调仓"
+      status: pending
+      completed_at: null
+    - id: "m3-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

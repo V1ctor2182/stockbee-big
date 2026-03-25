@@ -1,0 +1,19 @@
+spec_id: "constraint-03-macro-data-001"
+type: constraint
+state: draft
+intent:
+  summary: "point-in-time 对齐无未来偏差"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "Tech Design §2.4"
+relations: []
+anchors: []

@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-news_events-表设计"
+      name: "news_events 表设计"
+      status: pending
+      completed_at: null
+    - id: "m2-G1-过滤入库"
+      name: "G1 过滤入库"
+      status: pending
+      completed_at: null
+    - id: "m3-分级字段存储"
+      name: "分级字段存储"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

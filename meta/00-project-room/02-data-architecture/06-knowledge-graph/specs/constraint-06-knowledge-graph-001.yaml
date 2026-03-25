@@ -1,0 +1,19 @@
+spec_id: "constraint-06-knowledge-graph-001"
+type: constraint
+state: draft
+intent:
+  summary: "宏观传播 Tilt = 0.6 × 规则 + 0.4 × 传播"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "Tech Design §2.7"
+relations: []
+anchors: []

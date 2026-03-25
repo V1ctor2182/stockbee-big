@@ -1,0 +1,24 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-JSON-Schema-验证"
+      name: "JSON Schema 验证"
+      status: pending
+      completed_at: null
+    - id: "m2-风控约束检查"
+      name: "风控约束检查"
+      status: pending
+      completed_at: null
+    - id: "m3-异常检测"
+      name: "异常检测"
+      status: pending
+      completed_at: null
+    - id: "m4-Injection-防护"
+      name: "Injection 防护"
+      status: pending
+      completed_at: null
+    - id: "m5-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

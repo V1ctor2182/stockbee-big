@@ -1,0 +1,23 @@
+spec_id: "intent-02-rolling-ic-ir-001"
+type: intent
+state: draft
+intent:
+  summary: "信息系数评估，自动因子加权/禁用"
+  detail: |
+    252 日滚动窗口计算 IC 和 ICIR。ICIR 从正转负时自动禁用或降权。
+
+来源：Feature Hierarchy §5.2, Tech Design §2.5
+研究状态：待研究
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

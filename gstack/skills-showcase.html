@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>gstack Skills</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a26;
+    --border: #2a2a3a;
+    --text: #e4e4ef;
+    --text-dim: #8888a0;
+    --accent: #7c6aef;
+    --accent-glow: rgba(124, 106, 239, 0.15);
+    --green: #34d399;
+    --amber: #fbbf24;
+    --rose: #f472b6;
+    --cyan: #22d3ee;
+    --orange: #fb923c;
+    --blue: #60a5fa;
+    --red: #f87171;
+    --purple: #a78bfa;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  .hero {
+    text-align: center;
+    padding: 80px 24px 48px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -120px; left: 50%; transform: translateX(-50%);
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero h1 {
+    font-size: 3rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, #fff 0%, var(--accent) 50%, var(--rose) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+  }
+  .hero p {
+    color: var(--text-dim);
+    font-size: 1.1rem;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+  .stat-bar {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin-top: 32px;
+    flex-wrap: wrap;
+  }
+  .stat {
+    text-align: center;
+  }
+  .stat-num {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .stat-label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* Filter */
+  .filter-bar {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 24px 40px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .filter-btn:hover { border-color: var(--accent); color: var(--text); }
+  .filter-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* Category Section */
+  .categories {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+  .category {
+    margin-bottom: 48px;
+  }
+  .category-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .category-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+  .category-header h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .category-count {
+    margin-left: auto;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    background: var(--surface2);
+    padding: 2px 10px;
+    border-radius: 12px;
+  }
+
+  /* Skill Cards */
+  .skill-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+  }
+  .skill-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    transition: all 0.25s ease;
+    cursor: default;
+    position: relative;
+    overflow: hidden;
+  }
+  .skill-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: 14px 14px 0 0;
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+  .skill-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+  .skill-card:hover::before { opacity: 1; }
+
+  .skill-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .skill-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #fff;
+  }
+  .skill-cmd {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.78rem;
+    color: var(--accent);
+    background: var(--accent-glow);
+    padding: 3px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-left: 12px;
+  }
+  .skill-desc {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+    line-height: 1.55;
+  }
+  .skill-features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .feature-tag {
+    font-size: 0.72rem;
+    padding: 3px 9px;
+    border-radius: 6px;
+    background: var(--surface2);
+    color: var(--text-dim);
+    border: 1px solid transparent;
+  }
+  .skill-usage {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    font-size: 0.82rem;
+    color: var(--text-dim);
+  }
+  .skill-usage code {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    background: var(--surface2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--green);
+    font-size: 0.78rem;
+  }
+
+  /* Category colors */
+  .cat-qa .category-icon { background: rgba(52, 211, 153, 0.15); color: var(--green); }
+  .cat-qa .skill-card::before { background: var(--green); }
+  .cat-plan .category-icon { background: rgba(124, 106, 239, 0.15); color: var(--accent); }
+  .cat-plan .skill-card::before { background: var(--accent); }
+  .cat-code .category-icon { background: rgba(96, 165, 250, 0.15); color: var(--blue); }
+  .cat-code .skill-card::before { background: var(--blue); }
+  .cat-deploy .category-icon { background: rgba(251, 146, 60, 0.15); color: var(--orange); }
+  .cat-deploy .skill-card::before { background: var(--orange); }
+  .cat-safety .category-icon { background: rgba(248, 113, 113, 0.15); color: var(--red); }
+  .cat-safety .skill-card::before { background: var(--red); }
+  .cat-docs .category-icon { background: rgba(34, 211, 238, 0.15); color: var(--cyan); }
+  .cat-docs .skill-card::before { background: var(--cyan); }
+  .cat-team .category-icon { background: rgba(244, 114, 182, 0.15); color: var(--rose); }
+  .cat-team .skill-card::before { background: var(--rose); }
+  .cat-infra .category-icon { background: rgba(251, 191, 36, 0.15); color: var(--amber); }
+  .cat-infra .skill-card::before { background: var(--amber); }
+  .cat-util .category-icon { background: rgba(167, 139, 250, 0.15); color: var(--purple); }
+  .cat-util .skill-card::before { background: var(--purple); }
+
+  /* Workflow */
+  .workflow {
+    max-width: 1200px;
+    margin: 0 auto 80px;
+    padding: 0 24px;
+  }
+  .workflow h2 {
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 32px;
+  }
+  .pipeline {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: 12px;
+  }
+  .pipe-stage {
+    flex: 1;
+    min-width: 140px;
+    padding: 20px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    text-align: center;
+    position: relative;
+  }
+  .pipe-stage:first-child { border-radius: 14px 0 0 14px; }
+  .pipe-stage:last-child { border-radius: 0 14px 14px 0; }
+  .pipe-stage:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: -1px; top: 50%; transform: translateY(-50%);
+    width: 0; height: 0;
+    border-top: 12px solid transparent;
+    border-bottom: 12px solid transparent;
+    border-left: 12px solid var(--border);
+    z-index: 1;
+  }
+  .pipe-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .pipe-cmds {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+  }
+  .pipe-cmd {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--accent);
+  }
+
+  footer {
+    text-align: center;
+    padding: 40px 24px;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 768px) {
+    .hero h1 { font-size: 2rem; }
+    .skill-grid { grid-template-columns: 1fr; }
+    .stat-bar { gap: 24px; }
+    .pipeline { flex-direction: column; }
+    .pipe-stage { border-radius: 0 !important; }
+    .pipe-stage:first-child { border-radius: 14px 14px 0 0 !important; }
+    .pipe-stage:last-child { border-radius: 0 0 14px 14px !important; }
+    .pipe-stage::after { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <h1>gstack Skills</h1>
+  <p>AI-powered development workflow toolkit. 28 skills covering the full lifecycle from idea to production.</p>
+  <div class="stat-bar">
+    <div class="stat"><div class="stat-num">28</div><div class="stat-label">Skills</div></div>
+    <div class="stat"><div class="stat-num">9</div><div class="stat-label">Categories</div></div>
+    <div class="stat"><div class="stat-num">~100ms</div><div class="stat-label">Browse Speed</div></div>
+  </div>
+</section>
+
+<div class="filter-bar">
+  <button class="filter-btn active" onclick="filterBy('all')">All</button>
+  <button class="filter-btn" onclick="filterBy('qa')">Browser & QA</button>
+  <button class="filter-btn" onclick="filterBy('plan')">Planning & Review</button>
+  <button class="filter-btn" onclick="filterBy('code')">Code Workflow</button>
+  <button class="filter-btn" onclick="filterBy('deploy')">Deployment</button>
+  <button class="filter-btn" onclick="filterBy('safety')">Safety</button>
+  <button class="filter-btn" onclick="filterBy('docs')">Documentation</button>
+  <button class="filter-btn" onclick="filterBy('team')">Team</button>
+  <button class="filter-btn" onclick="filterBy('infra')">Security & AI</button>
+  <button class="filter-btn" onclick="filterBy('util')">Utility</button>
+</div>
+
+<section class="categories">
+
+  <!-- Browser & QA -->
+  <div class="category cat-qa" data-cat="qa">
+    <div class="category-header">
+      <div class="category-icon">&#x1F50D;</div>
+      <h2>Browser & QA</h2>
+      <span class="category-count">8 skills</span>
+    </div>
+    <div class="skill-grid">
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">browse</div>
+          <div class="skill-cmd">/browse</div>
+        </div>
+        <div class="skill-desc">Fast headless Chromium browser. Navigate, click, fill forms, take screenshots, verify state. Persistent sessions with ~100ms per command.</div>
+        <div class="skill-features">
+          <span class="feature-tag">goto</span>
+          <span class="feature-tag">click</span>
+          <span class="feature-tag">fill</span>
+          <span class="feature-tag">snapshot</span>
+          <span class="feature-tag">screenshot</span>
+          <span class="feature-tag">console</span>
+          <span class="feature-tag">network</span>
+        </div>
+        <div class="skill-usage">Core browser commands: <code>$B goto &lt;url&gt;</code>, <code>$B click "Button"</code>, <code>$B snapshot</code></div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">gstack</div>
+          <div class="skill-cmd">/gstack</div>
+        </div>
+        <div class="skill-desc">Full-featured QA testing & site dogfooding. Navigate pages, interact with elements, diff before/after, test responsive layouts, forms, uploads, and dialogs.</div>
+        <div class="skill-features">
+          <span class="feature-tag">snapshots</span>
+          <span class="feature-tag">diffs</span>
+          <span class="feature-tag">annotations</span>
+          <span class="feature-tag">responsive</span>
+          <span class="feature-tag">assertions</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/gstack</code> then interact with the browser session</div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">QA Test & Fix</div>
+          <div class="skill-cmd">/qa</div>
+        </div>
+        <div class="skill-desc">Systematically QA test a web app, then iteratively fix each bug with atomic commits and re-verification. Three tiers: quick, standard, exhaustive.</div>
+        <div class="skill-features">
+          <span class="feature-tag">3 tiers</span>
+          <span class="feature-tag">auto-fix</span>
+          <span class="feature-tag">atomic commits</span>
+          <span class="feature-tag">health scores</span>
+          <span class="feature-tag">diff-aware</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/qa</code>, <code>/qa --quick</code>, or <code>/qa --exhaustive</code></div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">QA Report Only</div>
+          <div class="skill-cmd">/qa-only</div>
+        </div>
+        <div class="skill-desc">Structured QA report with health scores, screenshots, and repro steps. No code changes -- report only mode for auditing.</div>
+        <div class="skill-features">
+          <span class="feature-tag">report-only</span>
+          <span class="feature-tag">baseline</span>
+          <span class="feature-tag">regression mode</span>
+          <span class="feature-tag">screenshots</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/qa-only</code> or <code>/qa-only --regression</code></div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Benchmark</div>
+          <div class="skill-cmd">/benchmark</div>
+        </div>
+        <div class="skill-desc">Performance regression detection. Establishes baselines for page load times, Core Web Vitals, resource sizes. Compare before/after on PRs.</div>
+        <div class="skill-features">
+          <span class="feature-tag">TTFB</span>
+          <span class="feature-tag">FCP</span>
+          <span class="feature-tag">LCP</span>
+          <span class="feature-tag">budgets</span>
+          <span class="feature-tag">trends</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/benchmark &lt;url&gt;</code></div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Canary Monitor</div>
+          <div class="skill-cmd">/canary</div>
+        </div>
+        <div class="skill-desc">Post-deploy visual monitoring. Watches for console errors, performance regressions, page failures. Periodic screenshots with baseline comparison.</div>
+        <div class="skill-features">
+          <span class="feature-tag">post-deploy</span>
+          <span class="feature-tag">console errors</span>
+          <span class="feature-tag">perf regression</span>
+          <span class="feature-tag">alerts</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/canary &lt;url&gt;</code></div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Design Review</div>
+          <div class="skill-cmd">/design-review</div>
+        </div>
+        <div class="skill-desc">Designer's eye QA for live sites. Finds visual inconsistency, spacing issues, hierarchy problems, and AI slop. Iteratively fixes with before/after screenshots.</div>
+        <div class="skill-features">
+          <span class="feature-tag">visual audit</span>
+          <span class="feature-tag">auto-fix</span>
+          <span class="feature-tag">before/after</span>
+          <span class="feature-tag">AI slop detection</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/design-review</code> or <code>/design-review &lt;url&gt;</code></div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Setup Cookies</div>
+          <div class="skill-cmd">/setup-browser-cookies</div>
+        </div>
+        <div class="skill-desc">Import cookies from your real browser into the headless browse session. Interactive domain picker for testing authenticated pages.</div>
+        <div class="skill-features">
+          <span class="feature-tag">Chrome import</span>
+          <span class="feature-tag">domain picker</span>
+          <span class="feature-tag">keychain</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/setup-browser-cookies</code> or <code>/setup-browser-cookies &lt;domain&gt;</code></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Planning & Review -->
+  <div class="category cat-plan" data-cat="plan">
+    <div class="category-header">
+      <div class="category-icon">&#x1F4CB;</div>
+      <h2>Planning & Review</h2>
+      <span class="category-count">5 skills</span>
+    </div>
+    <div class="skill-grid">
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">CEO Review</div>
+          <div class="skill-cmd">/plan-ceo-review</div>
+        </div>
+        <div class="skill-desc">Founder-mode plan review. Rethink the problem, find the 10-star product, challenge premises, expand scope. Four modes from expansion to reduction.</div>
+        <div class="skill-features">
+          <span class="feature-tag">4 scope modes</span>
+          <span class="feature-tag">17 patterns</span>
+          <span class="feature-tag">dual voice</span>
+          <span class="feature-tag">dream state</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/plan-ceo-review</code> -- requires a plan file in plan mode</div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Design Plan Review</div>
+          <div class="skill-cmd">/plan-design-review</div>
+        </div>
+        <div class="skill-desc">Designer's eye on your plan. Rates 7 design dimensions 0-10, explains what would make each a 10, then fixes the plan. AI slop risk assessment.</div>
+        <div class="skill-features">
+          <span class="feature-tag">7 dimensions</span>
+          <span class="feature-tag">12 patterns</span>
+          <span class="feature-tag">scorecard</span>
+          <span class="feature-tag">AI slop risk</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/plan-design-review</code> -- works in plan mode</div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Eng Review</div>
+          <div class="skill-cmd">/plan-eng-review</div>
+        </div>
+        <div class="skill-desc">Lock in the execution plan. Architecture, data flow, edge cases, test coverage, performance. Interactive walk-through with opinionated recommendations.</div>
+        <div class="skill-features">
+          <span class="feature-tag">15 patterns</span>
+          <span class="feature-tag">architecture</span>
+          <span class="feature-tag">test diagram</span>
+          <span class="feature-tag">failure modes</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/plan-eng-review</code> -- requires a plan file</div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Auto-Review Pipeline</div>
+          <div class="skill-cmd">/autoplan</div>
+        </div>
+        <div class="skill-desc">Runs CEO + Design + Eng reviews sequentially with 6 decision principles. Full review pipeline with auto-decisions. One command, fully reviewed plan.</div>
+        <div class="skill-features">
+          <span class="feature-tag">triple review</span>
+          <span class="feature-tag">6 principles</span>
+          <span class="feature-tag">auto-decide</span>
+          <span class="feature-tag">approval gate</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/autoplan</code> -- runs the full review gauntlet</div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Office Hours</div>
+          <div class="skill-cmd">/office-hours</div>
+        </div>
+        <div class="skill-desc">YC-style brainstorming. Startup mode: 6 forcing questions on demand, wedge, and user. Builder mode: design thinking for side projects and hackathons.</div>
+        <div class="skill-features">
+          <span class="feature-tag">startup mode</span>
+          <span class="feature-tag">builder mode</span>
+          <span class="feature-tag">design doc</span>
+          <span class="feature-tag">6 questions</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/office-hours</code> -- before any code is written</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Code Workflow -->
+  <div class="category cat-code" data-cat="code">
+    <div class="category-header">
+      <div class="category-icon">&#x1F4BB;</div>
+      <h2>Code Workflow</h2>
+      <span class="category-count">4 skills</span>
+    </div>
+    <div class="skill-grid">
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Ship</div>
+          <div class="skill-cmd">/ship</div>
+        </div>
+        <div class="skill-desc">Full ship workflow: merge base branch, run tests, review diff, bump VERSION, update CHANGELOG, commit, push, and create PR. Fully automated.</div>
+        <div class="skill-features">
+          <span class="feature-tag">non-interactive</span>
+          <span class="feature-tag">version bump</span>
+          <span class="feature-tag">changelog</span>
+          <span class="feature-tag">PR creation</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/ship</code> -- when code is ready to land</div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Code Review</div>
+          <div class="skill-cmd">/review</div>
+        </div>
+        <div class="skill-desc">Pre-landing PR review. Analyzes diff for SQL safety, LLM trust boundaries, conditional side effects, scope drift, and test coverage gaps.</div>
+        <div class="skill-features">
+          <span class="feature-tag">SQL safety</span>
+          <span class="feature-tag">scope drift</span>
+          <span class="feature-tag">cross-model</span>
+          <span class="feature-tag">auto-fix</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/review</code> -- before merging</div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Investigate</div>
+          <div class="skill-cmd">/investigate</div>
+        </div>
+        <div class="skill-desc">Systematic root-cause debugging. Four phases: investigate, analyze, hypothesize, implement. Iron Law: no fixes without finding the root cause first.</div>
+        <div class="skill-features">
+          <span class="feature-tag">4 phases</span>
+          <span class="feature-tag">iron law</span>
+          <span class="feature-tag">3-strike rule</span>
+          <span class="feature-tag">regression test</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/investigate</code> or describe a bug and it triggers</div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Design Consultation</div>
+          <div class="skill-cmd">/design-consultation</div>
+        </div>
+        <div class="skill-desc">Build a complete design system from scratch. Typography, colors, spacing, motion, layout. Generates DESIGN.md + font/color preview pages.</div>
+        <div class="skill-features">
+          <span class="feature-tag">design system</span>
+          <span class="feature-tag">preview pages</span>
+          <span class="feature-tag">light/dark</span>
+          <span class="feature-tag">competitive research</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/design-consultation</code> -- at project start</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Deployment -->
+  <div class="category cat-deploy" data-cat="deploy">
+    <div class="category-header">
+      <div class="category-icon">&#x1F680;</div>
+      <h2>Deployment</h2>
+      <span class="category-count">2 skills</span>
+    </div>
+    <div class="skill-grid">
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Land & Deploy</div>
+          <div class="skill-cmd">/land-and-deploy</div>
+        </div>
+        <div class="skill-desc">Merge PR, wait for CI and deploy, verify production health via canary. Pre-merge readiness gate with review staleness check. Revert escape hatch.</div>
+        <div class="skill-features">
+          <span class="feature-tag">merge</span>
+          <span class="feature-tag">CI polling</span>
+          <span class="feature-tag">canary verify</span>
+          <span class="feature-tag">revert hatch</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/land-and-deploy</code> or <code>/land-and-deploy &lt;pr#&gt;</code></div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Setup Deploy</div>
+          <div class="skill-cmd">/setup-deploy</div>
+        </div>
+        <div class="skill-desc">One-time deployment configuration. Detects your platform (Fly.io, Render, Vercel, Netlify, Heroku), URLs, health checks. Writes config to CLAUDE.md.</div>
+        <div class="skill-features">
+          <span class="feature-tag">auto-detect</span>
+          <span class="feature-tag">6 platforms</span>
+          <span class="feature-tag">health checks</span>
+          <span class="feature-tag">CLAUDE.md</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/setup-deploy</code> -- run once per project</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Safety -->
+  <div class="category cat-safety" data-cat="safety">
+    <div class="category-header">
+      <div class="category-icon">&#x1F6E1;</div>
+      <h2>Safety & Guardrails</h2>
+      <span class="category-count">4 skills</span>
+    </div>
+    <div class="skill-grid">
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Guard</div>
+          <div class="skill-cmd">/guard</div>
+        </div>
+        <div class="skill-desc">Full safety mode. Combines destructive command warnings with directory-scoped edit restrictions. Maximum protection for prod environments.</div>
+        <div class="skill-features">
+          <span class="feature-tag">dual protection</span>
+          <span class="feature-tag">warnings + boundaries</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/guard</code> -- combines /careful + /freeze</div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Careful</div>
+          <div class="skill-cmd">/careful</div>
+        </div>
+        <div class="skill-desc">Warns before destructive commands: rm -rf, DROP TABLE, force-push, git reset --hard, kubectl delete. User can override each warning.</div>
+        <div class="skill-features">
+          <span class="feature-tag">hook-based</span>
+          <span class="feature-tag">overridable</span>
+          <span class="feature-tag">safe exceptions</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/careful</code> -- session-scoped</div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Freeze</div>
+          <div class="skill-cmd">/freeze</div>
+        </div>
+        <div class="skill-desc">Lock file edits to a specific directory. Prevents accidental changes to unrelated code during debugging or scoped work.</div>
+        <div class="skill-features">
+          <span class="feature-tag">directory scope</span>
+          <span class="feature-tag">session-scoped</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/freeze src/components/</code></div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Unfreeze</div>
+          <div class="skill-cmd">/unfreeze</div>
+        </div>
+        <div class="skill-desc">Clear the freeze boundary, allowing edits to all directories again. Non-destructive -- can re-freeze anytime.</div>
+        <div class="skill-features">
+          <span class="feature-tag">clear boundary</span>
+          <span class="feature-tag">re-freezable</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/unfreeze</code></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Documentation -->
+  <div class="category cat-docs" data-cat="docs">
+    <div class="category-header">
+      <div class="category-icon">&#x1F4DD;</div>
+      <h2>Documentation</h2>
+      <span class="category-count">1 skill</span>
+    </div>
+    <div class="skill-grid">
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Document Release</div>
+          <div class="skill-cmd">/document-release</div>
+        </div>
+        <div class="skill-desc">Post-ship documentation sync. Updates README, ARCHITECTURE, CONTRIBUTING, CLAUDE.md to match what shipped. Polishes CHANGELOG voice, cleans TODOS.</div>
+        <div class="skill-features">
+          <span class="feature-tag">auto-update</span>
+          <span class="feature-tag">changelog polish</span>
+          <span class="feature-tag">cross-doc sync</span>
+          <span class="feature-tag">discoverability</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/document-release</code> -- after shipping</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Team -->
+  <div class="category cat-team" data-cat="team">
+    <div class="category-header">
+      <div class="category-icon">&#x1F465;</div>
+      <h2>Team & Retrospective</h2>
+      <span class="category-count">1 skill</span>
+    </div>
+    <div class="skill-grid">
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Retrospective</div>
+          <div class="skill-cmd">/retro</div>
+        </div>
+        <div class="skill-desc">Weekly engineering retro. Analyzes commits, work patterns, and code quality. Team-aware with per-person breakdowns, praise, and growth areas. Trend tracking.</div>
+        <div class="skill-features">
+          <span class="feature-tag">time windows</span>
+          <span class="feature-tag">compare mode</span>
+          <span class="feature-tag">global mode</span>
+          <span class="feature-tag">hotspots</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/retro</code>, <code>/retro 14d</code>, or <code>/retro global</code></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Security & AI -->
+  <div class="category cat-infra" data-cat="infra">
+    <div class="category-header">
+      <div class="category-icon">&#x1F512;</div>
+      <h2>Security & AI</h2>
+      <span class="category-count">2 skills</span>
+    </div>
+    <div class="skill-grid">
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">CSO Security Audit</div>
+          <div class="skill-cmd">/cso</div>
+        </div>
+        <div class="skill-desc">Infrastructure-first security audit. Secrets archaeology, dependency supply chain, CI/CD pipeline, LLM security, OWASP Top 10, STRIDE threat modeling.</div>
+        <div class="skill-features">
+          <span class="feature-tag">14 phases</span>
+          <span class="feature-tag">OWASP</span>
+          <span class="feature-tag">STRIDE</span>
+          <span class="feature-tag">daily + comprehensive</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/cso</code> or <code>/cso --comprehensive</code></div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Codex Second Opinion</div>
+          <div class="skill-cmd">/codex</div>
+        </div>
+        <div class="skill-desc">OpenAI Codex CLI wrapper. Three modes: review (pass/fail gate), challenge (adversarial, try to break your code), consult (freeform with session continuity).</div>
+        <div class="skill-features">
+          <span class="feature-tag">review</span>
+          <span class="feature-tag">challenge</span>
+          <span class="feature-tag">consult</span>
+          <span class="feature-tag">reasoning traces</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/codex review</code>, <code>/codex challenge</code>, or <code>/codex &lt;question&gt;</code></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Utility -->
+  <div class="category cat-util" data-cat="util">
+    <div class="category-header">
+      <div class="category-icon">&#x2699;</div>
+      <h2>Utility</h2>
+      <span class="category-count">1 skill</span>
+    </div>
+    <div class="skill-grid">
+
+      <div class="skill-card">
+        <div class="skill-top">
+          <div class="skill-name">Upgrade gstack</div>
+          <div class="skill-cmd">/gstack-upgrade</div>
+        </div>
+        <div class="skill-desc">Upgrade gstack to the latest version. Detects global vs vendored install, syncs local copies, shows what's new in the changelog.</div>
+        <div class="skill-features">
+          <span class="feature-tag">auto-detect</span>
+          <span class="feature-tag">vendored sync</span>
+          <span class="feature-tag">changelog</span>
+        </div>
+        <div class="skill-usage">Usage: <code>/gstack-upgrade</code></div>
+      </div>
+
+    </div>
+  </div>
+
+</section>
+
+<!-- Workflow Pipeline -->
+<section class="workflow">
+  <h2>Typical Workflow</h2>
+  <div class="pipeline">
+    <div class="pipe-stage">
+      <div class="pipe-label">Brainstorm</div>
+      <div class="pipe-cmds">
+        <span class="pipe-cmd">/office-hours</span>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-label">Plan</div>
+      <div class="pipe-cmds">
+        <span class="pipe-cmd">/plan-ceo-review</span>
+        <span class="pipe-cmd">/plan-design-review</span>
+        <span class="pipe-cmd">/plan-eng-review</span>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-label">Design</div>
+      <div class="pipe-cmds">
+        <span class="pipe-cmd">/design-consultation</span>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-label">Build & Debug</div>
+      <div class="pipe-cmds">
+        <span class="pipe-cmd">/investigate</span>
+        <span class="pipe-cmd">/freeze</span>
+        <span class="pipe-cmd">/careful</span>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-label">Test</div>
+      <div class="pipe-cmds">
+        <span class="pipe-cmd">/qa</span>
+        <span class="pipe-cmd">/benchmark</span>
+        <span class="pipe-cmd">/design-review</span>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-label">Review</div>
+      <div class="pipe-cmds">
+        <span class="pipe-cmd">/review</span>
+        <span class="pipe-cmd">/codex review</span>
+        <span class="pipe-cmd">/cso</span>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-label">Ship</div>
+      <div class="pipe-cmds">
+        <span class="pipe-cmd">/ship</span>
+        <span class="pipe-cmd">/land-and-deploy</span>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-label">Monitor</div>
+      <div class="pipe-cmds">
+        <span class="pipe-cmd">/canary</span>
+        <span class="pipe-cmd">/document-release</span>
+        <span class="pipe-cmd">/retro</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  gstack &mdash; AI-powered development workflow toolkit
+</footer>
+
+<script>
+function filterBy(cat) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+
+  document.querySelectorAll('.category').forEach(c => {
+    if (cat === 'all' || c.dataset.cat === cat) {
+      c.style.display = '';
+    } else {
+      c.style.display = 'none';
+    }
+  });
+}
+</script>
+
+</body>
+</html>

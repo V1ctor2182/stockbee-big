@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-5-风格因子定义"
+      name: "5 风格因子定义"
+      status: pending
+      completed_at: null
+    - id: "m2-利率风格映射"
+      name: "利率风格映射"
+      status: pending
+      completed_at: null
+    - id: "m3-soft-overlay-实现"
+      name: "soft overlay 实现"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

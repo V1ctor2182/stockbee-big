@@ -1,0 +1,19 @@
+spec_id: "constraint-01-universe-mgmt-001"
+type: constraint
+state: draft
+intent:
+  summary: "覆盖 11 大 GICS 行业"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "PRD §3.1"
+relations: []
+anchors: []

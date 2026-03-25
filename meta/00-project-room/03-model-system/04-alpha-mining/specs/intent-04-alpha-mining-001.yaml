@@ -1,0 +1,23 @@
+spec_id: "intent-04-alpha-mining-001"
+type: intent
+state: draft
+intent:
+  summary: "Alpha158/360 基线因子集，IC/ICIR 评估，动态加权"
+  detail: |
+    基于 Qlib 的 Alpha158 标准因子集。60 天滚动 IC/ICIR 评估，ICIR < 0 的因子自动禁用/降权。
+
+来源：Tech Design §2.5
+研究状态：研究完成 (qlib因子挖掘和量化模型.md)
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

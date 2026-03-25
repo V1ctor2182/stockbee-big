@@ -1,0 +1,22 @@
+spec_id: "intent-03-tiered-actions-001"
+type: intent
+state: draft
+intent:
+  summary: "Tier-1 自动执行 / Tier-2 待审批 / Tier-3 观察"
+  detail: |
+    Tier-1：分数 > 85 自动 ±5% 权重微调。Tier-2：分数 60-85 推送审批。Tier-3：记录不触发。
+
+来源：Tech Design §5.2, Feature Hierarchy §7.3
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

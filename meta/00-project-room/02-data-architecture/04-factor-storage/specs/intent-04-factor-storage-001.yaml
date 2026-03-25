@@ -1,0 +1,23 @@
+spec_id: "intent-04-factor-storage-001"
+type: intent
+state: draft
+intent:
+  summary: "表达式引擎（技术因子）+ Parquet 预计算（融合因子）"
+  detail: |
+    Alpha158 技术因子用表达式引擎动态计算，灵活度高。基本面/情绪/ML 因子预计算存 Parquet。
+
+来源：Tech Design §2.5
+研究状态：研究完成 (research-factor-storage.md)
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-API-配额监控"
+      name: "API 配额监控"
+      status: pending
+      completed_at: null
+    - id: "m2-LLM-成本追踪"
+      name: "LLM 成本追踪"
+      status: pending
+      completed_at: null
+    - id: "m3-交易数统计"
+      name: "交易数统计"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

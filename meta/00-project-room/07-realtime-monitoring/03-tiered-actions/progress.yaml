@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-Tier-1-自动执行"
+      name: "Tier-1 自动执行"
+      status: pending
+      completed_at: null
+    - id: "m2-Tier-2-审批推送"
+      name: "Tier-2 审批推送"
+      status: pending
+      completed_at: null
+    - id: "m3-Tier-3-观察记录"
+      name: "Tier-3 观察记录"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

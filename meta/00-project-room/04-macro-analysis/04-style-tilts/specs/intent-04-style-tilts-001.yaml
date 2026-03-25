@@ -1,0 +1,23 @@
+spec_id: "intent-04-style-tilts-001"
+type: intent
+state: draft
+intent:
+  summary: "价值/增长/质量/动量/波动性风格因子倾斜"
+  detail: |
+    利率高→倾斜价值（+3%），反之→倾斜成长。作为 soft overlay 施加在 RL Agent 原始选股上。
+
+来源：Feature Hierarchy §4.4, Tech Design §3.5
+研究状态：待研究
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

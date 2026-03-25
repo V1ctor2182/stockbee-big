@@ -1,0 +1,23 @@
+spec_id: "intent-03-xgboost-fusion-001"
+type: intent
+state: draft
+intent:
+  summary: "多因子 XGBoost 评分模型，动态因子权重"
+  detail: |
+    输入 6-8 个预计算因子，输出综合评分。相比等权提升 Sharpe 约 5-10%。
+
+来源：Feature Hierarchy §5.3
+研究状态：待开发
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

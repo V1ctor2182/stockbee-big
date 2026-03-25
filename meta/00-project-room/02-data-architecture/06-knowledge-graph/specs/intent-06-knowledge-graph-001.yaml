@@ -1,0 +1,25 @@
+spec_id: "intent-06-knowledge-graph-001"
+type: intent
+state: draft
+intent:
+  summary: "两层传播图（宏观指标图 + 公司关系图），事件沿图谱传播生成信号"
+  detail: |
+    宏观图：~30 节点、~70 有向边，Z-score > 1.0 触发传播，3 层衰减。
+公司图：U100 的 100 节点、~500 边（供应链/竞争/同行业/母子/合作）。
+Phase 1：静态图可查询。Phase 2：传播引擎上线。
+
+来源：Tech Design §2.7
+研究状态：研究完成 (research-knowledge-graph-20260324.md)
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

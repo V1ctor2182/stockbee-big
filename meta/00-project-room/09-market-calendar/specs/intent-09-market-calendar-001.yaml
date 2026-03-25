@@ -1,0 +1,20 @@
+spec_id: "intent-09-market-calendar-001"
+type: intent
+state: draft
+intent:
+  summary: "美股交易会话管理 + 假期检测与调仓调整"
+  detail: |
+    来源：PRD §3.8, Feature Hierarchy §9
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

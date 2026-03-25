@@ -1,0 +1,20 @@
+spec_id: "intent-11-info-sources-memory-001"
+type: intent
+state: draft
+intent:
+  summary: "多源信息整合 + 决策历史存储 + 分析师报告爬取"
+  detail: |
+    来源：Feature Hierarchy §11
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

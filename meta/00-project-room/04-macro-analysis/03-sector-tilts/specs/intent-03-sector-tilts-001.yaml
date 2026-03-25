@@ -1,0 +1,23 @@
+spec_id: "intent-03-sector-tilts-001"
+type: intent
+state: draft
+intent:
+  summary: "11 个 GICS 行业动态加权"
+  detail: |
+    行业对宏观指标的敏感度矩阵（预训练，存于 SQLite）。如能源对油价敏感度 0.8。±3% 权重调整。
+
+来源：Feature Hierarchy §4.3, Tech Design §3.5
+研究状态：待研究
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

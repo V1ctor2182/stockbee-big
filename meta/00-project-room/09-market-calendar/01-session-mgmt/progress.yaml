@@ -1,0 +1,16 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-四种会话状态检测"
+      name: "四种会话状态检测"
+      status: pending
+      completed_at: null
+    - id: "m2-自动状态转移"
+      name: "自动状态转移"
+      status: pending
+      completed_at: null
+    - id: "m3-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

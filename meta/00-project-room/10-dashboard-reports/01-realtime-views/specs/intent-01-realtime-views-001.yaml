@@ -1,0 +1,20 @@
+spec_id: "intent-01-realtime-views-001"
+type: intent
+state: draft
+intent:
+  summary: "持仓、beta、新闻队列、信号展示"
+  detail: |
+    来源：Feature Hierarchy §10.1
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

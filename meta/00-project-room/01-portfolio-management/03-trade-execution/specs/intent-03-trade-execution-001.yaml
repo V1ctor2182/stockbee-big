@@ -1,0 +1,22 @@
+spec_id: "intent-03-trade-execution-001"
+type: intent
+state: draft
+intent:
+  summary: "通过 Alpaca API 执行交易，幂等订单，完整日志"
+  detail: |
+    周度再平衡：周一开盘市价单。实时信号：Tier-1 立即执行，Tier-2 待命。每笔交易记录完整理由。
+
+来源：PRD §3.1, Tech Design §6.1
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

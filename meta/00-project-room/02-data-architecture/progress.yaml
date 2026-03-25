@@ -1,0 +1,24 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-Provider-架构"
+      name: "Provider 架构"
+      status: pending
+      completed_at: null
+    - id: "m2-股票新闻宏观存储"
+      name: "股票+新闻+宏观存储"
+      status: pending
+      completed_at: null
+    - id: "m3-因子存储"
+      name: "因子存储"
+      status: pending
+      completed_at: null
+    - id: "m4-知识图谱"
+      name: "知识图谱"
+      status: pending
+      completed_at: null
+    - id: "m5-集成测试"
+      name: "集成测试"
+      status: pending
+      completed_at: null
+  commits: []

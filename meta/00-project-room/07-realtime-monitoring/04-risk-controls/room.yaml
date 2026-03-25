@@ -1,0 +1,15 @@
+room:
+  id: "04-risk-controls"
+  name: "风险控制"
+  parent: "07-realtime-monitoring"
+  type: feature
+  lifecycle: planning
+  priority: P1
+  phase: "1"
+  created_at: "2026-03-24"
+  updated_at: "2026-03-24"
+  prompt_test:
+    passable: false
+    last_tested: null
+    token_count: null
+  depends_on: ['01-portfolio-management/02-portfolio-construction']

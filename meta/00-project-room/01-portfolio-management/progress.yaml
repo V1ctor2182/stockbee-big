@@ -1,0 +1,24 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-宇宙管理完成"
+      name: "宇宙管理完成"
+      status: pending
+      completed_at: null
+    - id: "m2-组合构建算法"
+      name: "组合构建算法"
+      status: pending
+      completed_at: null
+    - id: "m3-交易执行集成"
+      name: "交易执行集成"
+      status: pending
+      completed_at: null
+    - id: "m4-做空模式"
+      name: "做空模式"
+      status: pending
+      completed_at: null
+    - id: "m5-集成测试"
+      name: "集成测试"
+      status: pending
+      completed_at: null
+  commits: []

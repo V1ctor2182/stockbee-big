@@ -1,0 +1,23 @@
+spec_id: "intent-01-macro-sources-001"
+type: intent
+state: draft
+intent:
+  summary: "FRED API + BLS + 美联储 RSS 数据采集"
+  detail: |
+    通过 MacroProvider 采集 19 个 FRED 指标，日度更新。央行语调分析覆盖 FOMC 声明。
+
+来源：Feature Hierarchy §4.1
+研究状态：研究完成 (research-macro-features.md)
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

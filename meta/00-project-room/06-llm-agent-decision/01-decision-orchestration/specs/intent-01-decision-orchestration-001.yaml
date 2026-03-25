@@ -1,0 +1,22 @@
+spec_id: "intent-01-decision-orchestration-001"
+type: intent
+state: draft
+intent:
+  summary: "信号整合 → 构建 prompt → 调用 LLM → 输出交易建议"
+  detail: |
+    整合因子评分、新闻分析、图谱传播等信号，构建决策 prompt，LLM 输出结构化交易建议。
+
+来源：Feature Hierarchy §6.1
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

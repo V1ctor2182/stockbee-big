@@ -1,0 +1,22 @@
+spec_id: "intent-05-factor-scoring-001"
+type: intent
+state: draft
+intent:
+  summary: "多因子评分系统，动态加权，IC/ICIR 滚动评估"
+  detail: |
+    覆盖价格动量、质量、价值、情绪、宏观 Beta 五大类。60 天滚动 IC/ICIR，自动调整因子权重。
+
+来源：PRD §3.6, Feature Hierarchy §5
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

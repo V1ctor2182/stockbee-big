@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-多因子融合"
+      name: "多因子融合"
+      status: pending
+      completed_at: null
+    - id: "m2-IC-IR-评估"
+      name: "IC/IR 评估"
+      status: pending
+      completed_at: null
+    - id: "m3-XGBoost-融合"
+      name: "XGBoost 融合"
+      status: pending
+      completed_at: null
+    - id: "m4-集成测试"
+      name: "集成测试"
+      status: pending
+      completed_at: null
+  commits: []

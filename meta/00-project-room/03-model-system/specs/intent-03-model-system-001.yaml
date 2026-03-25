@@ -1,0 +1,22 @@
+spec_id: "intent-03-model-system-001"
+type: intent
+state: draft
+intent:
+  summary: "LLM 多模型路由 + 小模型本地部署 + RL 选股/权重优化"
+  detail: |
+    分离式多模型设计。LLM 路由降低成本到 <$15/月。小模型本地 GPU 推理。RL 双阶段：DQN 选股 + PPO/SAC 权重。
+
+来源：PRD §3.3, Tech Design §3
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

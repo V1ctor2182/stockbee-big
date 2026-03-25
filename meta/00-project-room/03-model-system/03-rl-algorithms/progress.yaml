@@ -1,0 +1,28 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-Gymnasium-环境定义"
+      name: "Gymnasium 环境定义"
+      status: pending
+      completed_at: null
+    - id: "m2-DQN-选股网络"
+      name: "DQN 选股网络"
+      status: pending
+      completed_at: null
+    - id: "m3-PPO-权重网络"
+      name: "PPO 权重网络"
+      status: pending
+      completed_at: null
+    - id: "m4-Walk-forward-验证"
+      name: "Walk-forward 验证"
+      status: pending
+      completed_at: null
+    - id: "m5-训练调度"
+      name: "训练调度"
+      status: pending
+      completed_at: null
+    - id: "m6-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

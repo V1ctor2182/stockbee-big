@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-ATR-尾随止损"
+      name: "ATR 尾随止损"
+      status: pending
+      completed_at: null
+    - id: "m2-加速冷却期"
+      name: "加速冷却期"
+      status: pending
+      completed_at: null
+    - id: "m3-头寸限制检查"
+      name: "头寸限制检查"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

@@ -1,0 +1,19 @@
+spec_id: "constraint-00-project-room-001"
+type: constraint
+state: draft
+intent:
+  summary: "月度总运营成本 < $200"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "PRD §4 非功能需求"
+relations: []
+anchors: []

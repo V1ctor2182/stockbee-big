@@ -1,0 +1,115 @@
+tree:
+  root: "00-project-room"
+  generated_at: "2026-03-24"
+  updated_at: "2026-03-24"
+  total_rooms: 49
+
+  rooms:
+    - id: "00-project-room"
+      type: project
+      children:
+        - id: "01-portfolio-management"
+          type: epic
+          priority: P0
+          phase: 1
+          children:
+            - { id: "01-universe-mgmt", type: feature, priority: P0, phase: 1, status: "待开发" }
+            - { id: "02-portfolio-construction", type: feature, priority: P0, phase: 1, status: "待研究" }
+            - { id: "03-trade-execution", type: feature, priority: P0, phase: 1, status: "待开发" }
+            - { id: "04-short-mode", type: feature, priority: P0, phase: 1, status: "待开发" }
+
+        - id: "02-data-architecture"
+          type: epic
+          priority: P0
+          phase: 1
+          children:
+            - { id: "01-stock-data", type: feature, priority: P0, phase: 1, status: "研究完成" }
+            - { id: "02-news-data", type: feature, priority: P0, phase: 1, status: "研究完成" }
+            - { id: "03-macro-data", type: feature, priority: P0, phase: 1, status: "研究完成" }
+            - { id: "04-factor-storage", type: feature, priority: P0, phase: 1, status: "研究完成" }
+            - { id: "05-experience-buffer", type: feature, priority: P0, phase: 2, status: "研究完成" }
+            - { id: "06-knowledge-graph", type: feature, priority: P0, phase: "1-2", status: "研究完成" }
+            - { id: "07-provider-arch", type: feature, priority: P0, phase: 1, status: "研究完成" }
+
+        - id: "03-model-system"
+          type: epic
+          priority: P0
+          phase: "1-2"
+          children:
+            - { id: "01-llm-routing", type: feature, priority: P0, phase: 1, status: "研究完成" }
+            - { id: "02-small-models", type: feature, priority: P0, phase: 1, status: "研究完成" }
+            - { id: "03-rl-algorithms", type: feature, priority: P0, phase: 2, status: "待研究" }
+            - { id: "04-alpha-mining", type: feature, priority: P0, phase: 1, status: "研究完成" }
+
+        - id: "04-macro-analysis"
+          type: epic
+          priority: P0
+          phase: 1
+          children:
+            - { id: "01-macro-sources", type: feature, priority: P0, phase: 1, status: "研究完成" }
+            - { id: "02-macro-scoring", type: feature, priority: P0, phase: 1, status: "待研究" }
+            - { id: "03-sector-tilts", type: feature, priority: P0, phase: 1, status: "待研究" }
+            - { id: "04-style-tilts", type: feature, priority: P0, phase: 1, status: "待研究" }
+
+        - id: "05-factor-scoring"
+          type: epic
+          priority: P1
+          phase: 1
+          children:
+            - { id: "01-multi-factor-fusion", type: feature, priority: P1, phase: 1, status: "待研究" }
+            - { id: "02-rolling-ic-ir", type: feature, priority: P1, phase: 1, status: "待研究" }
+            - { id: "03-xgboost-fusion", type: feature, priority: P1, phase: 2, status: "待开发" }
+
+        - id: "06-llm-agent-decision"
+          type: epic
+          priority: P0
+          phase: 1
+          children:
+            - { id: "01-decision-orchestration", type: feature, priority: P0, phase: 1, status: "待开发" }
+            - { id: "02-validation-layer", type: feature, priority: P0, phase: 1, status: "待开发" }
+            - { id: "03-decision-log", type: feature, priority: P0, phase: 1, status: "待开发" }
+            - { id: "04-approval-workflow", type: feature, priority: P0, phase: 1, status: "待开发" }
+
+        - id: "07-realtime-monitoring"
+          type: epic
+          priority: P1
+          phase: 2
+          children:
+            - { id: "01-rt-data-sources", type: feature, priority: P1, phase: 2, status: "待开发" }
+            - { id: "02-news-funnel", type: feature, priority: P1, phase: 2, status: "待开发" }
+            - { id: "03-tiered-actions", type: feature, priority: P1, phase: 2, status: "待开发" }
+            - { id: "04-risk-controls", type: feature, priority: P1, phase: 1, status: "待开发" }
+
+        - id: "08-budget-governance"
+          type: epic
+          priority: P1
+          phase: "1-2"
+          children:
+            - { id: "01-resource-tracking", type: feature, priority: P1, phase: 2, status: "待开发" }
+            - { id: "02-degradation", type: feature, priority: P1, phase: 2, status: "待开发" }
+
+        - id: "09-market-calendar"
+          type: epic
+          priority: P1
+          phase: 1
+          children:
+            - { id: "01-session-mgmt", type: feature, priority: P1, phase: 1, status: "待开发" }
+            - { id: "02-holiday-rebalance", type: feature, priority: P1, phase: 1, status: "待开发" }
+
+        - id: "10-dashboard-reports"
+          type: epic
+          priority: P2
+          phase: "2-3"
+          children:
+            - { id: "01-realtime-views", type: feature, priority: P2, phase: 2, status: "待开发" }
+            - { id: "02-analytics-views", type: feature, priority: P2, phase: 2, status: "待开发" }
+            - { id: "03-report-generation", type: feature, priority: P2, phase: 3, status: "待开发" }
+
+        - id: "11-info-sources-memory"
+          type: epic
+          priority: P2
+          phase: "2-3"
+          children:
+            - { id: "01-info-sources", type: feature, priority: P2, phase: 2, status: "待研究" }
+            - { id: "02-decision-history", type: feature, priority: P2, phase: 3, status: "待开发" }
+            - { id: "03-openclaw-crawler", type: feature, priority: P2, phase: 3, status: "待研究" }

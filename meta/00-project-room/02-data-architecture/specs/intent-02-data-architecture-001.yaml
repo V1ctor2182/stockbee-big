@@ -1,0 +1,22 @@
+spec_id: "intent-02-data-architecture-001"
+type: intent
+state: draft
+intent:
+  summary: "完整数据管道，覆盖行情、新闻、宏观、因子、图谱、RL 经验库"
+  detail: |
+    10 个 Provider 抽象接口，支持 backtest/live 无缝切换。Parquet + SQLite 混合存储，3 层缓存策略。全部数据 < 2GB。
+
+来源：PRD §3.2, Tech Design §2
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

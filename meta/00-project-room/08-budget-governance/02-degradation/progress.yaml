@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-三级阈值判断"
+      name: "三级阈值判断"
+      status: pending
+      completed_at: null
+    - id: "m2-自动降级执行"
+      name: "自动降级执行"
+      status: pending
+      completed_at: null
+    - id: "m3-降级通知"
+      name: "降级通知"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

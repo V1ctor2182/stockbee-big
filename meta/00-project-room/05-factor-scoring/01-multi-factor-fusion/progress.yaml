@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-五大类因子对齐"
+      name: "五大类因子对齐"
+      status: pending
+      completed_at: null
+    - id: "m2-等权融合基线"
+      name: "等权融合基线"
+      status: pending
+      completed_at: null
+    - id: "m3-100-维评分输出"
+      name: "100 维评分输出"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

@@ -1,0 +1,16 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-资源追踪"
+      name: "资源追踪"
+      status: pending
+      completed_at: null
+    - id: "m2-降级策略"
+      name: "降级策略"
+      status: pending
+      completed_at: null
+    - id: "m3-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

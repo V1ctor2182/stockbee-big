@@ -1,0 +1,24 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-19-FRED-指标采集"
+      name: "19 FRED 指标采集"
+      status: pending
+      completed_at: null
+    - id: "m2-Parquet-时间序列"
+      name: "Parquet 时间序列"
+      status: pending
+      completed_at: null
+    - id: "m3-Z-score-计算"
+      name: "Z-score 计算"
+      status: pending
+      completed_at: null
+    - id: "m4-point-in-time-对齐"
+      name: "point-in-time 对齐"
+      status: pending
+      completed_at: null
+    - id: "m5-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

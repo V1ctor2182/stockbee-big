@@ -1,0 +1,19 @@
+spec_id: "constraint-05-experience-buffer-002"
+type: constraint
+state: draft
+intent:
+  summary: "内存占用 ≈ 35MB"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "Tech Design §2.6"
+relations: []
+anchors: []

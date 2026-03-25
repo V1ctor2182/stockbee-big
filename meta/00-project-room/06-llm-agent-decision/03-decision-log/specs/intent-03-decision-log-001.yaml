@@ -1,0 +1,22 @@
+spec_id: "intent-03-decision-log-001"
+type: intent
+state: draft
+intent:
+  summary: "所有 LLM 输入/输出全记录，Decision Loop 护城河种子"
+  detail: |
+    Decision Record Schema: timestamp, market_regime, signals_snapshot, llm_input/output, decision, rationale, risk_check, outcome_1d/5d/20d。存入 SQLite decision_log 表。
+
+来源：PRD §5 护城河策略, Feature Hierarchy §6.3
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

@@ -1,0 +1,19 @@
+spec_id: "constraint-03-rl-algorithms-002"
+type: constraint
+state: draft
+intent:
+  summary: "训练硬件 RTX 3070 (8GB VRAM)"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "Tech Design §7.1"
+relations: []
+anchors: []

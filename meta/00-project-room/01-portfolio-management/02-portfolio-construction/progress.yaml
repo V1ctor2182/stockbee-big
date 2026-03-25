@@ -1,0 +1,24 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-约束优化器"
+      name: "约束优化器"
+      status: pending
+      completed_at: null
+    - id: "m2-score_final-公式实现"
+      name: "score_final 公式实现"
+      status: pending
+      completed_at: null
+    - id: "m3-Long-7Short-1-生成"
+      name: "Long 7+Short 1 生成"
+      status: pending
+      completed_at: null
+    - id: "m4-回测验证"
+      name: "回测验证"
+      status: pending
+      completed_at: null
+    - id: "m5-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

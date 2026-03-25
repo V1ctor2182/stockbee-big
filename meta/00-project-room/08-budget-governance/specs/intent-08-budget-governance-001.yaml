@@ -1,0 +1,20 @@
+spec_id: "intent-08-budget-governance-001"
+type: intent
+state: draft
+intent:
+  summary: "月度 < $200 总成本控制，四级降级策略"
+  detail: |
+    来源：PRD §3.8, Tech Design §8
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

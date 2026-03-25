@@ -1,0 +1,23 @@
+spec_id: "intent-01-multi-factor-fusion-001"
+type: intent
+state: draft
+intent:
+  summary: "价格/成交量、质量、价值、动量、情感五大类融合"
+  detail: |
+    等权或 XGBoost 非线性融合。输出 100 维综合评分供 RL 使用。
+
+来源：Feature Hierarchy §5.1
+研究状态：待研究
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

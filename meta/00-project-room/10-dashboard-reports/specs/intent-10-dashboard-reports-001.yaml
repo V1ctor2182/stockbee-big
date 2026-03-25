@@ -1,0 +1,22 @@
+spec_id: "intent-10-dashboard-reports-001"
+type: intent
+state: draft
+intent:
+  summary: "持仓 P&L、板块热力图、因子 IC 趋势、日/周/月报告"
+  detail: |
+    FastAPI + Plotly + WebSocket。
+
+来源：PRD §3.8, Feature Hierarchy §10
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

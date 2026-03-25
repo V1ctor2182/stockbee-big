@@ -1,0 +1,49 @@
+project:
+  name: "Stockbee"
+  description: "AI 驱动的美股量化交易系统，LLM Agent 编排多信号源做组合决策"
+  version: "2.1"
+  created_at: "2026-03-24"
+  updated_at: "2026-03-24"
+
+  positioning: "组合管理大脑 — Long 7 + Short 1，周度调仓"
+  target_user: "Victor（投资组合经理）及 2-3 人量化团队"
+  long_term_vision: "跑通验证后，整理为开源 AI 量化交易框架"
+  moat: "Decision Intelligence — 被动积累的 LLM 决策智能语料库"
+
+  tech_stack:
+    language: "Python 3.11+"
+    data_storage: "Parquet + SQLite (WAL)"
+    rl_framework: "SB3 (Phase 1) → ElegantRL (Phase 2)"
+    llm: "OpenAI + Anthropic + Google (多模型路由)"
+    small_models: "FinBERT + Fin-E5 + LightGBM + XGBoost"
+    knowledge_graph: "NetworkX + CSV"
+    factor_engine: "Pandas + NumExpr"
+    broker: "Alpaca API"
+    dashboard: "FastAPI + Plotly"
+    scheduler: "APScheduler + cron"
+
+  constraints:
+    monthly_cost: "<$200"
+    llm_cost: "<$15/month"
+    gpu: "RTX 3070 (8GB VRAM)"
+    storage: "<2GB data, 5GB SSD allocated"
+    availability: ">99.5% during trading hours"
+
+  phases:
+    - id: "phase-1"
+      name: "MVP"
+      target: "2026-Q2 (3-6 months)"
+      goal: "完整 Long 7+Short 1 交易流程跑通"
+    - id: "phase-2"
+      name: "增强"
+      target: "2026-Q3 (3-4 months)"
+      goal: "实时监控 + RL 升级 + 知识图谱传播"
+    - id: "phase-3"
+      name: "生产优化 + 开源"
+      target: "2026-Q4 (2-3 months)"
+      goal: "99.5% 可用性，GitHub 可公开"
+
+  source_docs:
+    - "BASIC/stockbee-prd-20260324.md"
+    - "BASIC/stockbee-feature-hierarchy-20260324.md"
+    - "BASIC/stockbee-tech-design-20260324.md"

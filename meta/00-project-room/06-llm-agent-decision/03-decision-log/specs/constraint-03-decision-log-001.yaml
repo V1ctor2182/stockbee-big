@@ -1,0 +1,19 @@
+spec_id: "constraint-03-decision-log-001"
+type: constraint
+state: draft
+intent:
+  summary: "Phase 1 积累 1000+ Decision Records"
+  detail: ""
+constraints: []
+indexing:
+  type: constraint
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.9
+  source_ref: "PRD §6"
+relations: []
+anchors: []

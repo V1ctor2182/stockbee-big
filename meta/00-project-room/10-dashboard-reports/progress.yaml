@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-实时视图"
+      name: "实时视图"
+      status: pending
+      completed_at: null
+    - id: "m2-分析视图"
+      name: "分析视图"
+      status: pending
+      completed_at: null
+    - id: "m3-报告生成"
+      name: "报告生成"
+      status: pending
+      completed_at: null
+    - id: "m4-集成测试"
+      name: "集成测试"
+      status: pending
+      completed_at: null
+  commits: []

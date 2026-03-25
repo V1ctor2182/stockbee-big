@@ -1,0 +1,23 @@
+spec_id: "intent-01-info-sources-001"
+type: intent
+state: draft
+intent:
+  summary: "NewsAPI + Perigon RSS + SEC EDGAR + Polymarket"
+  detail: |
+    Polymarket 预测市场概率作 MacroTiltEngine 补充因子。
+
+来源：Feature Hierarchy §11.1, Tech Design §4.3
+研究状态：待研究 (信息.md)
+constraints: []
+indexing:
+  type: intent
+  priority: high
+  layer: epic
+  domain: "quantitative-trading"
+  tags: []
+provenance:
+  source_type: prd_extraction
+  confidence: 0.8
+  source_ref: "PRD + Feature Hierarchy + Tech Design"
+relations: []
+anchors: []

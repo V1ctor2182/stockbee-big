@@ -1,0 +1,24 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-宏观传播图构建"
+      name: "宏观传播图构建"
+      status: pending
+      completed_at: null
+    - id: "m2-公司关系图构建"
+      name: "公司关系图构建"
+      status: pending
+      completed_at: null
+    - id: "m3-CSV-备份加载"
+      name: "CSV 备份加载"
+      status: pending
+      completed_at: null
+    - id: "m4-传播算法基础"
+      name: "传播算法基础"
+      status: pending
+      completed_at: null
+    - id: "m5-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []

@@ -1,0 +1,20 @@
+progress:
+  completion: 0.0
+  milestones:
+    - id: "m1-11-行业敏感度矩阵"
+      name: "11 行业敏感度矩阵"
+      status: pending
+      completed_at: null
+    - id: "m2-Tilt-计算逻辑"
+      name: "Tilt 计算逻辑"
+      status: pending
+      completed_at: null
+    - id: "m3-权重调整"
+      name: "权重调整"
+      status: pending
+      completed_at: null
+    - id: "m4-测试"
+      name: "测试"
+      status: pending
+      completed_at: null
+  commits: []
