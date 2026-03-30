@@ -1,22 +1,22 @@
 progress:
-  completion: 0.0
+  completion: 0.8
   milestones:
     - id: "m1-Provider-基类Registry"
       name: "Provider 基类+Registry"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-03-30"
     - id: "m2-YAML-配置切换"
       name: "YAML 配置切换"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-03-30"
     - id: "m3-3-层缓存策略"
       name: "3 层缓存策略"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-03-30"
     - id: "m4-10-个-Provider-接口"
       name: "10 个 Provider 接口"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-03-30"
     - id: "m5-测试"
       name: "测试"
       status: pending

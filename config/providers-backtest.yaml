@@ -1,0 +1,47 @@
+# Stockbee Provider 配置 — 回测环境
+# 所有 Provider 使用本地数据源（Parquet / SQLite / 本地模型）
+
+CalendarProvider:
+  implementation: LocalCalendarProvider
+  calendar_path: ${DATA_DIR:-data}/calendars/
+
+UniverseProvider:
+  implementation: SqliteUniverseProvider
+  db_path: ${DATA_DIR:-data}/universe.db
+
+MarketDataProvider:
+  implementation: ParquetMarketData
+  data_path: ${DATA_DIR:-data}/ohlcv/
+
+FactorProvider:
+  implementation: LocalFactorProvider
+  expression_config: config/factors-alpha158.yaml
+  precomputed_path: ${DATA_DIR:-data}/factors/
+
+FundamentalProvider:
+  implementation: LocalFundamentalProvider
+  data_path: ${DATA_DIR:-data}/fundamentals/
+
+NewsProvider:
+  implementation: SqliteNewsProvider
+  db_path: ${DATA_DIR:-data}/news.db
+
+MacroProvider:
+  implementation: ParquetMacroProvider
+  data_path: ${DATA_DIR:-data}/macro/
+  index_db: ${DATA_DIR:-data}/macro_index.db
+
+SentimentProvider:
+  implementation: LocalSentimentProvider
+  model_path: ${MODEL_DIR:-models}/finbert/
+
+BrokerProvider:
+  implementation: PaperBrokerProvider
+  initial_cash: 100000.0
+  commission_rate: 0.0
+
+CacheProvider:
+  implementation: DefaultCacheProvider
+  cache_dir: ${DATA_DIR:-data}/cache/
+  l1_max_size: 2048
+  l1_default_ttl: 7200

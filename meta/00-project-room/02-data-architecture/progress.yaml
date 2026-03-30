@@ -1,9 +1,9 @@
 progress:
-  completion: 0.0
+  completion: 0.11
   milestones:
     - id: "m1-Provider-架构"
       name: "Provider 架构"
-      status: pending
+      status: in_progress
       completed_at: null
     - id: "m2-股票新闻宏观存储"
       name: "股票+新闻+宏观存储"

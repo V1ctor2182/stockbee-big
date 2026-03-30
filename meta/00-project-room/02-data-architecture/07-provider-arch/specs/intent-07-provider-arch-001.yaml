@@ -1,6 +1,6 @@
 spec_id: "intent-07-provider-arch-001"
 type: intent
-state: draft
+state: active
 intent:
   summary: "10 个 Provider + Registry，支持 backtest/live 切换"
   detail: |
@@ -20,4 +20,16 @@ provenance:
   confidence: 0.8
   source_ref: "PRD + Feature Hierarchy + Tech Design"
 relations: []
-anchors: []
+anchors:
+  - file: src/stockbee/providers/base.py
+    symbols: [BaseProvider, ProviderConfig, ProviderEnv]
+  - file: src/stockbee/providers/registry.py
+    symbols: [ProviderRegistry]
+  - file: src/stockbee/providers/cache.py
+    symbols: [CacheManager, L1MemoryCache, L2ParquetCache]
+  - file: src/stockbee/providers/config.py
+    symbols: [load_env_config, load_provider_configs]
+  - file: src/stockbee/providers/interfaces.py
+    symbols: [CalendarProvider, UniverseProvider, MarketDataProvider, FactorProvider, FundamentalProvider, NewsProvider, MacroProvider, SentimentProvider, BrokerProvider, CacheProviderInterface]
+  - file: config/providers-backtest.yaml
+  - file: config/providers-live.yaml

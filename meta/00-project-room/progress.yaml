@@ -1,9 +1,9 @@
 progress:
-  completion: 0.0
+  completion: 0.02
   milestones:
     - id: "m1-Phase-1-MVP-跑通"
       name: "Phase 1 MVP 跑通"
-      status: pending
+      status: in_progress
       completed_at: null
     - id: "m2-Phase-2-增强完成"
       name: "Phase 2 增强完成"
