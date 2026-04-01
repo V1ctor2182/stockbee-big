@@ -29,7 +29,7 @@ tree:
             - { id: "04-factor-storage", type: feature, priority: P0, phase: 1, status: "研究完成" }
             - { id: "05-experience-buffer", type: feature, priority: P0, phase: 2, status: "研究完成" }
             - { id: "06-knowledge-graph", type: feature, priority: P0, phase: "1-2", status: "研究完成" }
-            - { id: "07-provider-arch", type: feature, priority: P0, phase: 1, status: "研究完成" }
+            - { id: "07-provider-arch", type: feature, priority: P0, phase: 1, status: "已完成" }
 
         - id: "03-model-system"
           type: epic

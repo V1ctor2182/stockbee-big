@@ -1,0 +1,32 @@
+spec_id: "change-07-provider-arch-20260330"
+type: change
+state: active
+intent:
+  summary: "初始实现 Provider 架构：BaseProvider + Registry + 3层缓存 + 10接口 + YAML配置"
+  detail: |
+    首次实现 07-provider-arch 的核心代码：
+
+    1. BaseProvider ABC — 统一生命周期 (initialize/shutdown/health_check)，自动注入 CacheManager
+    2. ProviderRegistry — 全局注册中心，按名称查找，支持按环境批量实例化
+    3. CacheManager — L1 LRU内存 → L2 Parquet磁盘 → L3 API fetcher，自动回填上层
+    4. ConfigLoader — 读取 providers-{env}.yaml，支持 ${ENV_VAR:-default} 环境变量替换
+    5. 10 个 Provider 抽象接口 — Calendar/Universe/MarketData/Factor/Fundamental/News/Macro/Sentiment/Broker/Cache
+    6. 回测/实盘 YAML 配置文件
+
+    所有代码通过基本 import + 功能验证测试。
+constraints: []
+indexing:
+  type: change
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: [provider, registry, cache, architecture]
+provenance:
+  source_type: commit
+  confidence: 1.0
+  source_ref: "commit by Victor, 2026-03-30"
+relations:
+  - spec_id: "intent-07-provider-arch-001"
+    relation: implements
+anchors:
+  - file: src/stockbee/providers/

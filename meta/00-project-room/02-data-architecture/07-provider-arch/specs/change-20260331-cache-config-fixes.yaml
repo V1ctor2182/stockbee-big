@@ -1,0 +1,31 @@
+spec_id: "change-07-provider-arch-20260331"
+type: change
+state: active
+intent:
+  summary: "L1 智能驱逐 + ConfigLoader 安全修复 + 67 项测试"
+  detail: |
+    1. L1MemoryCache.set() — 缓存满时优先驱逐过期条目，避免误淘汰有效热数据
+    2. load_provider_configs() — 显式 utf-8 编码 + shallow copy 防止 .pop() 污染原始 YAML dict
+    3. 新增 tests/test_provider_arch.py — 67 个测试覆盖 L1/L2/CacheManager/ConfigLoader/BaseProvider/Registry/E2E
+constraints: []
+indexing:
+  type: change
+  priority: medium
+  layer: feature
+  domain: "quantitative-trading"
+  tags: [cache, config, testing, bugfix]
+provenance:
+  source_type: commit
+  confidence: 1.0
+  source_ref: "commit by Victor, 2026-03-31"
+relations:
+  - spec_id: "intent-07-provider-arch-001"
+    relation: implements
+  - spec_id: "change-07-provider-arch-20260330"
+    relation: follows
+anchors:
+  - file: src/stockbee/providers/cache.py
+    symbols: [L1MemoryCache]
+  - file: src/stockbee/providers/config.py
+    symbols: [load_provider_configs]
+  - file: tests/test_provider_arch.py

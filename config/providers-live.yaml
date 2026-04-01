@@ -1,0 +1,57 @@
+# Stockbee Provider 配置 — 实盘环境
+# 优先使用远程 API，Parquet/SQLite 作为 fallback
+
+CalendarProvider:
+  implementation: AlpacaCalendarProvider
+  api_key: ${ALPACA_API_KEY}
+  api_secret: ${ALPACA_API_SECRET}
+  fallback: LocalCalendarProvider
+
+UniverseProvider:
+  implementation: SqliteUniverseProvider
+  db_path: ${DATA_DIR:-data}/universe.db
+
+MarketDataProvider:
+  implementation: AlpacaMarketData
+  api_key: ${ALPACA_API_KEY}
+  api_secret: ${ALPACA_API_SECRET}
+  fallback: ParquetMarketData
+
+FactorProvider:
+  implementation: LocalFactorProvider
+  expression_config: config/factors-alpha158.yaml
+  precomputed_path: ${DATA_DIR:-data}/factors/
+
+FundamentalProvider:
+  implementation: PolygonFundamentalProvider
+  api_key: ${POLYGON_API_KEY}
+  fallback: YahooFundamentalProvider
+
+NewsProvider:
+  implementation: LiveNewsProvider
+  newsapi_key: ${NEWSAPI_KEY}
+  perigon_key: ${PERIGON_API_KEY}
+  db_path: ${DATA_DIR:-data}/news.db
+  fallback: SqliteNewsProvider
+
+MacroProvider:
+  implementation: FredMacroProvider
+  api_key: ${FRED_API_KEY}
+  cache_path: ${DATA_DIR:-data}/macro/
+  fallback: ParquetMacroProvider
+
+SentimentProvider:
+  implementation: LocalSentimentProvider
+  model_path: ${MODEL_DIR:-models}/finbert/
+
+BrokerProvider:
+  implementation: AlpacaBrokerProvider
+  api_key: ${ALPACA_API_KEY}
+  api_secret: ${ALPACA_API_SECRET}
+  base_url: ${ALPACA_BASE_URL:-https://paper-api.alpaca.markets}
+
+CacheProvider:
+  implementation: DefaultCacheProvider
+  cache_dir: ${DATA_DIR:-data}/cache/
+  l1_max_size: 4096
+  l1_default_ttl: 1800
