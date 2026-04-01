@@ -23,10 +23,10 @@ timeline:
           target_start: "2026-04-01"
           target_end: "2026-04-11"
           estimated_days: 9
-          status: in_progress
-          completion: 0.8
+          status: completed
+          completion: 1.0
           depends_on: []
-          note: "核心架构已实现，剩余测试"
+          note: "核心架构已实现，测试完成"
 
         - room: "01-stock-data"
           parent: "02-data-architecture"
@@ -471,8 +471,8 @@ timeline:
     phase_1_rooms: 26
     phase_2_rooms: 11
     phase_3_rooms: 3
-    completed: 0
-    in_progress: 1
+    completed: 1
+    in_progress: 0
     planning: 25
     backlog: 14
-    completion: 0.02
+    completion: 0.025

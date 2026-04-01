@@ -79,7 +79,15 @@ class L1MemoryCache:
         if key in self._store:
             del self._store[key]
         elif len(self._store) >= self._max_size:
-            self._store.popitem(last=False)
+            # 先尝试清理一个过期 entry，避免驱逐有效热数据
+            evicted = False
+            for k, v in list(self._store.items()):
+                if v.is_expired:
+                    del self._store[k]
+                    evicted = True
+                    break
+            if not evicted:
+                self._store.popitem(last=False)
         self._store[key] = CacheEntry(
             value=value,
             created_at=time.time(),

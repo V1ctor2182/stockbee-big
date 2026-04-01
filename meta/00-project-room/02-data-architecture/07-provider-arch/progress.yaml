@@ -1,5 +1,5 @@
 progress:
-  completion: 0.8
+  completion: 1.0
   milestones:
     - id: "m1-Provider-基类Registry"
       name: "Provider 基类+Registry"
@@ -19,6 +19,14 @@ progress:
       completed_at: "2026-03-30"
     - id: "m5-测试"
       name: "测试"
-      status: pending
-      completed_at: null
-  commits: []
+      status: completed
+      completed_at: "2026-03-31"
+  commits:
+    - hash: "bed31c5"
+      date: "2026-03-31"
+      message: "[07-provider-arch] fix+test: smart cache eviction, config safety, comprehensive tests"
+      files_changed: 11
+      specs_affected:
+        - "change-07-provider-arch-20260331 (created)"
+      milestones_affected:
+        - "m5-测试 (→ completed)"

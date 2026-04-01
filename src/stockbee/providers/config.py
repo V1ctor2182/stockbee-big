@@ -72,7 +72,7 @@ def load_provider_configs(
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
 
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         raw = yaml.safe_load(f)
 
     if not isinstance(raw, dict):
@@ -84,6 +84,7 @@ def load_provider_configs(
     for provider_name, settings in raw.items():
         if not isinstance(settings, dict):
             continue
+        settings = dict(settings)  # shallow copy before mutating
         implementation = settings.pop("implementation", None)
         if not implementation:
             logger.warning(
