@@ -1,0 +1,35 @@
+spec_id: "constraint-01-stock-data-004"
+type: constraint
+state: active
+intent:
+  summary: "漏斗筛选参数可配置，FunnelConfig dataclass 控制"
+  detail: |
+    UniverseFunnel 的筛选阈值通过 FunnelConfig 配置：
+
+    @dataclass
+    class FunnelConfig:
+        min_avg_dollar_volume: float = 500_000.0    # broad 层流动性阈值（日均成交额）
+        require_shortable: bool = False              # 是否要求可做空
+        candidate_size: int = 500                    # candidate 层最大数量
+        min_market_cap: float = 300_000_000.0        # 最小市值 3 亿
+        u100_size: int = 100                         # u100 层最大数量
+
+    默认值来源于 Tech Design §2.1 和团队讨论。
+constraints:
+  - "broad 过滤：avg_dollar_volume >= min_avg_dollar_volume"
+  - "candidate 过滤：market_cap >= min_market_cap，然后按 avg_dollar_volume 排名取 top candidate_size"
+  - "u100 选择：有 factor_scores 时按 composite_score 排名；无评分时按 market_cap 排名（Phase 1 简化）"
+  - "日均成交额最低 50 万美元（保证交易流动性）"
+indexing:
+  type: constraint
+  priority: medium
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["funnel", "config", "filtering", "liquidity"]
+provenance:
+  source_type: implementation_verified
+  confidence: 1.0
+  source_ref: "Tech Design §2.1, src/stockbee/stock_data/funnel.py"
+relations: []
+anchors:
+  - { file: "src/stockbee/stock_data/funnel.py", type: implementation }

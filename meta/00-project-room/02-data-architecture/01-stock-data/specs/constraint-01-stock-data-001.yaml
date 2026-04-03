@@ -1,19 +1,28 @@
 spec_id: "constraint-01-stock-data-001"
 type: constraint
-state: draft
+state: active
 intent:
-  summary: "覆盖 ~4000 只可投资美股"
-  detail: ""
-constraints: []
+  summary: "覆盖 ~4000 只可投资美股（实际 broad_all 12654 只）"
+  detail: |
+    broad_all 层从 Alpaca API 同步全部可交易美股，实测为 12,654 只。
+    经过流动性过滤后 broad 层目标约 4000 只。
+    四层漏斗：broad_all(12654) → broad(~4000) → candidate(500) → u100(100)。
+constraints:
+  - "broad_all 必须包含全部 Alpaca 可交易美股"
+  - "broad 层通过 avg_dollar_volume 过滤，目标 ~4000 只"
+  - "candidate 层通过市值 + 流动性排名截取，默认 500 只"
+  - "u100 层通过因子综合评分选取，默认 100 只"
 indexing:
   type: constraint
   priority: high
-  layer: epic
+  layer: feature
   domain: "quantitative-trading"
-  tags: []
+  tags: ["universe", "funnel", "coverage"]
 provenance:
-  source_type: prd_extraction
-  confidence: 0.9
-  source_ref: "PRD §3.2"
+  source_type: implementation_verified
+  confidence: 1.0
+  source_ref: "PRD §3.2, 实测验证 2026-04-03"
 relations: []
-anchors: []
+anchors:
+  - { file: "src/stockbee/stock_data/universe_store.py", type: implementation }
+  - { file: "src/stockbee/stock_data/funnel.py", type: implementation }

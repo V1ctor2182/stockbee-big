@@ -1,0 +1,34 @@
+spec_id: "decision-01-stock-data-001"
+type: decision
+state: active
+intent:
+  summary: "Parquet 列存 vs Qlib .bin vs HDF5"
+  detail: |
+    决策：采用 Parquet 列式存储 OHLCV 日线数据。
+
+    评估选项：
+    - Parquet：通用性强、社区生态广、列式压缩 8:1、支持部分列读取、跨语言兼容
+    - Qlib .bin：查询快但格式私有、难跨语言、占用空间大
+    - HDF5：支持多维数据但写入锁限制并发、API 复杂
+
+    决策理由：
+    - Parquet 是金融数据存储的事实标准，pandas/polars/DuckDB 均原生支持
+    - 8:1 压缩率使 4000只×5年 仅占 ~250MB
+    - 按 ticker 分文件可并行读写，避免全局锁
+    - 长期可维护性优于 Qlib 私有格式
+
+    回溯计划：若 Parquet 查询变慢，可引入 DuckDB 做查询加速层，Parquet 文件格式不变。
+constraints: []
+indexing:
+  type: decision
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["parquet", "storage", "adr"]
+provenance:
+  source_type: tech_design
+  confidence: 1.0
+  source_ref: "Tech Design §2.2, research-stock-data-storage.md §2"
+relations: []
+anchors:
+  - { file: "src/stockbee/stock_data/parquet_store.py", type: implementation }

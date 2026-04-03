@@ -1,0 +1,58 @@
+spec_id: "contract-01-stock-data-003"
+type: contract
+state: active
+intent:
+  summary: "StockDataSyncer 同步管道接口约定"
+  detail: |
+    class StockDataSyncer:
+
+      def __init__(
+          parquet: ParquetMarketData,
+          universe: SqliteUniverseProvider,
+          alpaca: AlpacaMarketData,
+          funnel_config: FunnelConfig | None = None,
+      )
+
+      def sync_assets(snapshot_date: date | None = None) -> int:
+          """Alpaca → broad_all。返回资产总数。"""
+
+      def sync_ohlcv(
+          tickers: list[str] | None = None,  # None = broad 层全部
+          days: int = 5,                      # 增量天数
+          end_date: date | None = None,
+      ) -> int:
+          """增量同步 OHLCV → Parquet。分批 batch_size=100。返回同步成功数。"""
+
+      def sync_ohlcv_full(
+          tickers: list[str] | None = None,
+          years: int = 5,
+      ) -> int:
+          """全量同步历史数据（初始化时使用）。"""
+
+      def update_liquidity(lookback_days: int = 60, level: str = "broad_all") -> int:
+          """从 Parquet 计算 avg_volume + avg_dollar_volume 回写 SQLite。"""
+
+      def run_funnel(
+          factor_scores: pd.DataFrame | None = None,
+          snapshot_date: date | None = None,
+      ) -> dict[str, int]:
+          """运行四层漏斗。返回每层成员数。"""
+
+      def run_weekly_sync(factor_scores=None) -> dict[str, int | dict]:
+          """完整周度流程：sync_assets → sync_ohlcv(7) → update_liquidity → run_funnel"""
+constraints: []
+indexing:
+  type: contract
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["sync", "pipeline", "api", "interface"]
+provenance:
+  source_type: implementation
+  confidence: 1.0
+  source_ref: "src/stockbee/stock_data/sync.py"
+relations:
+  - { type: uses, target: "contract-01-stock-data-001", reason: "写入 Parquet" }
+  - { type: uses, target: "contract-01-stock-data-002", reason: "写入 SQLite universe" }
+anchors:
+  - { file: "src/stockbee/stock_data/sync.py", type: implementation }

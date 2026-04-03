@@ -3,13 +3,17 @@ room:
   name: "股票数据存储"
   parent: "02-data-architecture"
   type: feature
-  lifecycle: planning
+  lifecycle: active
   priority: P0
   phase: "1"
   created_at: "2026-03-24"
-  updated_at: "2026-03-24"
+  updated_at: "2026-04-03"
   prompt_test:
-    passable: false
-    last_tested: null
-    token_count: null
+    passable: true
+    last_tested: "2026-04-03"
+    token_count: 5500
   depends_on: ['02-data-architecture/07-provider-arch']
+  implemented_at: "2026-04-02"
+  verified_at: "2026-04-03"
+  test_count: 24
+  known_issues: [2, 3, 4]

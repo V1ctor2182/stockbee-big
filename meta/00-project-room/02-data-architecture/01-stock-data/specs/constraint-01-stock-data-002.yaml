@@ -1,0 +1,28 @@
+spec_id: "constraint-01-stock-data-002"
+type: constraint
+state: active
+intent:
+  summary: "Parquet 按 ticker 分文件，OHLCV 6 列 schema"
+  detail: |
+    存储布局：data/ohlcv/{TICKER}.parquet（大写 ticker）
+    每个文件 schema：DatetimeIndex, columns=[open, high, low, close, volume, adj_close]
+    压缩率约 8:1（Parquet 列式压缩）。
+    4000只 × 5年 × 252交易日 预估 ~250MB。
+constraints:
+  - "文件命名统一大写：{TICKER}.parquet"
+  - "DatetimeIndex 为日期索引"
+  - "6 列固定 schema：open, high, low, close, volume, adj_close"
+  - "增量写入时按日期去重，keep='last'（新数据覆盖旧数据）"
+indexing:
+  type: constraint
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["parquet", "ohlcv", "schema", "storage"]
+provenance:
+  source_type: implementation_verified
+  confidence: 1.0
+  source_ref: "Tech Design §2.2, src/stockbee/stock_data/parquet_store.py"
+relations: []
+anchors:
+  - { file: "src/stockbee/stock_data/parquet_store.py", type: implementation }

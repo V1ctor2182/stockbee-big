@@ -1,0 +1,54 @@
+spec_id: "contract-01-stock-data-002"
+type: contract
+state: active
+intent:
+  summary: "SqliteUniverseProvider 接口约定（UniverseProvider 实现）"
+  detail: |
+    class SqliteUniverseProvider(UniverseProvider):
+
+      # --- 读取接口（继承自 UniverseProvider）---
+
+      def get_universe(
+          level: str = "u100",          # "broad_all" | "broad" | "candidate" | "u100"
+          as_of: date | None = None,    # 时间切片，None 为当前活跃成员
+      ) -> pd.DataFrame:
+          """返回 DataFrame: ticker, sector, market_cap, avg_volume,
+          avg_dollar_volume, short_able(bool)。
+          无效 level 抛出 ValueError。"""
+
+      def refresh_universe(level: str = "broad_all") -> int:
+          """占位（no-op），实际刷新由 StockDataSyncer 驱动。"""
+
+      # --- 写入接口 ---
+
+      def upsert_members(
+          level: str,
+          members: pd.DataFrame,         # 必须包含 ticker 列
+          snapshot_date: date | None = None,
+      ) -> int:
+          """批量更新某层级成员。
+          新增成员 INSERT，已移除成员标记 removed_at，
+          同时保存 snapshot 到 universe_snapshots 表。
+          返回更新后的成员总数。"""
+
+      def get_member_count(level: str) -> int
+      def get_all_level_counts() -> dict[str, int]
+
+    初始化参数（ProviderConfig.params）：
+      - db_path: str = "data/universe.db"
+constraints: []
+indexing:
+  type: contract
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["sqlite", "api", "interface", "universe"]
+provenance:
+  source_type: implementation
+  confidence: 1.0
+  source_ref: "src/stockbee/stock_data/universe_store.py"
+relations:
+  - { type: implements, target: "UniverseProvider", reason: "四层漏斗股票池管理" }
+anchors:
+  - { file: "src/stockbee/stock_data/universe_store.py", type: implementation }
+  - { file: "src/stockbee/providers/interfaces.py", type: interface }

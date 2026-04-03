@@ -1,0 +1,35 @@
+spec_id: "decision-01-stock-data-002"
+type: decision
+state: active
+intent:
+  summary: "四层漏斗 vs 直接 U100"
+  detail: |
+    决策：采用四层漏斗设计（broad_all → broad → candidate → u100），而非直接维护 U100。
+
+    问题：如果直接从 U100 开始回测，会产生幸存者偏差（survivorship bias）。
+    今天的 U100 在 5 年前可能不存在，直接用当前 U100 回测历史会高估收益。
+
+    四层漏斗的优势：
+    - 回测时可通过 as_of 时间切片，还原任意历史时刻的真实股票池
+    - 每层筛选条件透明可审计
+    - 支持不同层级使用不同更新频率（broad_all 周度、u100 月度）
+    - universe_snapshots 表保留完整历史，便于回测验证
+
+    代价：需要维护更多数据（12654 只 vs 100 只），但 SQLite 轻量足够。
+
+    回溯计划：若四层过于复杂，可合并 broad_all 和 broad 为一层。
+constraints: []
+indexing:
+  type: decision
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["funnel", "survivorship-bias", "universe", "adr"]
+provenance:
+  source_type: tech_design
+  confidence: 1.0
+  source_ref: "Tech Design §2.1, research-stock-data-storage.md §1 §3"
+relations: []
+anchors:
+  - { file: "src/stockbee/stock_data/funnel.py", type: implementation }
+  - { file: "src/stockbee/stock_data/universe_store.py", type: implementation }
