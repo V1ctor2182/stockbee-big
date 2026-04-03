@@ -1,24 +1,24 @@
 progress:
-  completion: 0.0
+  completion: 1.0
   milestones:
     - id: "m1-Parquet-存储层"
       name: "Parquet 存储层"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-02"
     - id: "m2-SQLite-元数据表"
       name: "SQLite 元数据表"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-02"
     - id: "m3-四层漏斗查询"
       name: "四层漏斗查询"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-02"
     - id: "m4-数据同步管道"
       name: "数据同步管道"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-02"
     - id: "m5-测试"
       name: "测试"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-02"
   commits: []
