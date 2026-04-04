@@ -1,24 +1,28 @@
 progress:
-  completion: 0.0
+  completion: 1.0
   milestones:
     - id: "m1-19-FRED-指标采集"
-      name: "19 FRED 指标采集"
-      status: pending
-      completed_at: null
+      name: "17 FRED 指标定义与采集"
+      status: completed
+      completed_at: "2026-04-04"
     - id: "m2-Parquet-时间序列"
       name: "Parquet 时间序列"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-04"
     - id: "m3-Z-score-计算"
       name: "Z-score 计算"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-04"
     - id: "m4-point-in-time-对齐"
       name: "point-in-time 对齐"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-04"
     - id: "m5-测试"
       name: "测试"
-      status: pending
-      completed_at: null
-  commits: []
+      status: completed
+      completed_at: "2026-04-04"
+  commits:
+    - { date: "2026-04-04", hash: "067abed", message: "[03-macro-data] feat: add ParquetMacroProvider" }
+    - { date: "2026-04-04", hash: "b6f7aff", message: "[03-macro-data] feat: add FredMacroProvider" }
+    - { date: "2026-04-04", hash: "72ff006", message: "[03-macro-data] feat: add MacroDataSyncer" }
+    - { date: "2026-04-04", hash: "d9cde5b", message: "[03-macro-data] test: 23 tests" }
