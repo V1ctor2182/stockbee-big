@@ -1,12 +1,16 @@
 ---
 name: prompt-gen
 description: >
-  Pull Feature Room context and enhance user prompts for AI coding assistants (Cursor/Claude). Automatically gathers specs, decisions, constraints, contracts, conventions, and progress from the relevant Room(s), then wraps the user's own prompt with full project context. Use when the user says "帮我写prompt", "增强prompt", "pull context", "帮我实现xxx", "给Cursor写prompt", or when the user wants a context-rich prompt for AI-assisted development. Also use for prompt testing ("测一下spec够不够").
+  Pull Feature Room context and enhance user prompts for AI coding assistants (Cursor/Claude). Automatically gathers specs, decisions, constraints, contracts, conventions, and progress from the relevant Room(s), then wraps the user's own prompt with full project context. Use when the user says "帮我写prompt", "增强prompt", "pull context", "帮我实现xxx", "给Cursor写prompt", "promptgen", or when the user wants a context-rich prompt for AI-assisted development. Also use for prompt testing ("测一下spec够不够"). Supports both Room-level and Milestone-level prompts.
 ---
 
 # Prompt Gen — Context Pull + 用户 Prompt 增强
 
 用户写自己的 prompt（想让 AI 做什么），这个 skill 自动 pull 相关 Room 的上下文，把用户的 prompt 增强为一个带完整背景的 prompt。核心逻辑是 **context pulling**，不是替用户写 prompt。
+
+支持两种粒度：
+- **Room 级**：`promptgen stock-data` — 拉整个 Room 的上下文（用于规划）
+- **Milestone 级**：`promptgen stock-data/m1` — 只拉该 milestone 需要的上下文（用于开发）
 
 ## 前置条件
 
@@ -14,6 +18,17 @@ description: >
 - 用户提供了自己的 prompt + 指定（或可推断）Room
 
 ## 执行步骤
+
+### Phase 0: 确定粒度
+
+- 用户指定了 milestone（如 "promptgen macro-data/m3"）→ **Milestone 模式**
+- 用户只指定 Room（如 "promptgen macro-data"）→ **Room 模式**（现有行为）
+
+**Milestone 模式额外行为**：
+- 只拉该 milestone 相关的 specs（而非全部）
+- 已完成 milestone 的产出作为 "前置条件" 段落
+- 未来 milestone 不包含在 prompt 中
+- token 预算更紧凑（目标 2K-5K）
 
 ### Phase 1: 确定 Room
 
@@ -120,9 +135,46 @@ Pull 的 spec 类型包括全部 7 种：
 - 报告粒度是否合适
 - 这是验证 Room 拆分是否合理的代理指标
 
+## Milestone 模式输出模板
+
+```markdown
+# Milestone Prompt — {Room} / {milestone-id}: {milestone-name}
+
+<!-- context_from: {room-id}/{milestone-id} -->
+<!-- token_count: XXXX | prompt_test: pass/fail -->
+
+## 目标
+
+{milestone 的具体目标，从 progress.yaml 和 intent spec 提取}
+
+## 前置条件（已完成的 milestones）
+
+{列出该 Room 已完成的 milestones 及其产出摘要}
+- ✅ m1-xxx: {一句话描述产出，含关键文件路径}
+- ✅ m2-xxx: ...
+
+## 上下文
+
+{只包含该 milestone 相关的 specs，精简版}
+
+## 约束
+
+{只包含和该 milestone 直接相关的 constraints}
+
+## 已有代码参考
+
+{如果本 milestone 要实现某个 interface，列出接口签名}
+{如果要 import 已完成 milestone 的代码，列出 import 路径}
+
+## 你的任务
+
+{用户原始 prompt 或 milestone 描述}
+```
+
 ## 重要规则
 
 - 增强 prompt 中，用户原始 prompt 放在最后 "你的任务" 段落，**原封不动**
 - draft 和 stale 的 spec 要明确标注状态，让使用 prompt 的 AI 知道这些信息可能不准确
 - 从父 Room 继承的 specs 要标注来源（"来自 00-project-room"）
 - token 估算可以用字符数 / 4 作为粗略近似
+- **Milestone 模式下 token 目标 2K-5K**，Room 模式下 3K-8K
