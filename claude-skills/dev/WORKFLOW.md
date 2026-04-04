@@ -40,9 +40,12 @@
               └────────────┬─────────────┘
                            │
                     ┌──────▼───────┐
-                    │ Room 全部完成  │  最后一个 milestone commit-sync 时
-                    │ 自动:         │  自动更新 room.yaml lifecycle
-                    │ - spec 完善   │  自动更新 _tree.yaml status
+                    │ Room 全部完成  │  每个 milestone 都 commit-sync
+                    │              │  最后一个 milestone 的 commit-sync
+                    │ 最后一个 m 的  │  额外触发:
+                    │ commit-sync   │  - room.yaml lifecycle → active
+                    │ 额外做:       │  - _tree.yaml status → 已完成
+                    │ - spec 完善   │  - spec.md 完整重写
                     │ - status 传播 │
                     └──────┬───────┘
                            │
