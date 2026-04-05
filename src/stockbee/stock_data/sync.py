@@ -135,7 +135,10 @@ class StockDataSyncer:
             成功同步的 ticker 数
         """
         end_date = date.today()
-        start_date = date(end_date.year - years, end_date.month, end_date.day)
+        try:
+            start_date = end_date.replace(year=end_date.year - years)
+        except ValueError:  # Feb 29 in non-leap year
+            start_date = end_date.replace(year=end_date.year - years, day=28)
         days = (end_date - start_date).days
         return self.sync_ohlcv(tickers=tickers, days=days, end_date=end_date)
 
@@ -161,11 +164,12 @@ class StockDataSyncer:
 
         updated = 0
         for ticker in tickers:
-            bars = self._parquet._read_ticker(ticker, start, end, ["close", "volume"])
-            if bars is None or bars.empty:
+            result = self._parquet.get_daily_bars([ticker], start, end, ["close", "volume"])
+            if result.empty:
                 continue
 
-            # 取最近 lookback_days 个交易日
+            # 提取单 ticker，取最近 lookback_days 个交易日
+            bars = result.xs(ticker.upper(), level="ticker")
             bars = bars.tail(lookback_days)
             if len(bars) < 10:  # 至少需要 10 天数据
                 continue

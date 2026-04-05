@@ -42,7 +42,10 @@ class MacroDataSyncer:
             同步结果摘要
         """
         end = date.today()
-        start = date(end.year - years, end.month, end.day)
+        try:
+            start = end.replace(year=end.year - years)
+        except ValueError:  # Feb 29 in non-leap year
+            start = end.replace(year=end.year - years, day=28)
 
         logger.info("Full macro sync: %s to %s", start, end)
 

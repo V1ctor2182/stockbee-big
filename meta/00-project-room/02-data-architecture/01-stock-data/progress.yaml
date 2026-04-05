@@ -28,3 +28,4 @@ progress:
     - { date: "2026-04-02", hash: "04fc58e", message: "[01-stock-data] feat: add AlpacaMarketData + StockDataSyncer" }
     - { date: "2026-04-02", hash: "24a262d", message: "[01-stock-data] test: 24 tests" }
     - { date: "2026-04-03", hash: "908b8ad", message: "chore: add data/ to .gitignore" }
+    - { date: "2026-04-04", hash: "172598f", message: "[01-stock-data][03-macro-data] fix: leap year crash, private method access, tight coupling", files_changed: 2, specs_affected: [], milestones_affected: [] }

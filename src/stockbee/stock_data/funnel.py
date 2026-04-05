@@ -16,7 +16,7 @@ from datetime import date
 
 import pandas as pd
 
-from .universe_store import SqliteUniverseProvider
+from stockbee.providers.interfaces import UniverseProvider
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class UniverseFunnel:
 
     def __init__(
         self,
-        universe: SqliteUniverseProvider,
+        universe: UniverseProvider,
         config: FunnelConfig | None = None,
     ) -> None:
         self._universe = universe
