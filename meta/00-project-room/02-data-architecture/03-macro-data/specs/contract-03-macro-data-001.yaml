@@ -1,0 +1,45 @@
+spec_id: "contract-03-macro-data-001"
+type: contract
+state: active
+intent:
+  summary: "ParquetMacroProvider + FredMacroProvider + MacroDataSyncer 接口约定"
+  detail: |
+    class ParquetMacroProvider(MacroProvider):
+      # 读取
+      def get_macro_indicators(indicators, start, end) -> DataFrame(date x indicators)
+      def get_latest_z_scores(indicators, window=252) -> dict[str, float]
+      def refresh() -> int  # no-op, 由 syncer 驱动
+      # 写入（供 syncer）
+      def write_indicators(df: DataFrame) -> None
+      def rebuild_z_score_index(window=252) -> int
+      def indicator_date_range() -> tuple[date, date] | None
+      # 配置: data_path, index_db
+
+    class FredMacroProvider(MacroProvider):
+      # 同上读取接口
+      def fetch_all(start, end) -> DataFrame  # 批量拉取供 syncer
+      # 配置: api_key
+
+    class MacroDataSyncer:
+      def __init__(parquet, fred)
+      def sync_all(years=5) -> dict
+      def sync_latest(days=30) -> dict
+      def run_weekly_sync() -> dict
+constraints: []
+indexing:
+  type: contract
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["api", "interface", "macro"]
+provenance:
+  source_type: implementation
+  confidence: 1.0
+  source_ref: "src/stockbee/macro_data/"
+relations:
+  - { type: implements, target: "MacroProvider", reason: "回测 + 实盘双实现" }
+anchors:
+  - { file: "src/stockbee/macro_data/parquet_macro.py", type: implementation }
+  - { file: "src/stockbee/macro_data/fred_macro.py", type: implementation }
+  - { file: "src/stockbee/macro_data/sync.py", type: implementation }
+  - { file: "src/stockbee/providers/interfaces.py", type: interface }

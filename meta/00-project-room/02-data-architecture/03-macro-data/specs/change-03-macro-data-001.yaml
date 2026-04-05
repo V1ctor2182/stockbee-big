@@ -1,0 +1,40 @@
+spec_id: "change-03-macro-data-001"
+type: change
+state: active
+intent:
+  summary: "03-macro-data 模块实现 + FRED API 验证 (2026-04-04 ~ 2026-04-05)"
+  detail: |
+    新增文件：
+    - src/stockbee/macro_data/__init__.py
+    - src/stockbee/macro_data/indicators.py — 17 个 FRED 指标定义
+    - src/stockbee/macro_data/parquet_macro.py — ParquetMacroProvider
+    - src/stockbee/macro_data/fred_macro.py — FredMacroProvider
+    - src/stockbee/macro_data/sync.py — MacroDataSyncer
+    - tests/test_macro_data.py — 23 个测试
+
+    Git commits：
+    - 067abed [03-macro-data] feat: add ParquetMacroProvider
+    - b6f7aff [03-macro-data] feat: add FredMacroProvider
+    - 72ff006 [03-macro-data] feat: add MacroDataSyncer
+    - d9cde5b [03-macro-data] test: 23 tests
+    - 62a5690 fix: leap year crash (同事 PR)
+    - 1da2218 fix: correct 3 invalid FRED series IDs (14/17 → 17/17)
+
+    FRED API 实测验证 (2026-04-05)：
+    - 17/17 指标全部连通
+    - sync_all(years=1): 365 rows, 17 indicators
+    - Z-scores: 17/17 计算成功
+    - Point-in-time: end=2026-03-01 → last date = 2026-02-28 ✅
+constraints: []
+indexing:
+  type: change
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["changelog", "implementation"]
+provenance:
+  source_type: git_history
+  confidence: 1.0
+  source_ref: "git log 067abed..1da2218"
+relations: []
+anchors: []

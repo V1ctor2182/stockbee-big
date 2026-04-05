@@ -1,0 +1,28 @@
+spec_id: "decision-03-macro-data-001"
+type: decision
+state: active
+intent:
+  summary: "单文件 Parquet vs 按指标分文件"
+  detail: |
+    决策：17 个指标存储在单个 Parquet 文件 macro_all.parquet。
+
+    vs stock-data 的按 ticker 分文件方案不同，原因：
+    - stock-data: 4000 只 × 5 年 = 250MB，需要按 ticker 并行 I/O
+    - macro-data: 17 指标 × 5 年 ≈ 200KB，单文件完全够用
+
+    优势：一次 read_parquet 获取全部指标，简化 I/O。
+    劣势：增量写入需要 read-merge-write 整个文件（但 200KB 无所谓）。
+constraints: []
+indexing:
+  type: decision
+  priority: medium
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["parquet", "storage", "adr"]
+provenance:
+  source_type: implementation
+  confidence: 1.0
+  source_ref: "src/stockbee/macro_data/parquet_macro.py"
+relations: []
+anchors:
+  - { file: "src/stockbee/macro_data/parquet_macro.py", type: implementation }

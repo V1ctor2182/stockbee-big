@@ -1,23 +1,54 @@
 spec_id: "intent-03-macro-data-001"
 type: intent
-state: draft
+state: active
 intent:
-  summary: "19 个 FRED 指标，point-in-time 对齐无未来偏差"
+  summary: "17 个 FRED 指标，Parquet 时间序列 + SQLite Z-score 索引 + point-in-time 对齐"
   detail: |
-    覆盖 8 个经济维度：利率(3)、就业(3)、物价(2)、增长(2)、信用(2)、流动性(2)、汇率(1)、商品(2)。每日计算 Z-score。
+    Macro Data 模块为 StockBEE 提供完整的宏观经济数据基础设施，包含四个核心组件：
 
-来源：Tech Design §2.4, §3.5
-研究状态：研究完成 (research-macro-features.md)
-constraints: []
+    1. indicators.py — 17 个 FRED 指标元数据定义
+       - 覆盖 8 个经济维度：利率(3)、就业(3)、物价(2)、增长(2)、信用(2)、流动性(2)、汇率(1)、商品(2)
+       - FredIndicator dataclass: code, name, dimension, frequency, unit
+       - INDICATOR_GROUPS 按维度分组索引
+
+    2. ParquetMacroProvider（MacroProvider 回测实现）
+       - 单文件 Parquet 存储：data/macro/macro_all.parquet（17 列 × N 天）
+       - SQLite Z-score 索引：data/macro_index.db（macro_latest 表）
+       - 252 天滚动 Z-score，clip [-3, +3]，min_periods=20
+       - Point-in-time 对齐：end=T 只返回 T-1 及之前的数据
+       - Forward-fill 混频指标（日/周/月/季 → 日频）
+
+    3. FredMacroProvider（MacroProvider 实盘实现）
+       - fredapi SDK 连接 FRED API
+       - 单指标 fetch + 批量 fetch_all
+       - Point-in-time 对齐内置
+       - 可选依赖（回测不需要 fredapi）
+
+    4. MacroDataSyncer（同步管道）
+       - sync_all(years): 全量历史拉取
+       - sync_latest(days=30): 增量同步
+       - 写入 Parquet + 重建 Z-score 索引
+
+    实现状态：已完成 + API 验证通过（17/17 指标连通）
+constraints:
+  - "constraint-03-macro-data-001"
+  - "constraint-03-macro-data-002"
+  - "constraint-03-macro-data-003"
+  - "constraint-03-macro-data-004"
 indexing:
   type: intent
   priority: high
-  layer: epic
+  layer: feature
   domain: "quantitative-trading"
-  tags: []
+  tags: ["fred", "macro", "z-score", "point-in-time", "parquet"]
 provenance:
-  source_type: prd_extraction
-  confidence: 0.8
-  source_ref: "PRD + Feature Hierarchy + Tech Design"
-relations: []
-anchors: []
+  source_type: implementation_verified
+  confidence: 1.0
+  source_ref: "src/stockbee/macro_data/, Tech Design §2.4 §3.5"
+relations:
+  - { type: depends_on, target: "intent-07-provider-arch-001", reason: "继承 BaseProvider + CacheManager" }
+anchors:
+  - { file: "src/stockbee/macro_data/indicators.py", type: implementation }
+  - { file: "src/stockbee/macro_data/parquet_macro.py", type: implementation }
+  - { file: "src/stockbee/macro_data/fred_macro.py", type: implementation }
+  - { file: "src/stockbee/macro_data/sync.py", type: implementation }

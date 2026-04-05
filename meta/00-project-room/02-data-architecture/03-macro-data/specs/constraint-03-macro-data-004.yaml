@@ -1,0 +1,27 @@
+spec_id: "constraint-03-macro-data-004"
+type: constraint
+state: active
+intent:
+  summary: "混频 forward-fill + Parquet 单文件存储"
+  detail: |
+    不同频率的 FRED 指标（日/周/月/季）统一 forward-fill 到日频。
+    所有指标存储在单个 Parquet 文件 data/macro/macro_all.parquet。
+    数据量极小（17 指标 × 5 年 × 252 天 ≈ 200KB）。
+    增量写入使用 combine_first + update 合并。
+constraints:
+  - "forward-fill 在读取时执行（df.ffill()），不修改存储"
+  - "Parquet 单文件，所有指标为列"
+  - "增量写入不丢失已有数据"
+indexing:
+  type: constraint
+  priority: medium
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["parquet", "forward-fill", "storage"]
+provenance:
+  source_type: implementation_verified
+  confidence: 1.0
+  source_ref: "Tech Design §2.2, §2.4"
+relations: []
+anchors:
+  - { file: "src/stockbee/macro_data/parquet_macro.py", type: implementation }

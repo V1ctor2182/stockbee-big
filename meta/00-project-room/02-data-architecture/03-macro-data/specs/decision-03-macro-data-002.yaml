@@ -1,0 +1,36 @@
+spec_id: "decision-03-macro-data-002"
+type: decision
+state: active
+intent:
+  summary: "3 个 FRED series ID 替换：黄金→铜价，杠杆→信贷收紧"
+  detail: |
+    Tech Design 中的 3 个 FRED 代码在实际 API 验证中发现不可用：
+
+    1. BAMLH0A0HY2 → BAMLH0A0HYM2
+       原因：少了 'M' 后缀，正确 ID 为 ICE BofA US High Yield OAS
+       影响：无（同一指标）
+
+    2. EXHYLD → DRTSCILM (Senior Loan Officer Survey: Tightening Standards)
+       原因：EXHYLD 不是真实 FRED series ID
+       替代理由：DRTSCILM 反映银行信贷收紧程度，比杠杆率更直接反映信用环境
+
+    3. GOLDAMGBD228NLBM → PCOPPUSDM (Global Price of Copper)
+       原因：London Gold Fixing Price series 已从 FRED 下架
+       替代理由：铜价是更好的工业商品通胀指标（"铜博士"），
+       黄金更多是避险资产而非商品通胀信号
+
+    总指标数保持 17 个，覆盖 8 个经济维度不变。
+constraints: []
+indexing:
+  type: decision
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["fred", "indicators", "adr"]
+provenance:
+  source_type: implementation_verified
+  confidence: 1.0
+  source_ref: "FRED API 实测 2026-04-05, commit 1da2218"
+relations: []
+anchors:
+  - { file: "src/stockbee/macro_data/indicators.py", type: implementation }

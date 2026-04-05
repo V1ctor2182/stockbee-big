@@ -1,0 +1,28 @@
+spec_id: "constraint-03-macro-data-002"
+type: constraint
+state: active
+intent:
+  summary: "Z-score 252 天滚动窗口，clip [-3, +3]，std=0 返回 NaN"
+  detail: |
+    每个指标的 Z-score = (当前值 - 252天均值) / 252天标准差。
+    clip 到 [-3, +3] 防止极端值。
+    std=0（常数序列）时除法返回 NaN 而非 inf。
+    min_periods=20，数据不足时不计算 Z-score。
+constraints:
+  - "窗口 = 252 个交易日（约 1 年）"
+  - "Z-score 范围 [-3, +3]"
+  - "std=0 时返回 NaN"
+  - "min_periods=20"
+indexing:
+  type: constraint
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["z-score", "normalization"]
+provenance:
+  source_type: implementation_verified
+  confidence: 1.0
+  source_ref: "Tech Design §3.5"
+relations: []
+anchors:
+  - { file: "src/stockbee/macro_data/parquet_macro.py", type: implementation }

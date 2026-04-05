@@ -1,0 +1,39 @@
+spec_id: "constraint-03-macro-data-003"
+type: constraint
+state: active
+intent:
+  summary: "17 个 FRED 指标全部经 API 验证可用"
+  detail: |
+    17 个 FRED series ID 全部验证通过（2026-04-05）。
+
+    | 维度 | 代码 | 频率 |
+    |------|------|------|
+    | 利率 | DFF, T10Y2Y, DGS10 | daily |
+    | 就业 | PAYEMS, UNRATE, ICSA | monthly/weekly |
+    | 物价 | CPIAUCSL, PPIFIS | monthly |
+    | 增长 | GDP, INDPRO | quarterly/monthly |
+    | 信用 | BAMLH0A0HYM2, DRTSCILM | daily/quarterly |
+    | 流动性 | M2SL, VIXCLS | monthly/daily |
+    | 汇率 | DEXUSEU | daily |
+    | 商品 | DCOILWTICO, PCOPPUSDM | daily/monthly |
+
+    修正历史：
+    - BAMLH0A0HY2 → BAMLH0A0HYM2（原 ID 不存在）
+    - EXHYLD → DRTSCILM（原 ID 非 FRED series）
+    - GOLDAMGBD228NLBM → PCOPPUSDM（黄金 series 已从 FRED 下架）
+constraints:
+  - "所有 17 个 series ID 必须在 FRED API 上可查询"
+  - "fredapi 为可选依赖，回测模式不需要"
+indexing:
+  type: constraint
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["fred", "api", "indicators"]
+provenance:
+  source_type: implementation_verified
+  confidence: 1.0
+  source_ref: "FRED API 实测 2026-04-05"
+relations: []
+anchors:
+  - { file: "src/stockbee/macro_data/indicators.py", type: implementation }
