@@ -366,7 +366,7 @@ class TestHelpers:
 
     def test_normalize_timestamp_invalid(self):
         result = _normalize_timestamp("garbage")
-        assert result is not None  # fallback to now
+        assert result is None  # returns None for unparseable timestamps
 
     def test_truncate(self):
         assert _truncate("hello", 3) == "hel"

@@ -60,6 +60,12 @@ for _ticker, _names in _AMBIGUOUS_TICKERS.items():
 # ticker 格式：1-5 个大写字母
 _TICKER_PATTERN = re.compile(r"\b([A-Z]{1,5})\b")
 
+# 短 ticker 语境判定关键词
+_FINANCIAL_KEYWORDS = frozenset({
+    "stock", "share", "buy", "sell", "price",
+    "market", "trade", "invest", "earning", "$",
+})
+
 # 排除常见英语单词（会被误识别为 ticker）
 _COMMON_WORDS = frozenset({
     "A", "I", "AM", "AN", "AS", "AT", "BE", "BY", "DO", "GO", "HE", "IF",
@@ -191,7 +197,10 @@ class G1Filter:
                 # 去掉 www. 前缀
                 if domain.startswith("www."):
                     domain = domain[4:]
-                if domain in self._blacklist:
+                if any(
+                    domain == bl or domain.endswith("." + bl)
+                    for bl in self._blacklist
+                ):
                     return False
             except Exception:
                 pass  # URL 解析失败不阻止，只检查 source 字段
@@ -270,9 +279,7 @@ class G1Filter:
                     start = max(0, match.start() - 30)
                     end = min(len(text), match.end() + 30)
                     context = text[start:end].lower()
-                    financial_keywords = ("stock", "share", "buy", "sell", "price",
-                                         "market", "trade", "invest", "earning", "$")
-                    if any(kw in context for kw in financial_keywords):
+                    if any(kw in context for kw in _FINANCIAL_KEYWORDS):
                         found.add(candidate)
             elif candidate not in _COMMON_WORDS:
                 # 2-5 字母：排除常见英语单词

@@ -66,8 +66,8 @@ CREATE TABLE IF NOT EXISTS g3_daily_counts (
 """
 
 
-def _normalize_timestamp(ts: str | datetime) -> str:
-    """归一化时间戳为 UTC ISO 8601 字符串。"""
+def _normalize_timestamp(ts: str | datetime) -> str | None:
+    """归一化时间戳为 UTC ISO 8601 字符串。无法解析时返回 None。"""
     if isinstance(ts, datetime):
         if ts.tzinfo is None:
             ts = ts.replace(tzinfo=timezone.utc)
@@ -79,8 +79,8 @@ def _normalize_timestamp(ts: str | datetime) -> str:
             dt = dt.replace(tzinfo=timezone.utc)
         return dt.astimezone(timezone.utc).isoformat()
     except (ValueError, TypeError):
-        logger.warning("Invalid timestamp format: %r, using current UTC time", ts)
-        return datetime.now(timezone.utc).isoformat()
+        logger.warning("Invalid timestamp format: %r, skipping", ts)
+        return None
 
 
 def _truncate(text: str | None, max_len: int) -> str | None:
@@ -98,7 +98,11 @@ def _normalize_tickers(tickers: list[str] | str | None) -> str:
         try:
             parsed = json.loads(tickers)
             if isinstance(parsed, list):
-                return json.dumps(sorted(set(t.upper() for t in parsed if t)))
+                return json.dumps(sorted(set(
+                    t.upper() for t in parsed if isinstance(t, str) and t
+                )))
+            if isinstance(parsed, str) and parsed.strip():
+                return json.dumps([parsed.strip().upper()])
         except (json.JSONDecodeError, TypeError):
             # 可能是逗号分隔的字符串
             parts = [t.strip().upper() for t in tickers.split(",") if t.strip()]
@@ -273,6 +277,9 @@ class SqliteNewsProvider(NewsProvider):
         headline = _truncate(headline.strip(), MAX_HEADLINE_LENGTH)
         snippet = _truncate(snippet, MAX_SNIPPET_LENGTH)
         ts_normalized = _normalize_timestamp(timestamp)
+        if ts_normalized is None:
+            logger.debug("Skipping news with invalid timestamp: %r", timestamp)
+            return None
         tickers_json = _normalize_tickers(tickers)
         now = datetime.now(timezone.utc).isoformat()
 
@@ -321,6 +328,8 @@ class SqliteNewsProvider(NewsProvider):
                 source = event.get("source", "")
                 snippet = _truncate(event.get("snippet"), MAX_SNIPPET_LENGTH)
                 ts = _normalize_timestamp(event.get("timestamp", ""))
+                if ts is None:
+                    continue
                 tickers_json = _normalize_tickers(event.get("tickers"))
                 now = datetime.now(timezone.utc).isoformat()
                 try:

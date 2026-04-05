@@ -4,7 +4,7 @@
 
 **SQLite news_events 表 + G1/G2/G3 三级漏斗处理管道**
 
-8 个组件组成完整的新闻数据基础设施：
+7 个组件组成完整的新闻数据基础设施：
 - **SqliteNewsProvider** — WAL 模式 news_events 表，支持多条件查询（ticker/时间/重要度/g_level）
 - **G1 Filter** — 来源校验、时间校验、去重、实体识别（ticker 提取）
 - **G2 Classifier** — FinBERT 本地情绪分类 + 主题分类 + 重要度/紧急度评分
