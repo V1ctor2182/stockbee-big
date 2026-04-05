@@ -1,0 +1,53 @@
+spec_id: "contract-01-stock-data-001"
+type: contract
+state: active
+intent:
+  summary: "ParquetMarketData 接口约定（MarketDataProvider 实现）"
+  detail: |
+    class ParquetMarketData(MarketDataProvider):
+
+      # --- 读取接口（继承自 MarketDataProvider）---
+
+      def get_daily_bars(
+          tickers: list[str],
+          start: date,
+          end: date,
+          fields: list[str] | None = None,    # 默认 OHLCV_FIELDS 全部 6 列
+      ) -> pd.DataFrame:
+          """返回 MultiIndex DataFrame (date, ticker) x fields。
+          空结果返回空 DataFrame（不抛异常）。"""
+
+      def get_latest_price(tickers: list[str]) -> dict[str, float]:
+          """返回 {ticker: close_price}，不存在的 ticker 不包含在结果中。"""
+
+      # --- 写入接口（供 sync 管道使用）---
+
+      def write_ticker(ticker: str, df: pd.DataFrame) -> None:
+          """写入/追加 OHLCV 数据。
+          df 须有 DatetimeIndex + OHLCV 列。
+          已存在的文件会 merge（按日期去重，keep='last'）。"""
+
+      def list_tickers() -> list[str]:
+          """返回已存储的全部 ticker 列表（从文件名推断）。"""
+
+      def ticker_date_range(ticker: str) -> tuple[date, date] | None:
+          """返回某 ticker 的数据起止日期，不存在返回 None。"""
+
+    初始化参数（ProviderConfig.params）：
+      - data_path: str = "data/ohlcv"    # Parquet 文件根目录
+constraints: []
+indexing:
+  type: contract
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["parquet", "api", "interface", "market-data"]
+provenance:
+  source_type: implementation
+  confidence: 1.0
+  source_ref: "src/stockbee/stock_data/parquet_store.py"
+relations:
+  - { type: implements, target: "MarketDataProvider", reason: "回测环境实现" }
+anchors:
+  - { file: "src/stockbee/stock_data/parquet_store.py", type: implementation }
+  - { file: "src/stockbee/providers/interfaces.py", type: interface }

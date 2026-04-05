@@ -23,9 +23,9 @@ tree:
           priority: P0
           phase: 1
           children:
-            - { id: "01-stock-data", type: feature, priority: P0, phase: 1, status: "研究完成" }
+            - { id: "01-stock-data", type: feature, priority: P0, phase: 1, status: "已完成" }
             - { id: "02-news-data", type: feature, priority: P0, phase: 1, status: "研究完成" }
-            - { id: "03-macro-data", type: feature, priority: P0, phase: 1, status: "研究完成" }
+            - { id: "03-macro-data", type: feature, priority: P0, phase: 1, status: "已完成" }
             - { id: "04-factor-storage", type: feature, priority: P0, phase: 1, status: "研究完成" }
             - { id: "05-experience-buffer", type: feature, priority: P0, phase: 2, status: "研究完成" }
             - { id: "06-knowledge-graph", type: feature, priority: P0, phase: "1-2", status: "研究完成" }

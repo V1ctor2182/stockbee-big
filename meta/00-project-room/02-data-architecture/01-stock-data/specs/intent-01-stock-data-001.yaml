@@ -1,23 +1,69 @@
 spec_id: "intent-01-stock-data-001"
 type: intent
-state: draft
+state: active
 intent:
-  summary: "三层金字塔架构，Parquet 列存 + SQLite 元数据"
+  summary: "Parquet 列存 OHLCV + SQLite 四层漏斗宇宙管理 + Alpaca API 同步管道"
   detail: |
-    4000 只可投资美股，日线 OHLCV。四层漏斗避免幸存者偏差。Parquet 压缩率 8:1。
+    Stock Data 模块为 StockBEE 提供完整的股票行情数据基础设施，包含三个核心组件：
 
-来源：Tech Design §2.1-§2.2
-研究状态：研究完成 (research-stock-data-storage.md)
-constraints: []
+    1. ParquetMarketData（MarketDataProvider 回测实现）
+       - 按 ticker 分文件存储：data/ohlcv/{TICKER}.parquet
+       - Schema: DatetimeIndex, columns=[open, high, low, close, volume, adj_close]
+       - 支持增量写入（追加 + 按日期去重，keep='last'）
+       - 支持日期范围过滤、字段过滤、多 ticker 联合查询
+       - 返回 MultiIndex DataFrame (date, ticker) x fields
+       - 集成 CacheManager（L1 内存 + L2 Parquet）
+
+    2. SqliteUniverseProvider（UniverseProvider 实现）
+       - 两张表：universe_members（成员管理）+ universe_snapshots（快照历史）
+       - 支持四层漏斗层级：broad_all / broad / candidate / u100
+       - 时间切片查询（as_of 参数）避免回测前看偏差
+       - 成员 add/remove 历史追踪（added_at / removed_at）
+       - SQLite WAL 模式，支持并发读
+
+    3. AlpacaMarketData（MarketDataProvider 实盘实现）
+       - 通过 alpaca-py SDK 连接 Alpaca Market Data API
+       - get_daily_bars: 分批拉取 OHLCV，batch_size=100
+       - get_all_tradable_assets: 获取全部可交易美股资产列表
+       - 配置中支持 fallback 到 ParquetMarketData
+
+    4. UniverseFunnel（四层漏斗筛选器）
+       - broad_all → broad: 流动性过滤（avg_dollar_volume >= 阈值）
+       - broad → candidate: 市值过滤 + 流动性排名截取
+       - candidate → u100: 因子综合评分 Top N（Phase 1 按市值简化）
+       - 参数可通过 FunnelConfig dataclass 配置
+
+    5. StockDataSyncer（数据同步管道编排器）
+       - sync_assets: Alpaca → broad_all
+       - sync_ohlcv / sync_ohlcv_full: Alpaca → Parquet（增量/全量）
+       - update_liquidity: Parquet → SQLite（计算 avg_volume, avg_dollar_volume）
+       - run_funnel: 运行四层漏斗筛选
+       - run_weekly_sync: 编排以上全部步骤
+
+    来源：Tech Design §2.1-§2.2, PRD §3.2
+    实现状态：已完成（2026-04-02）
+    已知 Gap：见 GitHub Issues #2, #3, #4
+constraints:
+  - "constraint-01-stock-data-001"
+  - "constraint-01-stock-data-002"
+  - "constraint-01-stock-data-003"
+  - "constraint-01-stock-data-004"
+  - "constraint-01-stock-data-005"
 indexing:
   type: intent
   priority: high
-  layer: epic
+  layer: feature
   domain: "quantitative-trading"
-  tags: []
+  tags: ["parquet", "sqlite", "ohlcv", "universe", "alpaca", "funnel"]
 provenance:
-  source_type: prd_extraction
-  confidence: 0.8
-  source_ref: "PRD + Feature Hierarchy + Tech Design"
-relations: []
-anchors: []
+  source_type: implementation
+  confidence: 1.0
+  source_ref: "src/stockbee/stock_data/, tests/test_stock_data.py"
+relations:
+  - { type: depends_on, target: "intent-07-provider-arch-001", reason: "继承 BaseProvider + CacheManager + Registry" }
+anchors:
+  - { file: "src/stockbee/stock_data/parquet_store.py", type: implementation }
+  - { file: "src/stockbee/stock_data/universe_store.py", type: implementation }
+  - { file: "src/stockbee/stock_data/alpaca_market.py", type: implementation }
+  - { file: "src/stockbee/stock_data/funnel.py", type: implementation }
+  - { file: "src/stockbee/stock_data/sync.py", type: implementation }

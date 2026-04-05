@@ -1,0 +1,47 @@
+spec_id: "constraint-01-stock-data-003"
+type: constraint
+state: active
+intent:
+  summary: "SQLite WAL 模式，universe_members + universe_snapshots 双表"
+  detail: |
+    SQLite 数据库存储四层漏斗元数据，启用 WAL 模式支持并发读。
+
+    universe_members 表：
+      - ticker TEXT NOT NULL
+      - level TEXT NOT NULL CHECK(level IN ('broad_all','broad','candidate','u100'))
+      - sector TEXT
+      - market_cap REAL
+      - avg_volume REAL
+      - avg_dollar_volume REAL
+      - short_able INTEGER DEFAULT 1
+      - added_at TEXT NOT NULL
+      - removed_at TEXT（NULL 表示当前活跃）
+      - PRIMARY KEY (ticker, level, added_at)
+
+    universe_snapshots 表：
+      - snapshot_date TEXT NOT NULL
+      - level TEXT NOT NULL
+      - ticker_count INTEGER NOT NULL
+      - tickers_json TEXT NOT NULL（JSON 数组，排序后的 ticker 列表）
+      - PRIMARY KEY (snapshot_date, level)
+
+    索引：idx_universe_level_active ON (level, removed_at)
+constraints:
+  - "必须使用 WAL 模式（PRAGMA journal_mode=WAL）"
+  - "level 字段只接受 4 个枚举值"
+  - "removed_at 为 NULL 表示当前活跃成员"
+  - "每次 upsert 同时保存 snapshot 用于历史查询"
+  - "as_of 时间切片查询基于 added_at/removed_at 区间"
+indexing:
+  type: constraint
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["sqlite", "wal", "schema", "universe", "time-slice"]
+provenance:
+  source_type: implementation_verified
+  confidence: 1.0
+  source_ref: "Tech Design §2.1, src/stockbee/stock_data/universe_store.py"
+relations: []
+anchors:
+  - { file: "src/stockbee/stock_data/universe_store.py", type: implementation }

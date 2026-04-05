@@ -1,0 +1,34 @@
+spec_id: "decision-01-stock-data-003"
+type: decision
+state: active
+intent:
+  summary: "按 ticker 分文件 vs 单一大 Parquet vs 分区目录"
+  detail: |
+    决策：每只 ticker 一个独立 Parquet 文件（data/ohlcv/{TICKER}.parquet）。
+
+    评估选项：
+    - 单文件（all_ohlcv.parquet）：简单但无法并行写入，增量更新需要重写整个文件
+    - 分区目录（按日期分区）：适合海量数据但 4000 只×5 年数据量不需要
+    - 按 ticker 分文件：增量更新只需重写单个文件，支持并行 I/O，文件大小均匀
+
+    决策理由：
+    - 增量同步（sync_ohlcv）只需读写变动的 ticker 文件，不影响其他 ticker
+    - 单个文件大小 ~60KB（252天×6列×4字节×5年），I/O 开销极小
+    - 支持并行读取多只股票
+    - 简单直观，便于手动检查和调试
+
+    代价：4000 个小文件，但现代文件系统处理无压力。
+constraints: []
+indexing:
+  type: decision
+  priority: medium
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["parquet", "file-layout", "adr"]
+provenance:
+  source_type: implementation
+  confidence: 1.0
+  source_ref: "src/stockbee/stock_data/parquet_store.py"
+relations: []
+anchors:
+  - { file: "src/stockbee/stock_data/parquet_store.py", type: implementation }

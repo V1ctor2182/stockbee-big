@@ -1,0 +1,42 @@
+spec_id: "change-01-stock-data-001"
+type: change
+state: active
+intent:
+  summary: "01-stock-data 模块初始实现（2026-04-02）"
+  detail: |
+    从零实现了 stock-data 模块全部 5 个 milestone：
+
+    新增文件：
+    - src/stockbee/stock_data/__init__.py — 模块入口
+    - src/stockbee/stock_data/parquet_store.py — ParquetMarketData (MarketDataProvider 回测实现)
+    - src/stockbee/stock_data/universe_store.py — SqliteUniverseProvider (UniverseProvider 实现)
+    - src/stockbee/stock_data/funnel.py — UniverseFunnel 四层漏斗筛选器
+    - src/stockbee/stock_data/alpaca_market.py — AlpacaMarketData (MarketDataProvider 实盘实现)
+    - src/stockbee/stock_data/sync.py — StockDataSyncer 同步管道编排器
+    - tests/test_stock_data.py — 24 个单元测试
+
+    Git commits（5 个原子提交）：
+    - c1e9a0a [01-stock-data] feat: add ParquetMarketData provider
+    - 4598e46 [01-stock-data] feat: add SqliteUniverseProvider with four-tier schema
+    - 7e287b3 [01-stock-data] feat: add UniverseFunnel four-tier filtering logic
+    - 04fc58e [01-stock-data] feat: add AlpacaMarketData and StockDataSyncer pipeline
+    - 24a262d [01-stock-data] test: add 24 tests for Parquet, SQLite, and funnel
+
+    实测验证（2026-04-03）：
+    - Alpaca API 连接成功，获取 12,654 只可交易美股
+    - OHLCV 拉取 + Parquet 存储 + 读回验证通过（AAPL/MSFT/GOOG/AMZN/NVDA）
+    - 四层漏斗筛选验证通过
+    - 118/118 测试通过（94 existing + 24 new）
+constraints: []
+indexing:
+  type: change
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["initial-implementation", "changelog"]
+provenance:
+  source_type: git_history
+  confidence: 1.0
+  source_ref: "git log c1e9a0a..24a262d"
+relations: []
+anchors: []

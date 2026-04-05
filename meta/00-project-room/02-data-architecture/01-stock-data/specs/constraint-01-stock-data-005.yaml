@@ -1,0 +1,34 @@
+spec_id: "constraint-01-stock-data-005"
+type: constraint
+state: active
+intent:
+  summary: "Alpaca API 为唯一实盘数据源，alpaca-py 为可选依赖"
+  detail: |
+    实盘 OHLCV 和资产列表通过 Alpaca API 获取：
+    - AlpacaMarketData 使用 alpaca-py SDK（StockHistoricalDataClient）
+    - get_all_tradable_assets 使用 TradingClient 获取资产列表
+    - Paper Trading 端点：https://paper-api.alpaca.markets/v2
+    - alpaca-py 为可选依赖，回测模式不需要安装
+
+    API 限制（免费账户）：
+    - 200 requests/min
+    - 分批拉取 batch_size=100 符号/次
+constraints:
+  - "alpaca-py 未安装时 _do_initialize 抛出 ImportError 并给出安装提示"
+  - "API key 通过 ProviderConfig.params 传入，不硬编码"
+  - "adj_close 当前用 VWAP 近似（已知 Gap，见 Issue #4）"
+  - "market_cap 和 sector 从 Alpaca 获取为 None（已知 Gap，见 Issue #2）"
+indexing:
+  type: constraint
+  priority: medium
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["alpaca", "api", "dependency", "live"]
+provenance:
+  source_type: implementation_verified
+  confidence: 1.0
+  source_ref: "src/stockbee/stock_data/alpaca_market.py, 实测验证 2026-04-03"
+relations: []
+anchors:
+  - { file: "src/stockbee/stock_data/alpaca_market.py", type: implementation }
+  - { file: "config/providers-live.yaml", type: config }

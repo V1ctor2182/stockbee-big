@@ -1,0 +1,44 @@
+spec_id: "context-01-stock-data-001"
+type: context
+state: active
+intent:
+  summary: "已知 Gap 和待解决问题"
+  detail: |
+    三个已知 Gap 已记录为 GitHub Issues：
+
+    1. Issue #2 — market_cap 和 sector 数据缺失
+       - 原因：Alpaca 资产 API 不提供这两个字段
+       - 影响：漏斗的市值过滤和行业分析失效
+       - 方案：从 FundamentalProvider（Polygon.io / Yahoo Finance / yfinance）补充
+       - 优先级：高（漏斗依赖 market_cap）
+
+    2. Issue #3 — 全量历史 OHLCV 同步未实测
+       - 原因：只用 5 只 × 1 周验证了通路
+       - 影响：4000只×5年 的 sync_ohlcv_full 未验证耗时和限流
+       - 方案：实跑并加入 rate limit sleep + 断点续传
+       - 优先级：中（不影响架构，需要执行验证）
+
+    3. Issue #4 — adj_close 使用 VWAP 近似
+       - 原因：Alpaca 不提供真实 adjusted close
+       - 影响：涉及拆股/分红的回测会有偏差
+       - 方案：从 Yahoo Finance 或 Polygon.io 补充真实复权价格
+       - 优先级：中（Phase 1 可暂时接受）
+
+    其他注意事项：
+    - alpaca-py 和 pytz 需要手动安装（可选依赖）
+    - data/ 目录已加入 .gitignore
+    - 测试覆盖 24 个用例，不包含 AlpacaMarketData（需 API key）
+constraints: []
+indexing:
+  type: context
+  priority: medium
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["gaps", "issues", "known-limitations"]
+provenance:
+  source_type: implementation_verified
+  confidence: 1.0
+  source_ref: "GitHub Issues #2 #3 #4, 实测验证 2026-04-03"
+relations: []
+anchors:
+  - { file: "src/stockbee/stock_data/alpaca_market.py", type: implementation }
