@@ -1,0 +1,34 @@
+spec_id: "change-2026-04-05-g2-tests"
+type: change
+state: active
+intent:
+  summary: "52 G2Classifier 测试：规则引擎、mock FinBERT、批量、集成"
+  detail: |
+    为 G2Classifier 添加完整测试覆盖：
+    - _is_classifiable: ASCII ratio 边界、中文、空文本 (8 tests)
+    - 规则引擎情绪分类: positive/negative/neutral/balanced/empty/non-English (6 tests)
+    - 主题分类: 6 topic + other fallback + highest-count 优先 (8 tests)
+    - 重要度评分: topic 权重、边界 0-1、文本长度 (4 tests)
+    - 紧急度评分: high/medium/low + precedence (6 tests)
+    - FinBERT mock: positive/negative/neutral + fallback + non-English skip (6 tests)
+    - 批量分类: rules/empty/snippets/finbert/mixed/fallback (7 tests)
+    - 文本预处理: truncation/join/None/empty (4 tests)
+    - G2Result 默认值 (1 test)
+    - G1→G2 集成: filter-then-classify + store pipeline (2 tests)
+
+    所有 FinBERT 测试使用 mock pipeline，不依赖 transformers/torch 安装。
+constraints: []
+indexing:
+  type: change
+  priority: medium
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["test", "g2-classifier", "finbert", "mock"]
+provenance:
+  source_type: commit
+  confidence: 1.0
+  source_ref: "commit on news_data branch, 2026-04-05"
+relations:
+  - { type: implements, target: "intent-02-news-data-001", reason: "m3 + m6 测试覆盖" }
+anchors:
+  - { file: "tests/test_news_data.py", type: test }

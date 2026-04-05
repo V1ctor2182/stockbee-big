@@ -45,10 +45,10 @@ timeline:
           target_start: "2026-04-07"
           target_end: "2026-04-16"
           estimated_days: 7
-          status: planning
-          completion: 0.0
+          status: in_progress
+          completion: 0.50
           depends_on: ["07-provider-arch"]
-          note: "研究完成，与 stock-data 并行"
+          note: "m1-m3 completed, m6 in_progress (G2 tests added)"
 
         - room: "03-macro-data"
           parent: "02-data-architecture"
@@ -475,4 +475,4 @@ timeline:
     in_progress: 0
     planning: 25
     backlog: 14
-    completion: 0.025
+    completion: 0.045

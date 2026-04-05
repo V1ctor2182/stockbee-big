@@ -1,5 +1,5 @@
 progress:
-  completion: 0.17
+  completion: 0.50
   milestones:
     - id: "m1-SqliteNewsProvider"
       name: "SqliteNewsProvider — news_events 表 + 查询接口"
@@ -17,8 +17,8 @@ progress:
         并发写入安全（WAL）、SQL 注入防护（参数化查询）。
     - id: "m2-G1-快速过滤"
       name: "G1 快速过滤管道"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-04"
       estimated_files: ["src/stockbee/news_data/g1_filter.py"]
       estimated_lines: 150
       depends_on: ["m1-SqliteNewsProvider"]
@@ -30,8 +30,8 @@ progress:
         相似但不同的新闻（如同一事件的更新报道）、ticker 误匹配（如 "Apple" 水果 vs AAPL）。
     - id: "m3-G2-FinBERT-分类"
       name: "G2 FinBERT 分类评分"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-05"
       estimated_files: ["src/stockbee/news_data/g2_classifier.py"]
       estimated_lines: 180
       depends_on: ["m2-G1-快速过滤"]
@@ -73,7 +73,7 @@ progress:
         增量同步时间窗口重叠（避免漏取）。
     - id: "m6-测试"
       name: "测试"
-      status: pending
+      status: in_progress
       completed_at: null
       estimated_files: ["tests/test_news_data.py"]
       estimated_lines: 280
@@ -83,4 +83,14 @@ progress:
         G2 FinBERT mock（情绪输出格式、主题分类覆盖、batch 处理）。
         G3 Haiku mock（触发条件、日限计数、降级）。同步管道 mock 端到端。
         Edge cases 专项测试：空数据、异常输入、时区边界、并发写入。
-  commits: []
+  commits:
+    - hash: "85114fe"
+      date: "2026-04-05"
+      message: "[02-news-data] test: add 52 G2 classifier tests — mock FinBERT, batch, rules, integration"
+      files_changed: 1
+      specs_affected:
+        - intent-02-news-data-001 (no change — 3/6 milestones done, draft kept)
+      milestones_affected:
+        - m2-G1-快速过滤 (→ completed, catch-up from f5152e2)
+        - m3-G2-FinBERT-分类 (→ completed, catch-up from a026aff)
+        - m6-测试 (→ in_progress)

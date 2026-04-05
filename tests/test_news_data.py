@@ -2,11 +2,13 @@
 """News Data 模块测���。
 # PYTHONPATH=src python -m pytest tests/test_news_data.py -v
 
-测试对象：SqliteNewsProvider、G1Filter
+测试对象：SqliteNewsProvider、G1Filter、G2Classifier
 不测 NewsAPI/Perplexity（需要 API key），不测 NewsDataSyncer（集成测试）。
+G2 测试使用 mock FinBERT（不依赖 transformers/torch 安装）。
 """
 
 from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
@@ -28,6 +30,16 @@ from stockbee.news_data.g1_filter import (
     _COMMON_WORDS,
     _COMPANY_TO_TICKER,
     _VALID_SHORT_TICKERS,
+)
+from stockbee.news_data.g2_classifier import (
+    G2Classifier,
+    G2Config,
+    G2Result,
+    FINBERT_MAX_LENGTH,
+    MIN_ASCII_RATIO,
+    _TOPIC_KEYWORDS,
+    _URGENCY_HIGH_KEYWORDS,
+    _URGENCY_MEDIUM_KEYWORDS,
 )
 
 
@@ -753,3 +765,540 @@ class TestG1StoreIntegration:
         assert id1 is not None
         assert id2 is not None
         assert provider.get_news().shape[0] == 2
+
+
+# =========================================================================
+# G2Classifier — Fixtures
+# =========================================================================
+
+@pytest.fixture
+def g2_rules() -> G2Classifier:
+    """纯规则引擎模式的 G2 分类器（不加载 FinBERT）。"""
+    return G2Classifier(G2Config(use_finbert=False))
+
+
+def _mock_finbert_pipeline(label: str = "positive", score: float = 0.92):
+    """构造一个 mock FinBERT pipeline，单条和批量都返回固定结果。"""
+    def pipeline_fn(text_or_texts, **kwargs):
+        if isinstance(text_or_texts, list):
+            return [{"label": label, "score": score}] * len(text_or_texts)
+        return [{"label": label, "score": score}]
+    return pipeline_fn
+
+
+# =========================================================================
+# G2Classifier — 可分类性检查
+# =========================================================================
+
+class TestG2Classifiable:
+
+    def test_english_text_classifiable(self):
+        assert G2Classifier._is_classifiable("Apple beats earnings expectations")
+
+    def test_empty_text_not_classifiable(self):
+        assert not G2Classifier._is_classifiable("")
+
+    def test_whitespace_not_classifiable(self):
+        assert not G2Classifier._is_classifiable("   ")
+
+    def test_pure_numbers_not_classifiable(self):
+        assert not G2Classifier._is_classifiable("123456789")
+
+    def test_pure_symbols_not_classifiable(self):
+        assert not G2Classifier._is_classifiable("!@#$%^&*()")
+
+    def test_chinese_text_below_ascii_ratio(self):
+        assert not G2Classifier._is_classifiable("苹果公司公布第四季度财报超预期")
+
+    def test_mixed_text_above_ratio(self):
+        # Enough ASCII letters to pass the threshold
+        assert G2Classifier._is_classifiable("Apple 苹果 beats earnings")
+
+    def test_ascii_ratio_boundary(self):
+        # Exactly at the boundary: 5 ascii letters out of 10 non-space chars = 0.5
+        assert G2Classifier._is_classifiable("abcde12345")
+
+
+# =========================================================================
+# G2Classifier — 规则引擎情绪分类
+# =========================================================================
+
+class TestG2RuleSentiment:
+
+    def test_positive_sentiment(self, g2_rules):
+        r = g2_rules.classify("Company beats earnings, strong growth and record profit")
+        assert r.sentiment == "positive"
+        assert r.sentiment_score > 0.5
+        assert not r.used_finbert
+
+    def test_negative_sentiment(self, g2_rules):
+        r = g2_rules.classify("Stock crash amid loss and decline, weak outlook")
+        assert r.sentiment == "negative"
+        assert r.sentiment_score < 0.5
+
+    def test_neutral_sentiment_no_keywords(self, g2_rules):
+        r = g2_rules.classify("Company announces quarterly results for review")
+        assert r.sentiment == "neutral"
+        assert r.sentiment_score == 0.5
+        assert r.confidence == 0.3  # no keywords → 0.3
+
+    def test_neutral_sentiment_balanced_keywords(self, g2_rules):
+        r = g2_rules.classify("Stock rise but also loss reported for the quarter")
+        assert r.sentiment == "neutral"
+        assert r.confidence == 0.4  # balanced → 0.4
+
+    def test_empty_headline(self, g2_rules):
+        r = g2_rules.classify("")
+        assert r.sentiment == "neutral"
+        assert r.sentiment_score == 0.5
+        assert r.confidence == 0.0
+
+    def test_unclassifiable_text_returns_neutral(self, g2_rules):
+        r = g2_rules.classify("苹果公布财报超预期增长数据报告")
+        assert r.sentiment == "neutral"
+        assert r.confidence == 0.1  # _is_classifiable false → 0.1
+
+
+# =========================================================================
+# G2Classifier — 主题分类
+# =========================================================================
+
+class TestG2Topic:
+
+    def test_earnings_topic(self, g2_rules):
+        r = g2_rules.classify("Company earnings beat forecast, revenue and profit up")
+        assert r.topic == "earnings"
+
+    def test_regulatory_topic(self, g2_rules):
+        r = g2_rules.classify("SEC launches probe into compliance violations and fines")
+        assert r.topic == "regulatory"
+
+    def test_merger_topic(self, g2_rules):
+        r = g2_rules.classify("Merger deal announced as company makes acquisition bid")
+        assert r.topic == "merger"
+
+    def test_litigation_topic(self, g2_rules):
+        r = g2_rules.classify("Patent lawsuit filed in court, trial verdict pending")
+        assert r.topic == "litigation"
+
+    def test_policy_topic(self, g2_rules):
+        r = g2_rules.classify("Federal reserve raises interest rate amid inflation concerns")
+        assert r.topic == "policy"
+
+    def test_product_topic(self, g2_rules):
+        r = g2_rules.classify("Company launch new product feature with update and upgrade")
+        assert r.topic == "product"
+
+    def test_other_topic_fallback(self, g2_rules):
+        r = g2_rules.classify("The weather is nice today in the city")
+        assert r.topic == "other"
+
+    def test_topic_picks_highest_count(self, g2_rules):
+        """多个主题关键词时，匹配最多的胜出。"""
+        # 3 earnings keywords vs 1 regulatory keyword
+        r = g2_rules.classify("Earnings revenue profit up, SEC investigation announced")
+        assert r.topic == "earnings"
+
+
+# =========================================================================
+# G2Classifier — 重要度评分
+# =========================================================================
+
+class TestG2Importance:
+
+    def test_merger_highest_base_weight(self, g2_rules):
+        r = g2_rules.classify("Major merger acquisition deal announced today")
+        assert r.importance_score >= 0.9  # merger base = 0.9
+
+    def test_other_topic_lowest_weight(self, g2_rules):
+        r = g2_rules.classify("The weather is nice today in the city")
+        assert r.importance_score < 0.5  # other base = 0.3
+
+    def test_importance_bounded_zero_to_one(self, g2_rules):
+        # Long text + high-weight topic to push score up
+        long_text = "Major merger acquisition " * 200
+        r = g2_rules.classify(long_text)
+        assert 0.0 <= r.importance_score <= 1.0
+
+    def test_longer_text_slightly_more_important(self, g2_rules):
+        short = g2_rules.classify("Earnings beat expectations")
+        long = g2_rules.classify("Earnings beat expectations " + "details " * 100)
+        assert long.importance_score >= short.importance_score
+
+
+# =========================================================================
+# G2Classifier — 紧急度评分
+# =========================================================================
+
+class TestG2Urgency:
+
+    def test_high_urgency_breaking(self, g2_rules):
+        r = g2_rules.classify("Breaking news: market crash alert issued")
+        assert r.urgency == "high"
+
+    def test_high_urgency_fraud(self, g2_rules):
+        r = g2_rules.classify("Emergency: fraud scandal discovered at company")
+        assert r.urgency == "high"
+
+    def test_medium_urgency_downgrade(self, g2_rules):
+        r = g2_rules.classify("Analyst downgrade issued for stock target")
+        assert r.urgency == "medium"
+
+    def test_medium_urgency_layoff(self, g2_rules):
+        r = g2_rules.classify("Company announces layoff and restructure plan")
+        assert r.urgency == "medium"
+
+    def test_low_urgency_default(self, g2_rules):
+        r = g2_rules.classify("Company reports quarterly results for investors")
+        assert r.urgency == "low"
+
+    def test_high_takes_precedence_over_medium(self, g2_rules):
+        """同时包含 high 和 medium 关键词时，high 优先。"""
+        r = g2_rules.classify("Breaking news: analyst downgrade amid crash")
+        assert r.urgency == "high"
+
+
+# =========================================================================
+# G2Classifier — FinBERT mock 集成
+# =========================================================================
+
+class TestG2FinBERT:
+
+    def test_finbert_positive(self):
+        g2 = G2Classifier(G2Config(use_finbert=True))
+        g2._pipeline = _mock_finbert_pipeline("positive", 0.92)
+        g2._finbert_available = True
+        r = g2.classify("Apple beats earnings expectations by wide margin")
+        assert r.sentiment == "positive"
+        assert r.used_finbert
+        assert r.confidence == 0.92
+        # score = 0.5 + 0.92/2 = 0.96
+        assert r.sentiment_score == pytest.approx(0.96, abs=0.01)
+
+    def test_finbert_negative(self):
+        g2 = G2Classifier(G2Config(use_finbert=True))
+        g2._pipeline = _mock_finbert_pipeline("negative", 0.85)
+        g2._finbert_available = True
+        r = g2.classify("Company reports massive quarterly loss today")
+        assert r.sentiment == "negative"
+        assert r.used_finbert
+        # score = 0.5 - 0.85/2 = 0.075
+        assert r.sentiment_score < 0.5
+
+    def test_finbert_neutral(self):
+        g2 = G2Classifier(G2Config(use_finbert=True))
+        g2._pipeline = _mock_finbert_pipeline("neutral", 0.70)
+        g2._finbert_available = True
+        r = g2.classify("Company announces quarterly results review")
+        assert r.sentiment == "neutral"
+        assert r.sentiment_score == 0.5
+
+    def test_finbert_fallback_on_failure(self):
+        """FinBERT 推理异常时降级到规则引擎。"""
+        g2 = G2Classifier(G2Config(use_finbert=True))
+        g2._finbert_available = True
+        g2._pipeline = MagicMock(side_effect=RuntimeError("model error"))
+        r = g2.classify("Stock surge and profit growth reported")
+        assert not r.used_finbert  # fell back to rules
+        assert r.sentiment == "positive"
+
+    def test_finbert_skipped_for_non_english(self):
+        """非英语文本跳过 FinBERT，直接返回 neutral。"""
+        g2 = G2Classifier(G2Config(use_finbert=True))
+        g2._pipeline = _mock_finbert_pipeline("positive", 0.99)
+        g2._finbert_available = True
+        r = g2.classify("苹果公司公布第四季度财报超预期增长数据")
+        assert not r.used_finbert
+        assert r.sentiment == "neutral"
+
+    def test_finbert_not_available_uses_rules(self):
+        """transformers/torch 未安装时使用规则引擎。"""
+        g2 = G2Classifier(G2Config(use_finbert=True))
+        g2._finbert_available = False
+        r = g2.classify("Stock crash and decline continues for market")
+        assert not r.used_finbert
+        assert r.sentiment == "negative"
+
+
+# =========================================================================
+# G2Classifier — 批量分类
+# =========================================================================
+
+class TestG2Batch:
+
+    def test_batch_rules_mode(self, g2_rules):
+        items = [
+            {"headline": "Apple beats earnings expectations today"},
+            {"headline": "Stock crash amid loss and decline"},
+            {"headline": "Weather is nice today in city"},
+        ]
+        results = g2_rules.classify_batch(items)
+        assert len(results) == 3
+        assert results[0].sentiment == "positive"
+        assert results[1].sentiment == "negative"
+        assert results[2].sentiment == "neutral"
+
+    def test_batch_empty(self, g2_rules):
+        assert g2_rules.classify_batch([]) == []
+
+    def test_batch_with_snippets(self, g2_rules):
+        items = [
+            {"headline": "Big deal announced", "snippet": "merger acquisition buyout confirmed"},
+        ]
+        results = g2_rules.classify_batch(items)
+        assert results[0].topic == "merger"
+
+    def test_batch_with_empty_headline(self, g2_rules):
+        items = [
+            {"headline": ""},
+            {"headline": "Valid earnings beat forecast"},
+        ]
+        results = g2_rules.classify_batch(items)
+        assert results[0].sentiment == "neutral"
+        assert results[0].confidence == 0.0
+        assert results[1].topic == "earnings"
+
+    def test_batch_finbert_mock(self):
+        """批量 FinBERT 推理 mock。"""
+        g2 = G2Classifier(G2Config(use_finbert=True))
+        g2._pipeline = _mock_finbert_pipeline("positive", 0.88)
+        g2._finbert_available = True
+        items = [
+            {"headline": "Apple beats earnings expectations"},
+            {"headline": "Tesla surges on strong demand"},
+        ]
+        results = g2.classify_batch(items)
+        assert len(results) == 2
+        assert all(r.used_finbert for r in results)
+        assert all(r.sentiment == "positive" for r in results)
+
+    def test_batch_finbert_mixed_classifiable(self):
+        """批量中混合可分类和不可分类文本。"""
+        g2 = G2Classifier(G2Config(use_finbert=True))
+        g2._pipeline = _mock_finbert_pipeline("negative", 0.80)
+        g2._finbert_available = True
+        items = [
+            {"headline": "Stock crash amid loss reported"},
+            {"headline": "苹果公司公布财报超预期增长"},  # non-English
+            {"headline": "Market decline continues today"},
+        ]
+        results = g2.classify_batch(items)
+        assert results[0].used_finbert
+        assert not results[1].used_finbert  # skipped FinBERT
+        assert results[1].sentiment == "neutral"
+        assert results[2].used_finbert
+
+    def test_batch_finbert_fallback_on_error(self):
+        """批量 FinBERT 异常时整体降级到规则引擎。"""
+        g2 = G2Classifier(G2Config(use_finbert=True))
+        g2._finbert_available = True
+        g2._pipeline = MagicMock(side_effect=RuntimeError("batch error"))
+        items = [
+            {"headline": "Stock surge and profit growth"},
+            {"headline": "Market crash and loss decline"},
+        ]
+        results = g2.classify_batch(items)
+        assert not results[0].used_finbert
+        assert not results[1].used_finbert
+        assert results[0].sentiment == "positive"
+        assert results[1].sentiment == "negative"
+
+
+# =========================================================================
+# G2Classifier — 文本预处理
+# =========================================================================
+
+class TestG2TextPrep:
+
+    def test_truncation_long_text(self):
+        g2 = G2Classifier(G2Config(use_finbert=False))
+        long_text = "A" * (FINBERT_MAX_LENGTH * 4 + 500)
+        prepared = g2._prepare_text(long_text)
+        assert len(prepared) == FINBERT_MAX_LENGTH * 4
+
+    def test_headline_plus_snippet_joined(self):
+        g2 = G2Classifier(G2Config(use_finbert=False))
+        text = g2._prepare_text("headline here", "snippet here")
+        assert "headline here" in text
+        assert "snippet here" in text
+
+    def test_none_headline(self):
+        g2 = G2Classifier(G2Config(use_finbert=False))
+        text = g2._prepare_text(None, "snippet only")
+        assert "snippet only" in text
+
+    def test_empty_returns_empty(self):
+        g2 = G2Classifier(G2Config(use_finbert=False))
+        assert g2._prepare_text("", None) == ""
+
+
+# =========================================================================
+# G2Classifier — G2Result 默认值
+# =========================================================================
+
+class TestG2Result:
+
+    def test_default_values(self):
+        r = G2Result()
+        assert r.sentiment == "neutral"
+        assert r.sentiment_score == 0.5
+        assert r.confidence == 0.0
+        assert r.topic == "other"
+        assert r.importance_score == 0.5
+        assert r.urgency == "low"
+        assert r.used_finbert is False
+
+
+# =========================================================================
+# Smoke Test — G1 → G2 集成
+# =========================================================================
+
+class TestG1G2Integration:
+
+    def test_g1_pass_then_g2_classify(self, g2_rules):
+        g1 = G1Filter()
+        event = {
+            "headline": "Apple beats Q4 earnings with record profit and growth",
+            "source": "reuters",
+            "timestamp": _now(),
+            "snippet": "Revenue exceeded expectations with strong guidance",
+        }
+        g1_result = g1.filter(**event)
+        assert g1_result.passed
+        assert "AAPL" in g1_result.tickers
+
+        g2_result = g2_rules.classify(event["headline"], event["snippet"])
+        assert g2_result.topic == "earnings"
+        assert g2_result.sentiment == "positive"
+        assert g2_result.importance_score > 0.5
+
+    def test_g1_g2_store_pipeline(self, provider, g2_rules):
+        """G1 → G2 → Store 完整管道。"""
+        g1 = G1Filter()
+        event = {
+            "headline": "Breaking: Tesla crash amid fraud scandal revealed",
+            "source": "bloomberg",
+            "timestamp": _now(),
+        }
+        g1r = g1.filter(**event)
+        assert g1r.passed
+
+        g2r = g2_rules.classify(event["headline"])
+        assert g2r.urgency == "high"
+
+        news_id = provider.insert_news(
+            headline=event["headline"],
+            source=event["source"],
+            timestamp=event["timestamp"],
+            tickers=g1r.tickers,
+            g_level=1,
+        )
+        assert news_id is not None
+
+        ok = provider.update_g_level(
+            news_id, g_level=2,
+            sentiment_score=g2r.sentiment_score,
+            importance_score=g2r.importance_score,
+        )
+        assert ok
+        row = provider.get_news_by_id(news_id)
+        assert row["g_level"] == 2
+        assert row["sentiment_score"] is not None
+
+
+# =========================================================================
+# Edge Cases — 子串误匹配回归测试
+# =========================================================================
+
+class TestG1SubstringEdgeCases:
+    """G1 ticker 提取不应被子串欺骗。"""
+
+    def test_pineapple_not_aapl(self, g1):
+        r = g1.filter("Pineapple juice sales surge in summer", "reuters", _now())
+        assert "AAPL" not in r.tickers
+
+    def test_gold_not_goldman(self, g1):
+        r = g1.filter("Gold prices hit new record this week", "reuters", _now())
+        assert "GS" not in r.tickers
+
+    def test_alphabet_still_matches_google(self, g1):
+        r = g1.filter("Alphabet reports strong cloud revenue growth", "reuters", _now())
+        assert "GOOG" in r.tickers or "GOOGL" in r.tickers
+
+    def test_dollar_ticker_lowercase(self, g1):
+        r = g1.filter("Buying more $aapl and $tsla today", "twitter", _now())
+        assert "AAPL" in r.tickers
+        assert "TSLA" in r.tickers
+
+    def test_multi_class_ticker_brk_a(self, g1):
+        r = g1.filter("BRK.A hits new high on Berkshire results", "reuters", _now())
+        assert "BRK.A" in r.tickers
+
+    def test_multi_class_ticker_dollar(self, g1):
+        r = g1.filter("Sold $BRK.B at the stock market today", "twitter", _now())
+        assert "BRK.B" in r.tickers
+
+    def test_future_timestamp_rejected(self, g1):
+        future = _now() + timedelta(days=30)
+        r = g1.filter("Fabricated future news headline here", "reuters", future)
+        assert not r.passed
+        assert "future" in r.reason
+
+    def test_slight_future_allowed(self, g1):
+        """允许 1 小时内的时钟偏差。"""
+        slight = _now() + timedelta(minutes=30)
+        r = g1.filter("News with minor clock skew here", "reuters", slight)
+        assert r.passed
+
+
+class TestG2SubstringEdgeCases:
+    """G2 关键词匹配不应被子串欺骗。"""
+
+    def test_said_not_ai_topic(self, g2_rules):
+        r = g2_rules.classify("The CEO said results were as certain as we again expected")
+        assert r.topic != "product"  # "ai" in "said"/"again" 不应触发
+
+    def test_second_sector_not_regulatory(self, g2_rules):
+        r = g2_rules.classify("The technology sector saw its second quarterly improvement")
+        assert r.topic != "regulatory"  # "sec" in "second"/"sector" 不应触发
+
+    def test_issue_not_litigation(self, g2_rules):
+        r = g2_rules.classify("The main issue remains inventory management this quarter")
+        assert r.topic != "litigation"  # "sue" in "issue" 不应触发
+
+    def test_fedex_not_policy(self, g2_rules):
+        r = g2_rules.classify("FedEx reports strong delivery numbers for holiday season")
+        assert r.topic != "policy"  # "fed" in "fedex" 不应触发
+
+    def test_ideal_forbidden_not_merger(self, g2_rules):
+        r = g2_rules.classify("The ideal forbidden strategy is under review by board")
+        assert r.topic != "merger"  # "deal"/"bid" in "ideal"/"forbidden" 不应触发
+
+    def test_surprise_against_not_positive(self, g2_rules):
+        r = g2_rules.classify("Surprise results against all expectations for the company")
+        assert r.sentiment != "positive"  # "rise"/"gain" in "surprise"/"against" 不应触发
+
+    def test_rainfall_not_negative(self, g2_rules):
+        r = g2_rules.classify("Rainfall impacts crop yields across midwest farming states")
+        assert r.sentiment != "negative"  # "fall" in "rainfall" 不应触发
+
+    def test_surgeon_not_high_urgency(self, g2_rules):
+        r = g2_rules.classify("The surgeon performed the procedure at hospital today")
+        assert r.urgency != "high"  # "surge" in "surgeon" 不应触发
+
+    def test_asphalt_not_high_urgency(self, g2_rules):
+        r = g2_rules.classify("Workers repaved the asphalt road near the office")
+        assert r.urgency != "high"  # "halt" in "asphalt" 不应触发
+
+    def test_praised_not_medium_urgency(self, g2_rules):
+        r = g2_rules.classify("The executive praised the new restructuring initiative")
+        assert r.urgency != "medium"  # "raise" in "praised" 不应触发
+
+    def test_real_keywords_still_work(self, g2_rules):
+        """修复子串后，真正的关键词仍然匹配。"""
+        r = g2_rules.classify("Breaking alert: SEC probe into fraud scandal at company")
+        assert r.urgency == "high"
+        assert r.topic == "regulatory"
+
+        r2 = g2_rules.classify("Stock surge and profit beat expectations with growth")
+        assert r2.sentiment == "positive"
