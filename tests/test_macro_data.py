@@ -35,12 +35,12 @@ def macro_data() -> pd.DataFrame:
     # 模拟各频率指标
     # 日频指标：每天有值
     for code in ["DFF", "T10Y2Y", "DGS10", "VIXCLS", "DEXUSEU",
-                 "DCOILWTICO", "GOLDAMGBD228NLBM", "BAMLH0A0HY2"]:
+                 "DCOILWTICO", "BAMLH0A0HYM2"]:
         data[code] = rng.normal(2.0, 0.5, 300)
 
     # 月频指标：每月一个值，其余 NaN
     for code in ["PAYEMS", "UNRATE", "CPIAUCSL", "PPIFIS",
-                 "INDPRO", "EXHYLD", "M2SL"]:
+                 "INDPRO", "M2SL", "PCOPPUSDM"]:
         vals = np.full(300, np.nan)
         # 每 ~21 个交易日放一个值
         for i in range(0, 300, 21):
@@ -55,7 +55,7 @@ def macro_data() -> pd.DataFrame:
         data[code] = vals
 
     # 季频指标：每 ~63 天一个值
-    for code in ["GDP"]:
+    for code in ["GDP", "DRTSCILM"]:
         vals = np.full(300, np.nan)
         for i in range(0, 300, 63):
             vals[i] = rng.normal(25000, 500)
