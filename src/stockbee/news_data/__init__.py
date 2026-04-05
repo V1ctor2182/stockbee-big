@@ -9,8 +9,12 @@
 - NewsDataSyncer: 同步管道编排
 """
 
+from .g1_filter import G1Config, G1Filter, G1Result
 from .news_store import SqliteNewsProvider
 
 __all__ = [
     "SqliteNewsProvider",
+    "G1Filter",
+    "G1Config",
+    "G1Result",
 ]
