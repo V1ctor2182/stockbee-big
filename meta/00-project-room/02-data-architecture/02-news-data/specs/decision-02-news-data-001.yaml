@@ -2,9 +2,9 @@ spec_id: "decision-02-news-data-001"
 type: decision
 state: active
 intent:
-  summary: "SqliteNewsProvider 四项数据安全设计决策（review 驱动）"
+  summary: "SqliteNewsProvider 五项数据安全设计决策（review 驱动）"
   detail: |
-    /review 发现 4 个问题后的设计决策：
+    /review 发现问题后的设计决策：
 
     1. DB-level UNIQUE 去重 > 应用层 SELECT-then-INSERT
        问题：两个进程并发插入相同新闻时，应用层 SELECT 检查存在 TOCTOU 竞态。
@@ -14,21 +14,22 @@ intent:
     2. get_news() 默认 LIMIT 1000
        问题：无过滤条件时 SELECT * 全表加载到内存，数据增长后有 OOM 风险。
        决策：添加 limit 参数（默认 1000），所有查询都有上限保护。
-       需要全量数据时显式传 limit=999999。
 
     3. insert_news_batch() 单事务包裹
        问题：原实现每条新闻独立 commit，500 条 = 500 次 fsync (~1-2秒)。
-       决策：批量插入包裹在单个事务中，一次 commit/fsync (~5ms)，性能提升 ~200x。
-       失败时整批回滚，保证原子性。
+       决策：批量插入包裹在单个事务中，性能提升 ~200x。
 
-    4. Ticker 查询精确 JSON 匹配
-       问题：LIKE '%"A"%' 会误匹配 "AAPL"、"META" 等包含字母 A 的 ticker。
-       决策：使用 JSON 边界字符精确匹配（[" 和 "] 和 , " 组合），
-       确保查询 "A" 只匹配 ticker 恰好为 "A" 的记录。
+    4. Junction table > JSON 字符串存储 tickers
+       问题：ticker 存为 JSON 字符串 + LIKE 查询有两个硬伤——依赖 json.dumps
+       精确格式（脆弱），全表 LIKE 扫描不可索引（慢）。
+       决策：拆出 news_tickers(news_id, ticker) junction table，ticker 列有独立索引。
+       查询改为 JOIN + WHERE ticker IN (?) — 可索引、不依赖序列化格式、SQL 标准写法。
+       原 news_events.tickers TEXT 列已移除。
 constraints:
   - "去重必须在 DB 层保证，不依赖应用层检查"
   - "所有 SELECT 查询必须有 LIMIT 保护"
   - "批量写入必须使用单事务"
+  - "ticker 存储使用 junction table，不用 JSON 字符串"
 indexing:
   type: decision
   priority: high

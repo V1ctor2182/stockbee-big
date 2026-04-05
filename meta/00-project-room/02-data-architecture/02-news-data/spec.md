@@ -5,7 +5,7 @@
 **SQLite news_events 表 + G1/G2/G3 三级漏斗处理管道**
 
 7 个组件组成完整的新闻数据基础设施：
-- **SqliteNewsProvider** — WAL 模式 news_events 表，支持多条件查询（ticker/时间/重要度/g_level）
+- **SqliteNewsProvider** — WAL 模式 news_events + news_tickers junction table，支持多条件查询（ticker JOIN 索引/时间/重要度/g_level）
 - **G1 Filter** — 来源校验、时间校验、去重、实体识别（ticker 提取）
 - **G2 Classifier** — FinBERT 本地情绪分类 + 主题分类 + 重要度/紧急度评分
 - **G3 Analyzer** — Claude Haiku 深度分析，日限 10 篇，影响评估 + 权重建议
@@ -34,7 +34,7 @@
 - **DB-level UNIQUE 去重** > 应用层 SELECT-then-INSERT — 消除 TOCTOU 并发竞态，由 /review 驱动
 - **get_news() 默认 LIMIT 1000** — 防止无过滤查询 OOM，由 /review 驱动
 - **batch 插入单事务** > 逐条 commit — 500 条从 ~1.5s 降到 ~5ms（200x），由 /review 驱动
-- **Ticker 精确 JSON 匹配** > LIKE '%"X"%' — 避免短 ticker 误匹配长 ticker，由 /review 驱动
+- **Junction table (news_tickers)** > JSON 字符串 + LIKE — 可索引、不依赖序列化格式、SQL 标准写法，由 code review 驱动
 
 ## Contracts
 
@@ -42,5 +42,5 @@
 
 ---
 _spec 状态: intent (draft), decision (active)_
-_spec.md 最后更新: 2026-04-05_
+_spec.md 最后更新: 2026-04-05 (junction table refactor)_
 _specs 目录: 1 intent + 1 decision = 2 个 spec 文件_

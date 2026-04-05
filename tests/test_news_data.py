@@ -16,7 +16,7 @@ from stockbee.news_data.news_store import (
     SqliteNewsProvider,
     MAX_HEADLINE_LENGTH,
     MAX_SNIPPET_LENGTH,
-    _normalize_tickers,
+    _parse_tickers,
     _normalize_timestamp,
     _truncate,
 )
@@ -249,6 +249,73 @@ class TestGLevelUpdate:
 
 
 # =========================================================================
+# SqliteNewsProvider — Junction Table (news_tickers)
+# =========================================================================
+
+class TestJunctionTable:
+
+    def test_tickers_stored_in_junction_table(self, provider):
+        """Tickers 存入 news_tickers 表，而非 JSON 字符串列。"""
+        news_id = provider.insert_news(
+            "Multi ticker news headline", "reuters", _now(),
+            tickers=["AAPL", "MSFT", "NVDA"],
+        )
+        result = provider.get_news_by_id(news_id)
+        assert result["tickers"] == ["AAPL", "MSFT", "NVDA"]
+
+    def test_query_by_single_ticker_uses_join(self, provider):
+        """按 ticker 查询通过 JOIN 索引匹配，不依赖 JSON 格式。"""
+        provider.insert_news("Apple news for testing", "reuters", _now(), tickers=["AAPL"])
+        provider.insert_news("Google news for testing", "reuters", _now(), tickers=["GOOG"])
+        df = provider.get_news(tickers=["AAPL"])
+        assert len(df) == 1
+        assert df.iloc[0]["tickers"] == ["AAPL"]
+
+    def test_query_by_multiple_tickers(self, provider):
+        """查询多个 ticker 返回匹配任一的新闻（OR 逻辑）。"""
+        provider.insert_news("Apple earnings news", "reuters", _now(), tickers=["AAPL"])
+        provider.insert_news("Google earnings news", "reuters", _now(), tickers=["GOOG"])
+        provider.insert_news("Tesla earnings news", "reuters", _now(), tickers=["TSLA"])
+        df = provider.get_news(tickers=["AAPL", "GOOG"])
+        assert len(df) == 2
+
+    def test_no_duplicate_rows_for_multi_ticker_news(self, provider):
+        """一条新闻有多个 ticker，查询时不返回重复行。"""
+        provider.insert_news("Tech roundup news today", "reuters", _now(),
+                             tickers=["AAPL", "MSFT", "GOOG"])
+        # 查询 AAPL 和 MSFT，应该只返回 1 行（DISTINCT）
+        df = provider.get_news(tickers=["AAPL", "MSFT"])
+        assert len(df) == 1
+
+    def test_no_tickers_stored_as_empty(self, provider):
+        """无 ticker 的新闻在 junction table 无记录。"""
+        news_id = provider.insert_news("No ticker news here", "reuters", _now())
+        result = provider.get_news_by_id(news_id)
+        assert result["tickers"] == []
+
+    def test_short_ticker_exact_match(self, provider):
+        """短 ticker "A" 不会误匹配 "AAPL"。"""
+        provider.insert_news("Agilent earnings report", "reuters", _now(), tickers=["A"])
+        provider.insert_news("Apple earnings report", "reuters", _now(), tickers=["AAPL"])
+        df = provider.get_news(tickers=["A"])
+        assert len(df) == 1
+        assert df.iloc[0]["tickers"] == ["A"]
+
+    def test_batch_inserts_tickers(self, provider):
+        """batch 插入也正确写入 junction table。"""
+        events = [
+            {"headline": "Batch Apple news here", "source": "s", "timestamp": _now(),
+             "tickers": ["AAPL"]},
+            {"headline": "Batch Google news here", "source": "s", "timestamp": _now(),
+             "tickers": ["GOOG", "MSFT"]},
+        ]
+        provider.insert_news_batch(events)
+        df = provider.get_news(tickers=["MSFT"])
+        assert len(df) == 1
+        assert "MSFT" in df.iloc[0]["tickers"]
+
+
+# =========================================================================
 # SqliteNewsProvider — G3 每日计数器
 # =========================================================================
 
@@ -336,20 +403,20 @@ class TestProviderLifecycle:
 
 class TestHelpers:
 
-    def test_normalize_tickers_list(self):
-        assert _normalize_tickers(["aapl", "MSFT", "aapl"]) == '["AAPL", "MSFT"]'
+    def test_parse_tickers_list(self):
+        assert _parse_tickers(["aapl", "MSFT", "aapl"]) == ["AAPL", "MSFT"]
 
-    def test_normalize_tickers_csv_string(self):
-        assert _normalize_tickers("AAPL, msft, goog") == '["AAPL", "GOOG", "MSFT"]'
+    def test_parse_tickers_csv_string(self):
+        assert _parse_tickers("AAPL, msft, goog") == ["AAPL", "GOOG", "MSFT"]
 
-    def test_normalize_tickers_json_string(self):
-        assert _normalize_tickers('["aapl"]') == '["AAPL"]'
+    def test_parse_tickers_json_string(self):
+        assert _parse_tickers('["aapl"]') == ["AAPL"]
 
-    def test_normalize_tickers_none(self):
-        assert _normalize_tickers(None) == "[]"
+    def test_parse_tickers_none(self):
+        assert _parse_tickers(None) == []
 
-    def test_normalize_tickers_empty(self):
-        assert _normalize_tickers([]) == "[]"
+    def test_parse_tickers_empty(self):
+        assert _parse_tickers([]) == []
 
     def test_normalize_timestamp_naive(self):
         result = _normalize_timestamp(datetime(2026, 1, 1, 12, 0))

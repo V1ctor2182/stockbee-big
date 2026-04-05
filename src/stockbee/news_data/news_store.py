@@ -5,9 +5,11 @@ news_events 表存储所有经过 G1/G2/G3 处理的新闻事件。
 WAL 模式保证并发读写安全。
 
 Schema:
-    news_events: id, timestamp, source, source_url, tickers, headline,
+    news_events: id, timestamp, source, source_url, headline,
                  snippet, sentiment_score, importance_score,
                  reliability_score, g_level, analysis, created_at
+    news_tickers: news_id, ticker (junction table, indexed on ticker)
+    g3_daily_counts: date, count
 """
 
 from __future__ import annotations
@@ -36,7 +38,6 @@ CREATE TABLE IF NOT EXISTS news_events (
     timestamp         TEXT    NOT NULL,
     source            TEXT    NOT NULL,
     source_url        TEXT,
-    tickers           TEXT    NOT NULL DEFAULT '[]',
     headline          TEXT    NOT NULL,
     snippet           TEXT,
     sentiment_score   REAL,
@@ -45,6 +46,13 @@ CREATE TABLE IF NOT EXISTS news_events (
     g_level           INTEGER NOT NULL DEFAULT 0,
     analysis          TEXT,
     created_at        TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS news_tickers (
+    news_id  INTEGER NOT NULL,
+    ticker   TEXT    NOT NULL,
+    PRIMARY KEY (news_id, ticker),
+    FOREIGN KEY (news_id) REFERENCES news_events(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_news_timestamp
@@ -59,6 +67,9 @@ CREATE INDEX IF NOT EXISTS idx_news_importance
 CREATE UNIQUE INDEX IF NOT EXISTS idx_news_dedup
     ON news_events(headline, source);
 
+CREATE INDEX IF NOT EXISTS idx_nt_ticker
+    ON news_tickers(ticker);
+
 CREATE TABLE IF NOT EXISTS g3_daily_counts (
     date  TEXT PRIMARY KEY,
     count INTEGER NOT NULL DEFAULT 0
@@ -72,7 +83,6 @@ def _normalize_timestamp(ts: str | datetime) -> str | None:
         if ts.tzinfo is None:
             ts = ts.replace(tzinfo=timezone.utc)
         return ts.astimezone(timezone.utc).isoformat()
-    # 字符串：尝试解析后归一化
     try:
         dt = datetime.fromisoformat(ts)
         if dt.tzinfo is None:
@@ -90,36 +100,36 @@ def _truncate(text: str | None, max_len: int) -> str | None:
     return text[:max_len] if len(text) > max_len else text
 
 
-def _normalize_tickers(tickers: list[str] | str | None) -> str:
-    """归一化 tickers 为 JSON 字符串。"""
+def _parse_tickers(tickers: list[str] | str | None) -> list[str]:
+    """解析 tickers 输入为干净的大写列表。"""
     if tickers is None:
-        return "[]"
+        return []
     if isinstance(tickers, str):
         try:
             parsed = json.loads(tickers)
             if isinstance(parsed, list):
-                return json.dumps(sorted(set(
-                    t.upper() for t in parsed if isinstance(t, str) and t
-                )))
+                return sorted(set(
+                    t.upper() for t in parsed if isinstance(t, str) and t.strip()
+                ))
             if isinstance(parsed, str) and parsed.strip():
-                return json.dumps([parsed.strip().upper()])
+                return [parsed.strip().upper()]
         except (json.JSONDecodeError, TypeError):
-            # 可能是逗号分隔的字符串
             parts = [t.strip().upper() for t in tickers.split(",") if t.strip()]
-            return json.dumps(sorted(set(parts)))
+            return sorted(set(parts))
     if isinstance(tickers, list):
-        cleaned = [t.upper() for t in tickers if isinstance(t, str) and t.strip()]
-        return json.dumps(sorted(set(cleaned)))
-    return "[]"
+        return sorted(set(
+            t.upper() for t in tickers if isinstance(t, str) and t.strip()
+        ))
+    return []
 
 
 class SqliteNewsProvider(NewsProvider):
     """SQLite 实现的新闻数据 Provider。
 
     功能:
-    - news_events 表 CRUD
-    - 按 ticker/时间/重要度/g_level 多条件查询
-    - 插入时自动去重（相同 headline + source 组合）
+    - news_events 表 CRUD + news_tickers junction table
+    - 按 ticker/时间/重要度/g_level 多条件查询（ticker 通过 JOIN 索引查询）
+    - 插入时自动去重（UNIQUE(headline, source)）
     - G3 每日分析计数器
     """
 
@@ -172,50 +182,43 @@ class SqliteNewsProvider(NewsProvider):
         """查询新闻事件，支持多条件组合过滤。"""
         conditions: list[str] = []
         params: list[Any] = []
+        join = ""
 
         if tickers is not None:
             if not tickers:
-                # 空列表：不匹配任何行
                 conditions.append("0 = 1")
             else:
-                # 精确匹配 JSON 数组中的 ticker（避免 "A" 误匹配 "AAPL"）
-                # 匹配模式：'["A"]' 或 ',"A"]' 或 '["A",' 或 ',"A",' 覆盖所有位置
-                ticker_conditions = []
-                for t in tickers:
-                    upper_t = t.upper()
-                    cond = "(tickers LIKE ? OR tickers LIKE ? OR tickers LIKE ? OR tickers LIKE ?)"
-                    ticker_conditions.append(cond)
-                    params.extend([
-                        f'["{upper_t}"]',       # 唯一元素
-                        f'["{upper_t}",%',       # 数组开头
-                        f'%, "{upper_t}"]',      # 数组结尾
-                        f'%, "{upper_t}",%',     # 数组中间
-                    ])
-                conditions.append(f"({' OR '.join(ticker_conditions)})")
+                # JOIN news_tickers，用索引精确匹配
+                join = "JOIN news_tickers nt ON e.id = nt.news_id"
+                placeholders = ",".join("?" for _ in tickers)
+                conditions.append(f"nt.ticker IN ({placeholders})")
+                params.extend(t.upper() for t in tickers)
 
         if start:
-            conditions.append("timestamp >= ?")
+            conditions.append("e.timestamp >= ?")
             params.append(_normalize_timestamp(start))
 
         if end:
-            conditions.append("timestamp <= ?")
+            conditions.append("e.timestamp <= ?")
             params.append(_normalize_timestamp(end))
 
         if min_importance > 0.0:
-            conditions.append("importance_score >= ?")
+            conditions.append("e.importance_score >= ?")
             params.append(min_importance)
 
         if g_level is not None:
-            conditions.append("g_level >= ?")
+            conditions.append("e.g_level >= ?")
             params.append(g_level)
 
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        # DISTINCT 防止多 ticker 匹配时返回重复行
         query = f"""
-            SELECT id, timestamp, source, tickers, headline, snippet,
-                   sentiment_score, importance_score, reliability_score, g_level
-            FROM news_events
+            SELECT DISTINCT e.id, e.timestamp, e.source, e.headline, e.snippet,
+                   e.sentiment_score, e.importance_score, e.reliability_score, e.g_level
+            FROM news_events e
+            {join}
             {where}
-            ORDER BY timestamp DESC
+            ORDER BY e.timestamp DESC
             LIMIT ?
         """
         params.append(limit)
@@ -232,15 +235,29 @@ class SqliteNewsProvider(NewsProvider):
             )
 
         df = pd.DataFrame(rows, columns=[
-            "id", "timestamp", "source", "tickers", "headline",
+            "id", "timestamp", "source", "headline",
             "snippet", "sentiment_score", "importance_score",
             "reliability_score", "g_level",
         ])
-        # 解析 tickers JSON 列为 list
-        df["tickers"] = df["tickers"].apply(
-            lambda x: json.loads(x) if isinstance(x, str) else []
-        )
+        # 批量加载 tickers
+        news_ids = df["id"].tolist()
+        df["tickers"] = self._get_tickers_for_ids(news_ids)
         return df
+
+    def _get_tickers_for_ids(self, news_ids: list[int]) -> list[list[str]]:
+        """批量获取多条新闻的 tickers。"""
+        if not news_ids or not self._conn:
+            return [[] for _ in news_ids]
+        placeholders = ",".join("?" for _ in news_ids)
+        cur = self._conn.execute(
+            f"SELECT news_id, ticker FROM news_tickers WHERE news_id IN ({placeholders})",
+            news_ids,
+        )
+        rows = cur.fetchall()
+        id_to_tickers: dict[int, list[str]] = {}
+        for news_id, ticker in rows:
+            id_to_tickers.setdefault(news_id, []).append(ticker)
+        return [sorted(id_to_tickers.get(nid, [])) for nid in news_ids]
 
     def ingest_news(self, source: str = "all") -> int:
         """占位：实际拉取逻辑由 NewsDataSyncer 编排。"""
@@ -266,6 +283,7 @@ class SqliteNewsProvider(NewsProvider):
         """插入一条新闻事件，自动去重。
 
         去重规则：相同 headline + source 的组合视为重复。
+        Tickers 写入 news_tickers junction table。
 
         Returns:
             插入的行 id，如果是重复则返回 None
@@ -280,20 +298,19 @@ class SqliteNewsProvider(NewsProvider):
         if ts_normalized is None:
             logger.debug("Skipping news with invalid timestamp: %r", timestamp)
             return None
-        tickers_json = _normalize_tickers(tickers)
+        ticker_list = _parse_tickers(tickers)
         now = datetime.now(timezone.utc).isoformat()
 
         with self._cursor() as cur:
-            # DB-level UNIQUE(headline, source) 保证并发安全的去重
             try:
                 cur.execute(
                     """INSERT INTO news_events
-                       (timestamp, source, source_url, tickers, headline, snippet,
+                       (timestamp, source, source_url, headline, snippet,
                         sentiment_score, importance_score, reliability_score,
                         g_level, analysis, created_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
-                        ts_normalized, source, source_url, tickers_json,
+                        ts_normalized, source, source_url,
                         headline, snippet, sentiment_score, importance_score,
                         reliability_score, g_level, analysis, now,
                     ),
@@ -302,6 +319,12 @@ class SqliteNewsProvider(NewsProvider):
                 logger.debug("Duplicate news skipped: %s [%s]", headline[:60], source)
                 return None
             row_id = cur.lastrowid
+
+            if ticker_list:
+                cur.executemany(
+                    "INSERT OR IGNORE INTO news_tickers (news_id, ticker) VALUES (?, ?)",
+                    [(row_id, t) for t in ticker_list],
+                )
 
         logger.debug("Inserted news #%d: %s", row_id, headline[:60])
         return row_id
@@ -330,22 +353,28 @@ class SqliteNewsProvider(NewsProvider):
                 ts = _normalize_timestamp(event.get("timestamp", ""))
                 if ts is None:
                     continue
-                tickers_json = _normalize_tickers(event.get("tickers"))
+                ticker_list = _parse_tickers(event.get("tickers"))
                 now = datetime.now(timezone.utc).isoformat()
                 try:
                     cur.execute(
                         """INSERT INTO news_events
-                           (timestamp, source, source_url, tickers, headline, snippet,
+                           (timestamp, source, source_url, headline, snippet,
                             sentiment_score, importance_score, reliability_score,
                             g_level, analysis, created_at)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (
-                            ts, source, event.get("source_url"), tickers_json,
+                            ts, source, event.get("source_url"),
                             headline, snippet, event.get("sentiment_score"),
                             event.get("importance_score"), event.get("reliability_score"),
                             event.get("g_level", 0), event.get("analysis"), now,
                         ),
                     )
+                    row_id = cur.lastrowid
+                    if ticker_list:
+                        cur.executemany(
+                            "INSERT OR IGNORE INTO news_tickers (news_id, ticker) VALUES (?, ?)",
+                            [(row_id, t) for t in ticker_list],
+                        )
                     inserted += 1
                 except sqlite3.IntegrityError:
                     continue
@@ -435,7 +464,7 @@ class SqliteNewsProvider(NewsProvider):
         """按 id 查询单条新闻。"""
         with self._cursor() as cur:
             cur.execute(
-                """SELECT id, timestamp, source, source_url, tickers, headline,
+                """SELECT id, timestamp, source, source_url, headline,
                           snippet, sentiment_score, importance_score,
                           reliability_score, g_level, analysis, created_at
                    FROM news_events WHERE id = ?""",
@@ -447,12 +476,13 @@ class SqliteNewsProvider(NewsProvider):
             return None
 
         columns = [
-            "id", "timestamp", "source", "source_url", "tickers", "headline",
+            "id", "timestamp", "source", "source_url", "headline",
             "snippet", "sentiment_score", "importance_score",
             "reliability_score", "g_level", "analysis", "created_at",
         ]
         result = dict(zip(columns, row))
-        result["tickers"] = json.loads(result["tickers"]) if result["tickers"] else []
+        # 从 junction table 获取 tickers
+        result["tickers"] = self._get_tickers_for_ids([news_id])[0]
         return result
 
     def count_by_g_level(self) -> dict[int, int]:

@@ -10,6 +10,7 @@
 """
 
 from .g1_filter import G1Config, G1Filter, G1Result
+from .g2_classifier import G2Classifier, G2Config, G2Result
 from .news_store import SqliteNewsProvider
 
 __all__ = [
@@ -17,4 +18,7 @@ __all__ = [
     "G1Filter",
     "G1Config",
     "G1Result",
+    "G2Classifier",
+    "G2Config",
+    "G2Result",
 ]
