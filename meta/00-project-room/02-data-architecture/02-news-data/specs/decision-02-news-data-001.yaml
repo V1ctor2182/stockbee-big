@@ -1,0 +1,45 @@
+spec_id: "decision-02-news-data-001"
+type: decision
+state: active
+intent:
+  summary: "SqliteNewsProvider 四项数据安全设计决策（review 驱动）"
+  detail: |
+    /review 发现 4 个问题后的设计决策：
+
+    1. DB-level UNIQUE 去重 > 应用层 SELECT-then-INSERT
+       问题：两个进程并发插入相同新闻时，应用层 SELECT 检查存在 TOCTOU 竞态。
+       决策：在 (headline, source) 上建 UNIQUE INDEX，用 INSERT + catch IntegrityError 替代
+       SELECT-then-INSERT。DB 层原子性保证，无论并发程度都不会重复。
+
+    2. get_news() 默认 LIMIT 1000
+       问题：无过滤条件时 SELECT * 全表加载到内存，数据增长后有 OOM 风险。
+       决策：添加 limit 参数（默认 1000），所有查询都有上限保护。
+       需要全量数据时显式传 limit=999999。
+
+    3. insert_news_batch() 单事务包裹
+       问题：原实现每条新闻独立 commit，500 条 = 500 次 fsync (~1-2秒)。
+       决策：批量插入包裹在单个事务中，一次 commit/fsync (~5ms)，性能提升 ~200x。
+       失败时整批回滚，保证原子性。
+
+    4. Ticker 查询精确 JSON 匹配
+       问题：LIKE '%"A"%' 会误匹配 "AAPL"、"META" 等包含字母 A 的 ticker。
+       决策：使用 JSON 边界字符精确匹配（[" 和 "] 和 , " 组合），
+       确保查询 "A" 只匹配 ticker 恰好为 "A" 的记录。
+constraints:
+  - "去重必须在 DB 层保证，不依赖应用层检查"
+  - "所有 SELECT 查询必须有 LIMIT 保护"
+  - "批量写入必须使用单事务"
+indexing:
+  type: decision
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["sqlite", "concurrency", "dedup", "performance", "review"]
+provenance:
+  source_type: review_finding
+  confidence: 1.0
+  source_ref: "/review on news_data branch, 2026-04-05"
+relations:
+  - { type: constrains, target: "intent-02-news-data-001", reason: "数据安全约束" }
+anchors:
+  - { file: "src/stockbee/news_data/news_store.py", type: implementation }

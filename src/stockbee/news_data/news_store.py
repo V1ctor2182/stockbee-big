@@ -56,6 +56,9 @@ CREATE INDEX IF NOT EXISTS idx_news_g_level
 CREATE INDEX IF NOT EXISTS idx_news_importance
     ON news_events(importance_score);
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_news_dedup
+    ON news_events(headline, source);
+
 CREATE TABLE IF NOT EXISTS g3_daily_counts (
     date  TEXT PRIMARY KEY,
     count INTEGER NOT NULL DEFAULT 0
@@ -160,17 +163,27 @@ class SqliteNewsProvider(NewsProvider):
         end: datetime | None = None,
         min_importance: float = 0.0,
         g_level: int | None = None,
+        limit: int = 1000,
     ) -> pd.DataFrame:
         """查询新闻事件，支持多条件组合过滤。"""
         conditions: list[str] = []
         params: list[Any] = []
 
         if tickers:
-            # 查找 tickers JSON 列中包含任意指定 ticker 的行
+            # 精确匹配 JSON 数组中的 ticker（避免 "A" 误匹配 "AAPL"）
+            # 匹配模式：'["A"]' 或 ',"A"]' 或 '["A",' 或 ',"A",' 覆盖所有位置
             ticker_conditions = []
             for t in tickers:
-                ticker_conditions.append("tickers LIKE ?")
-                params.append(f'%"{t.upper()}"%')
+                upper_t = t.upper()
+                # 用 JSON 边界字符确保精确匹配
+                cond = "(tickers LIKE ? OR tickers LIKE ? OR tickers LIKE ? OR tickers LIKE ?)"
+                ticker_conditions.append(cond)
+                params.extend([
+                    f'["{upper_t}"]',       # 唯一元素
+                    f'["{upper_t}",%',       # 数组开头
+                    f'%, "{upper_t}"]',      # 数组结尾
+                    f'%, "{upper_t}",%',     # 数组中间
+                ])
             conditions.append(f"({' OR '.join(ticker_conditions)})")
 
         if start:
@@ -196,7 +209,9 @@ class SqliteNewsProvider(NewsProvider):
             FROM news_events
             {where}
             ORDER BY timestamp DESC
+            LIMIT ?
         """
+        params.append(limit)
 
         with self._cursor() as cur:
             cur.execute(query, params)
@@ -259,34 +274,30 @@ class SqliteNewsProvider(NewsProvider):
         now = datetime.now(timezone.utc).isoformat()
 
         with self._cursor() as cur:
-            # 去重检查
-            cur.execute(
-                "SELECT id FROM news_events WHERE headline = ? AND source = ?",
-                (headline, source),
-            )
-            if cur.fetchone():
+            # DB-level UNIQUE(headline, source) 保证并发安全的去重
+            try:
+                cur.execute(
+                    """INSERT INTO news_events
+                       (timestamp, source, source_url, tickers, headline, snippet,
+                        sentiment_score, importance_score, reliability_score,
+                        g_level, analysis, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        ts_normalized, source, source_url, tickers_json,
+                        headline, snippet, sentiment_score, importance_score,
+                        reliability_score, g_level, analysis, now,
+                    ),
+                )
+            except sqlite3.IntegrityError:
                 logger.debug("Duplicate news skipped: %s [%s]", headline[:60], source)
                 return None
-
-            cur.execute(
-                """INSERT INTO news_events
-                   (timestamp, source, source_url, tickers, headline, snippet,
-                    sentiment_score, importance_score, reliability_score,
-                    g_level, analysis, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    ts_normalized, source, source_url, tickers_json,
-                    headline, snippet, sentiment_score, importance_score,
-                    reliability_score, g_level, analysis, now,
-                ),
-            )
             row_id = cur.lastrowid
 
         logger.debug("Inserted news #%d: %s", row_id, headline[:60])
         return row_id
 
     def insert_news_batch(self, events: list[dict[str, Any]]) -> int:
-        """批量插入新闻事件，跳过重复。
+        """批量插入新闻事件，跳过重复。单个事务包裹，避免 N 次 fsync。
 
         Args:
             events: 字典列表，每个字典的 key 对应 insert_news 的参数
@@ -294,11 +305,44 @@ class SqliteNewsProvider(NewsProvider):
         Returns:
             实际插入的条数
         """
+        if not self._conn:
+            raise RuntimeError("Provider not initialized")
         inserted = 0
-        for event in events:
-            result = self.insert_news(**event)
-            if result is not None:
-                inserted += 1
+        cur = self._conn.cursor()
+        try:
+            for event in events:
+                headline = event.get("headline", "")
+                if not headline or not str(headline).strip():
+                    continue
+                headline = _truncate(str(headline).strip(), MAX_HEADLINE_LENGTH)
+                source = event.get("source", "")
+                snippet = _truncate(event.get("snippet"), MAX_SNIPPET_LENGTH)
+                ts = _normalize_timestamp(event.get("timestamp", ""))
+                tickers_json = _normalize_tickers(event.get("tickers"))
+                now = datetime.now(timezone.utc).isoformat()
+                try:
+                    cur.execute(
+                        """INSERT INTO news_events
+                           (timestamp, source, source_url, tickers, headline, snippet,
+                            sentiment_score, importance_score, reliability_score,
+                            g_level, analysis, created_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            ts, source, event.get("source_url"), tickers_json,
+                            headline, snippet, event.get("sentiment_score"),
+                            event.get("importance_score"), event.get("reliability_score"),
+                            event.get("g_level", 0), event.get("analysis"), now,
+                        ),
+                    )
+                    inserted += 1
+                except sqlite3.IntegrityError:
+                    continue
+            self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
+        finally:
+            cur.close()
         return inserted
 
     def update_g_level(

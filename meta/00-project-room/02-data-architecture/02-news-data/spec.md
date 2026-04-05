@@ -31,11 +31,16 @@
 - **G3 用 Claude Haiku** > Sonnet — 成本更低（<$2/月），深度分析任务 Haiku 足够
 - **数据源: NewsAPI + Perplexity** — 两个同级新闻拉取源，跨源去重
 - **G3 Phase 1 包含** — 日限 10 篇，scope 可控
+- **DB-level UNIQUE 去重** > 应用层 SELECT-then-INSERT — 消除 TOCTOU 并发竞态，由 /review 驱动
+- **get_news() 默认 LIMIT 1000** — 防止无过滤查询 OOM，由 /review 驱动
+- **batch 插入单事务** > 逐条 commit — 500 条从 ~1.5s 降到 ~5ms（200x），由 /review 驱动
+- **Ticker 精确 JSON 匹配** > LIKE '%"X"%' — 避免短 ticker 误匹配长 ticker，由 /review 驱动
 
 ## Contracts
 
-_待实现后补充_
+- **SqliteNewsProvider** — get_news(tickers, start, end, min_importance, g_level, limit) -> DataFrame; insert_news(headline, source, timestamp, ...) -> id|None; insert_news_batch(events) -> int; update_g_level(news_id, g_level, scores) -> bool; get_g3_daily_count/increment; get_news_by_id; count_by_g_level
 
 ---
-_所有 spec 状态: draft（开发中）_
-_spec.md 最后更新: 2026-04-04_
+_spec 状态: intent (draft), decision (active)_
+_spec.md 最后更新: 2026-04-05_
+_specs 目录: 1 intent + 1 decision = 2 个 spec 文件_
