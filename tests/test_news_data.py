@@ -121,6 +121,23 @@ class TestSqliteNewsProvider:
         result = provider.get_news_by_id(news_id)
         assert len(result["snippet"]) == MAX_SNIPPET_LENGTH
 
+    def test_null_fields_round_trip(self, provider):
+        """所有可选字段为 None 时，存取后仍为 None 而非 "null" 字符串。"""
+        news_id = provider.insert_news(
+            headline="Minimal news with no optional fields",
+            source="reuters",
+            timestamp=_now(),
+            # 以下全部不传（默认 None）
+        )
+        result = provider.get_news_by_id(news_id)
+        assert result["snippet"] is None
+        assert result["sentiment_score"] is None
+        assert result["importance_score"] is None
+        assert result["reliability_score"] is None
+        assert result["analysis"] is None
+        assert result["source_url"] is None
+        assert result["tickers"] == []  # None tickers → "[]" → []
+
 
 # =========================================================================
 # SqliteNewsProvider — 查询
@@ -192,6 +209,25 @@ class TestNewsQuery:
         tickers_flat = [t for row in df["tickers"] for t in row]
         assert "AAPL" not in tickers_flat
         assert "A" in tickers_flat
+
+    def test_query_multi_filter_and(self, provider):
+        """多条件组合：ticker + g_level + importance 同时过滤，验证 AND 逻辑。"""
+        self._seed(provider)
+        # AAPL, importance=0.9, g_level=2 — 唯一满足全部条件
+        df = provider.get_news(tickers=["AAPL"], g_level=2, min_importance=0.7)
+        assert len(df) == 1
+        assert df.iloc[0]["headline"] == "Apple earnings beat expectations"
+        # MSFT importance=0.5 < 0.7, 不满足
+        df2 = provider.get_news(tickers=["MSFT"], min_importance=0.7)
+        assert len(df2) == 0
+
+    def test_query_empty_tickers_list(self, provider):
+        """tickers=[] 空列表 vs tickers=None 行为不同：空列表不匹配任何行。"""
+        self._seed(provider)
+        df_none = provider.get_news(tickers=None)  # 不过滤 ticker，返回全部
+        df_empty = provider.get_news(tickers=[])    # 空列表进入过滤循环，匹配 0 条
+        assert len(df_none) == 3
+        assert len(df_empty) == 0
 
 
 # =========================================================================

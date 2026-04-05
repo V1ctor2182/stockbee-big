@@ -169,22 +169,25 @@ class SqliteNewsProvider(NewsProvider):
         conditions: list[str] = []
         params: list[Any] = []
 
-        if tickers:
-            # 精确匹配 JSON 数组中的 ticker（避免 "A" 误匹配 "AAPL"）
-            # 匹配模式：'["A"]' 或 ',"A"]' 或 '["A",' 或 ',"A",' 覆盖所有位置
-            ticker_conditions = []
-            for t in tickers:
-                upper_t = t.upper()
-                # 用 JSON 边界字符确保精确匹配
-                cond = "(tickers LIKE ? OR tickers LIKE ? OR tickers LIKE ? OR tickers LIKE ?)"
-                ticker_conditions.append(cond)
-                params.extend([
-                    f'["{upper_t}"]',       # 唯一元素
-                    f'["{upper_t}",%',       # 数组开头
-                    f'%, "{upper_t}"]',      # 数组结尾
-                    f'%, "{upper_t}",%',     # 数组中间
-                ])
-            conditions.append(f"({' OR '.join(ticker_conditions)})")
+        if tickers is not None:
+            if not tickers:
+                # 空列表：不匹配任何行
+                conditions.append("0 = 1")
+            else:
+                # 精确匹配 JSON 数组中的 ticker（避免 "A" 误匹配 "AAPL"）
+                # 匹配模式：'["A"]' 或 ',"A"]' 或 '["A",' 或 ',"A",' 覆盖所有位置
+                ticker_conditions = []
+                for t in tickers:
+                    upper_t = t.upper()
+                    cond = "(tickers LIKE ? OR tickers LIKE ? OR tickers LIKE ? OR tickers LIKE ?)"
+                    ticker_conditions.append(cond)
+                    params.extend([
+                        f'["{upper_t}"]',       # 唯一元素
+                        f'["{upper_t}",%',       # 数组开头
+                        f'%, "{upper_t}"]',      # 数组结尾
+                        f'%, "{upper_t}",%',     # 数组中间
+                    ])
+                conditions.append(f"({' OR '.join(ticker_conditions)})")
 
         if start:
             conditions.append("timestamp >= ?")
