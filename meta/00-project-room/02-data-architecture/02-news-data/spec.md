@@ -2,21 +2,40 @@
 
 ## Intent
 
-**news_events 表，结构化字段，分级存储 G1/G2/G3**
+**SQLite news_events 表 + G1/G2/G3 三级漏斗处理管道**
 
-所有新闻进入 G1 快速过滤，通过后持久化到 SQLite，触发 G2/G3 处理。
+8 个组件组成完整的新闻数据基础设施：
+- **SqliteNewsProvider** — WAL 模式 news_events 表，支持多条件查询（ticker/时间/重要度/g_level）
+- **G1 Filter** — 来源校验、时间校验、去重、实体识别（ticker 提取）
+- **G2 Classifier** — FinBERT 本地情绪分类 + 主题分类 + 重要度/紧急度评分
+- **G3 Analyzer** — Claude Haiku 深度分析，日限 10 篇，影响评估 + 权重建议
+- **NewsAPI Source** — 免费层 ~500 条/天实时拉取
+- **Perplexity Source** — API 新闻拉取，与 NewsAPI 同级数据源
+- **NewsDataSyncer** — 编排 fetch → G1 → store → G2 → G3（条件触发）
 
-来源：Tech Design §2.3
-研究状态：研究完成 (research-news-storage.md)
+来源：Tech Design §2.3, §4.1-4.2
+依赖：transformers + torch (FinBERT), anthropic SDK (Haiku), newsapi-python
+
+## Milestones
+
+1. SqliteNewsProvider — news_events 表 + 查询接口 (~200 行)
+2. G1 快速过滤管道 (~150 行)
+3. G2 FinBERT 分类评分 (~180 行)
+4. G3 深度分析 Claude Haiku (~120 行)
+5. NewsAPI + Perplexity + NewsDataSyncer (~220 行)
+6. 测试 (~280 行)
 
 ## Decisions
 
-_暂无决策记录_
+- **G2 用本地 FinBERT** > 规则引擎 / LLM API — 准确率高、零 API 成本、离线可用
+- **G3 用 Claude Haiku** > Sonnet — 成本更低（<$2/月），深度分析任务 Haiku 足够
+- **数据源: NewsAPI + Perplexity** — 两个同级新闻拉取源，跨源去重
+- **G3 Phase 1 包含** — 日限 10 篇，scope 可控
 
 ## Contracts
 
-_暂无接口约定_
+_待实现后补充_
 
 ---
-_所有 spec 状态: draft（需要 review 后升为 active）_
-_spec.md 由 room-init 自动生成，specs/*.yaml 为源数据_
+_所有 spec 状态: draft（开发中）_
+_spec.md 最后更新: 2026-04-04_
