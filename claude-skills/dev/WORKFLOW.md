@@ -4,13 +4,19 @@
 
 ```
                     ┌──────────────┐
-                    │  room-init   │  创建 Room 结构 + milestones
+                    │  room-init   │  创建 Room 结构（初始 milestones 粗糙）
                     └──────┬───────┘
                            │
                     ┌──────▼───────┐
                     │  prompt-gen  │  Room 级: 生成完整上下文 prompt
                     │  (Room 级)   │  用于理解全貌、对齐设计
                     └──────┬───────┘
+                           │
+                    ┌──────▼────────────┐
+                    │ plan-milestones   │  开发前: 重新拆分 milestones
+                    │                   │  读 Tech Design + 已完成模式
+                    │ 遇到问题会问开发者  │  确认后写入 progress.yaml
+                    └──────┬────────────┘
                            │
               ┌────────────▼─────────────┐
               │                          │
@@ -101,6 +107,7 @@
 | Skill | 触发 | 做什么 | 何时用 |
 |-------|------|-------|-------|
 | **dev** | "做 X m1"、"下一个" | context pull → 开发 → commit-sync（全自动） | **日常开发主入口** |
+| **plan-milestones** | "拆 milestone X"、"准备开发 X" | 重新拆分 milestones，遇到问题问开发者 | **dev 之前必经** |
 | prompt-gen | "promptgen X" | 只生成 prompt，不开发 | 想看 context 或给 Cursor 用 |
 | commit-sync | "commit-sync" | 只 commit + spec 更新，不开发 | 手动改代码后提交 |
 | room | "创建 room X" | Room CRUD | 项目初期规划 |
