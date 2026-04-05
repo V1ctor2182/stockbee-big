@@ -94,3 +94,10 @@ progress:
         - m2-G1-快速过滤 (→ completed, catch-up from f5152e2)
         - m3-G2-FinBERT-分类 (→ completed, catch-up from a026aff)
         - m6-测试 (→ in_progress)
+    - hash: "9b19464"
+      date: "2026-04-05"
+      message: "[02-news-data] refactor: word-boundary regex for G1 ticker + G2 keyword matching"
+      files_changed: 3
+      specs_affected:
+        - change-2026-04-05-word-boundary (created)
+      milestones_affected: []

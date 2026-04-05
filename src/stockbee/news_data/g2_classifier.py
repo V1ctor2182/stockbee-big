@@ -18,47 +18,100 @@ logger = logging.getLogger(__name__)
 
 FINBERT_MODEL = "ProsusAI/finbert"
 FINBERT_MAX_LENGTH = 512
-MIN_ASCII_RATIO = 0.5  # ASCII 字母占比低于此值视为不可分类（非英语/纯符号）
+MIN_ASCII_RATIO = 0.5  # ASCII 字母占比低���此值视为不可分类（非英语/纯符号）
+
+
+def _build_keyword_patterns(keywords: list[str]) -> list[re.Pattern]:
+    """为关键词列表构建 word-boundary 正则，避免子串误匹配。"""
+    return [re.compile(r"\b" + re.escape(kw) + r"\b") for kw in keywords]
+
+
+def _count_keyword_hits(text_lower: str, patterns: list[re.Pattern]) -> int:
+    """统计文本中匹配的关键词数量。"""
+    return sum(1 for p in patterns if p.search(text_lower))
+
+
+def _any_keyword_hit(text_lower: str, patterns: list[re.Pattern]) -> bool:
+    """检查文本是否匹配任一关键词。"""
+    return any(p.search(text_lower) for p in patterns)
+
 
 # ------ 主题分类规则 ------
 
 _TOPIC_KEYWORDS: dict[str, list[str]] = {
     "earnings": [
-        "earnings", "revenue", "profit", "loss", "eps", "quarterly",
-        "fiscal", "guidance", "beat", "miss", "forecast", "outlook",
+        "earnings", "revenue", "profit", "profits", "loss", "losses",
+        "eps", "quarterly", "fiscal", "guidance",
+        "beat", "beats", "miss", "misses", "missed",
+        "forecast", "outlook",
     ],
     "regulatory": [
-        "sec", "fda", "regulation", "compliance", "fine", "penalty",
-        "lawsuit", "settlement", "antitrust", "probe", "investigation",
+        "sec", "fda", "regulation", "regulations", "compliance",
+        "fine", "fined", "fines", "penalty", "penalties",
+        "lawsuit", "lawsuits", "settlement", "antitrust",
+        "probe", "probes", "investigation", "investigations",
     ],
     "merger": [
-        "merger", "acquisition", "acquire", "takeover", "buyout",
-        "deal", "bid", "offer", "combine", "merge",
+        "merger", "mergers", "acquisition", "acquisitions",
+        "acquire", "acquired", "acquires",
+        "takeover", "buyout", "deal", "deals",
+        "bid", "bids", "offer", "offers", "combine", "merge", "merged",
     ],
     "litigation": [
-        "lawsuit", "sue", "court", "verdict", "trial", "legal",
-        "class action", "patent", "litigation", "ruling",
+        "lawsuit", "lawsuits", "sue", "sued", "suing",
+        "court", "verdict", "trial", "trials", "legal",
+        "class action", "patent", "patents", "litigation", "ruling", "rulings",
     ],
     "policy": [
-        "fed", "federal reserve", "interest rate", "inflation",
-        "tariff", "trade war", "sanctions", "stimulus", "policy",
+        "fed", "federal reserve", "interest rate", "interest rates",
+        "inflation", "tariff", "tariffs", "trade war",
+        "sanctions", "stimulus", "policy", "policies",
     ],
     "product": [
-        "launch", "release", "announce", "unveil", "product",
-        "feature", "update", "upgrade", "new model", "ai",
+        "launch", "launched", "launches",
+        "release", "released", "releases",
+        "announce", "announced", "announces",
+        "unveil", "unveiled", "unveils",
+        "product", "products", "feature", "features",
+        "update", "upgrade", "new model", "ai",
     ],
+}
+
+# 预编译主题关键词为 word-boundary 正则
+_TOPIC_PATTERNS: dict[str, list[re.Pattern]] = {
+    topic: _build_keyword_patterns(keywords)
+    for topic, keywords in _TOPIC_KEYWORDS.items()
 }
 
 # 紧急度关键词
 _URGENCY_HIGH_KEYWORDS = [
-    "breaking", "urgent", "alert", "crash", "plunge", "surge", "halt",
-    "bankrupt", "default", "recall", "emergency", "fraud", "scandal",
+    "breaking", "urgent", "alert", "alerts",
+    "crash", "crashes", "crashed", "crashing",
+    "plunge", "plunges", "plunged", "plunging",
+    "surge", "surges", "surged", "surging",
+    "halt", "halted", "halts",
+    "bankrupt", "bankruptcy",
+    "default", "defaults", "defaulted",
+    "recall", "recalls", "recalled",
+    "emergency", "fraud", "fraudulent", "scandal",
 ]
 
 _URGENCY_MEDIUM_KEYWORDS = [
-    "downgrade", "upgrade", "cut", "raise", "target", "warning",
-    "restructure", "layoff", "resign", "appoint",
+    "downgrade", "downgrades", "downgraded",
+    "upgrade", "upgrades", "upgraded",
+    "cut", "cuts", "cutting",
+    "raise", "raises", "raised", "raising",
+    "target", "targets", "targeted",
+    "warning", "warnings", "warned",
+    "restructure", "restructures", "restructured", "restructuring",
+    "layoff", "layoffs",
+    "resign", "resigns", "resigned", "resignation",
+    "appoint", "appoints", "appointed", "appointment",
 ]
+
+# 预编译紧急度关键词
+_URGENCY_HIGH_PATTERNS = _build_keyword_patterns(_URGENCY_HIGH_KEYWORDS)
+_URGENCY_MEDIUM_PATTERNS = _build_keyword_patterns(_URGENCY_MEDIUM_KEYWORDS)
 
 
 @dataclass
@@ -307,23 +360,55 @@ class G2Classifier:
             self._finbert_available = False
             return False
 
+    # 预编译情绪关键词（类级别，所有实例共享）
+    # 包含常见变形（beats/surges/crashed 等），因为 word boundary 要求精确匹配
+    _POSITIVE_PATTERNS = _build_keyword_patterns([
+        "beat", "beats", "beating",
+        "surge", "surges", "surging", "surged",
+        "gain", "gains", "gaining", "gained",
+        "rise", "rises", "rising", "rose",
+        "profit", "profits", "profitable",
+        "growth",
+        "upgrade", "upgrades", "upgraded",
+        "record",
+        "strong", "stronger", "strongest",
+        "rally", "rallies", "rallied", "rallying",
+        "outperform", "outperforms", "outperformed",
+        "boost", "boosts", "boosted",
+        "bullish",
+        "optimistic",
+        "upside",
+        "positive",
+        "exceed", "exceeds", "exceeded", "exceeding",
+        "soar", "soars", "soared", "soaring",
+    ])
+    _NEGATIVE_PATTERNS = _build_keyword_patterns([
+        "miss", "misses", "missed", "missing",
+        "drop", "drops", "dropped", "dropping",
+        "fall", "falls", "falling", "fell",
+        "loss", "losses",
+        "decline", "declines", "declined", "declining",
+        "crash", "crashes", "crashed", "crashing",
+        "plunge", "plunges", "plunged", "plunging",
+        "weak", "weaker", "weakest",
+        "downgrade", "downgrades", "downgraded",
+        "cut", "cuts", "cutting",
+        "layoff", "layoffs",
+        "bankrupt", "bankruptcy",
+        "default", "defaults", "defaulted",
+        "pessimistic",
+        "bearish",
+        "negative",
+        "warning", "warnings", "warned",
+        "fraud", "fraudulent",
+    ])
+
     def _rule_sentiment(self, text: str) -> tuple[str, float, float, bool]:
         """规则引擎情绪分类（FinBERT 降级模式）。"""
         text_lower = text.lower()
 
-        positive_words = [
-            "beat", "surge", "gain", "rise", "profit", "growth", "upgrade",
-            "record", "strong", "rally", "outperform", "boost", "bullish",
-            "optimistic", "upside", "positive", "exceed", "soar",
-        ]
-        negative_words = [
-            "miss", "drop", "fall", "loss", "decline", "crash", "plunge",
-            "weak", "downgrade", "cut", "layoff", "bankrupt", "default",
-            "pessimistic", "bearish", "negative", "warning", "fraud",
-        ]
-
-        pos_count = sum(1 for w in positive_words if w in text_lower)
-        neg_count = sum(1 for w in negative_words if w in text_lower)
+        pos_count = _count_keyword_hits(text_lower, self._POSITIVE_PATTERNS)
+        neg_count = _count_keyword_hits(text_lower, self._NEGATIVE_PATTERNS)
         total = pos_count + neg_count
 
         if total == 0:
@@ -342,13 +427,13 @@ class G2Classifier:
     # ------ 主题分类 ------
 
     def _classify_topic(self, text: str) -> str:
-        """规则引擎主题分类。匹配关键词最多的类别。"""
+        """规则引擎主题分类。匹配关键词最多的类别（word-boundary 匹配）。"""
         text_lower = text.lower()
         best_topic = "other"
         best_count = 0
 
-        for topic, keywords in _TOPIC_KEYWORDS.items():
-            count = sum(1 for kw in keywords if kw in text_lower)
+        for topic, patterns in _TOPIC_PATTERNS.items():
+            count = _count_keyword_hits(text_lower, patterns)
             if count > best_count:
                 best_count = count
                 best_topic = topic
@@ -378,11 +463,11 @@ class G2Classifier:
     # ------ 紧急度评分 ------
 
     def _score_urgency(self, text: str) -> str:
-        """紧急度评分：high / medium / low。"""
+        """紧急度评分：high / medium / low（word-boundary 匹配）。"""
         text_lower = text.lower()
 
-        if any(kw in text_lower for kw in _URGENCY_HIGH_KEYWORDS):
+        if _any_keyword_hit(text_lower, _URGENCY_HIGH_PATTERNS):
             return "high"
-        if any(kw in text_lower for kw in _URGENCY_MEDIUM_KEYWORDS):
+        if _any_keyword_hit(text_lower, _URGENCY_MEDIUM_PATTERNS):
             return "medium"
         return "low"

@@ -1,0 +1,37 @@
+spec_id: "change-2026-04-05-word-boundary"
+type: change
+state: active
+intent:
+  summary: "G1+G2 子串匹配 → word-boundary 正则，消除 false positive"
+  detail: |
+    G1 filter:
+    - ticker 模式支持 .A/.B 后缀 (BRK.A, BRK.B)
+    - $TICKER 提取大小写兼容 ($aapl → AAPL)
+    - 公司名匹配加 \b 词边界（防 "pineapple" → AAPL）
+    - 基础 ticker 去后缀后做常见词判定
+    - _check_time 增加未来时间戳拒绝（1hr 时钟偏差容忍）
+
+    G2 classifier:
+    - 新增 _build_keyword_patterns / _count_keyword_hits / _any_keyword_hit 辅助函数
+    - 所有关键词列表添加词形变体 (beats/surges/crashed/etc.)
+    - 主题、紧急度、情绪关键词全部预编译为 re.Pattern（word-boundary）
+    - 情绪关键词从方法局部变量提升到类级别预编译
+
+    测试: 修正 1 条 edge case 断言适配 word-boundary 匹配
+constraints: []
+indexing:
+  type: change
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["refactor", "regex", "word-boundary", "false-positive", "g1-filter", "g2-classifier"]
+provenance:
+  source_type: commit
+  confidence: 1.0
+  source_ref: "commit on news_data branch, 2026-04-05"
+relations:
+  - { type: refines, target: "intent-02-news-data-001", reason: "G1+G2 匹配质量改进" }
+anchors:
+  - { file: "src/stockbee/news_data/g1_filter.py", type: implementation }
+  - { file: "src/stockbee/news_data/g2_classifier.py", type: implementation }
+  - { file: "tests/test_news_data.py", type: test }

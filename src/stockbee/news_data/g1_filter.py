@@ -57,8 +57,8 @@ for _ticker, _names in _AMBIGUOUS_TICKERS.items():
     for _name in _names:
         _COMPANY_TO_TICKER[_name.lower()] = _ticker
 
-# ticker 格式：1-5 个大写字母
-_TICKER_PATTERN = re.compile(r"\b([A-Z]{1,5})\b")
+# ticker 格式：1-5 个大写字母（可带 .A/.B 后缀）
+_TICKER_PATTERN = re.compile(r"\b([A-Z]{1,5}(?:\.[A-Z]{1,2})?)\b")
 
 # 短 ticker 语境判定关键词
 _FINANCIAL_KEYWORDS = frozenset({
@@ -156,8 +156,10 @@ class G1Filter:
         if ts is None:
             return G1Result(passed=False, reason="invalid or missing timestamp")
         if not self._check_time(ts):
-            age_days = (datetime.now(timezone.utc) - ts).days
-            return G1Result(passed=False, reason=f"too old: {age_days} days")
+            delta = datetime.now(timezone.utc) - ts
+            if delta.total_seconds() < 0:
+                return G1Result(passed=False, reason="timestamp in the future")
+            return G1Result(passed=False, reason=f"too old: {delta.days} days")
 
         # 3. 内容校验
         if not self._check_content(headline):
@@ -207,9 +209,12 @@ class G1Filter:
         return True
 
     def _check_time(self, ts: datetime) -> bool:
-        """检查新闻是否在允许的时间窗口内。"""
-        cutoff = datetime.now(timezone.utc) - timedelta(days=self._config.max_age_days)
-        return ts >= cutoff
+        """检查新闻是否在允许的时间窗口内（不能太旧，也不能在未来）。"""
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(days=self._config.max_age_days)
+        # 允许最多 1 小时的时钟偏差
+        max_future = now + timedelta(hours=1)
+        return cutoff <= ts <= max_future
 
     def _check_content(self, headline: str) -> bool:
         """检查标题质量。"""
@@ -259,29 +264,32 @@ class G1Filter:
 
         found: set[str] = set()
 
-        # 1. $TICKER 格式（最高置信度）
-        for match in re.finditer(r"\$([A-Z]{1,5})\b", text):
-            found.add(match.group(1))
+        # 1. $TICKER 格式（最高置信度，大小写均可）
+        for match in re.finditer(r"\$([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)\b", text):
+            found.add(match.group(1).upper())
 
-        # 2. 公司名匹配
+        # 2. 公司名匹配（词边界，避免 "pineapple" → AAPL）
         text_lower = text.lower()
         for company_name, ticker in _COMPANY_TO_TICKER.items():
-            if company_name in text_lower:
+            # 用 \b 词边界防止子串误匹配
+            if re.search(r"\b" + re.escape(company_name) + r"\b", text_lower):
                 found.add(ticker)
 
-        # 3. 大写字母 ticker 匹配（从原文提取，保留大小写语境）
+        # 3. ��写字母 ticker 匹配（从��文提取，保留大小��语境）
         for match in _TICKER_PATTERN.finditer(text):
             candidate = match.group(1)
-            if len(candidate) == 1:
+            # 基础部分（去掉 .A/.B 后缀）用于常见词判定
+            base = candidate.split(".")[0] if "." in candidate else candidate
+            if len(base) == 1:
                 # 单字母 ticker 只接受已知的
-                if candidate in _VALID_SHORT_TICKERS:
-                    # 还需要检查语境：前后是否有金融关键词
+                if base in _VALID_SHORT_TICKERS:
+                    # 还需要检查语境：前后是否有���融关键词
                     start = max(0, match.start() - 30)
                     end = min(len(text), match.end() + 30)
                     context = text[start:end].lower()
                     if any(kw in context for kw in _FINANCIAL_KEYWORDS):
                         found.add(candidate)
-            elif candidate not in _COMMON_WORDS:
+            elif base not in _COMMON_WORDS:
                 # 2-5 字母：排除常见英语单词
                 found.add(candidate)
 

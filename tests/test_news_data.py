@@ -1291,7 +1291,7 @@ class TestG2SubstringEdgeCases:
         assert r.urgency != "high"  # "halt" in "asphalt" 不应触发
 
     def test_praised_not_medium_urgency(self, g2_rules):
-        r = g2_rules.classify("The executive praised the new restructuring initiative")
+        r = g2_rules.classify("The executive praised the new company initiative today")
         assert r.urgency != "medium"  # "raise" in "praised" 不应触发
 
     def test_real_keywords_still_work(self, g2_rules):
