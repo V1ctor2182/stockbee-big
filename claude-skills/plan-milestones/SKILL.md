@@ -26,6 +26,32 @@ Feature Room 的 milestones 最初由 room-init 从 PRD 机械生成，粒度不
 
 ## 执行步骤
 
+### Phase 0: 确认 Branch
+
+在做任何事之前，**必须先确认开发者在正确的 branch 上**：
+
+1. 运行 `git branch --show-current` 获取当前 branch
+2. 运行 `git status` 检查是否有未提交的变更
+3. 验证：
+   - 当前 branch **不是 main** → 如果是 main，提示开发者先创建 feature branch
+   - 当前 branch 名称和目标 Room **对得上** → 如果不对，提醒开发者确认
+   - 工作区**干净**（无未提交变更） → 如果有未提交，提示先 commit 或 stash
+
+```
+示例输出：
+
+⚠️ Branch 检查:
+  当前 branch: main
+  目标 Room: 02-news-data
+
+  你在 main 上，建议先创建 feature branch:
+    git checkout -b news-data
+
+  要我帮你创建吗？(y/n)
+```
+
+4. **等待开发者确认或切换 branch 后再继续**
+
 ### Phase 1: 收集信息
 
 1. 读取目标 Room 的当前状态：
