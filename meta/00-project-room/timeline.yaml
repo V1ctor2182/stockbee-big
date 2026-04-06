@@ -34,10 +34,10 @@ timeline:
           target_start: "2026-04-07"
           target_end: "2026-04-18"
           estimated_days: 9
-          status: planning
-          completion: 0.0
+          status: completed
+          completion: 1.0
           depends_on: ["07-provider-arch"]
-          note: "研究完成，四层漏斗+Parquet"
+          note: "已完成 2026-04-02, Alpaca API 验证通过"
 
         - room: "02-news-data"
           parent: "02-data-architecture"
@@ -56,10 +56,10 @@ timeline:
           target_start: "2026-04-07"
           target_end: "2026-04-16"
           estimated_days: 7
-          status: planning
-          completion: 0.0
+          status: completed
+          completion: 1.0
           depends_on: ["07-provider-arch"]
-          note: "研究完成，与 stock-data 并行"
+          note: "已完成 2026-04-05, FRED API 17/17 验证通过"
 
         - room: "04-factor-storage"
           parent: "02-data-architecture"
@@ -115,7 +115,7 @@ timeline:
           status: planning
           completion: 0.0
           depends_on: ["03-macro-data", "07-provider-arch"]
-          note: "研究完成"
+          note: "重新定义: Polymarket 事件概率 + 经济日历（原 FRED/BLS 已被 03-macro-data 覆盖）"
 
         - room: "02-macro-scoring"
           parent: "04-macro-analysis"
@@ -471,8 +471,8 @@ timeline:
     phase_1_rooms: 26
     phase_2_rooms: 11
     phase_3_rooms: 3
-    completed: 1
+    completed: 3
     in_progress: 0
-    planning: 25
+    planning: 23
     backlog: 14
-    completion: 0.025
+    completion: 0.075
