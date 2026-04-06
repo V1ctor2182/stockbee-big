@@ -3,8 +3,8 @@ progress:
   milestones:
     - id: "m1-polymarket-and-calendar"
       name: "Polymarket 事件概率 + FRED 经济日历"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-06"
       description: |
         1. Polymarket REST API (gamma-api.polymarket.com) 抓取前 30 大宏观事件概率
            - 存储到 SQLite（event_id, title, probability, previous_probability, fetched_at）
