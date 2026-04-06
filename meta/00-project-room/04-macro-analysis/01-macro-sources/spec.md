@@ -2,26 +2,32 @@
 
 ## Intent
 
-**Polymarket 事件概率 + 经济日历**（原 FRED/BLS/RSS 已被 03-macro-data 覆盖）
+**Polymarket 事件概率 + FRED 经济日历**（原 FRED/BLS/RSS 已被 03-macro-data 覆盖）
 
-两个补充数据源：
-- **Polymarket 事件概率** — 爬取前 30 大宏观事件，检测"概率悬崖"，作为 MacroTiltEngine 外生因子
-- **经济日历** — FOMC/非农/CPI 等事件日，标记高波动日，避免在数据发布前后再平衡
+2 个核心组件：
+- **PolymarketFetcher** — Gamma API 抓取前 30 大宏观事件概率，SQLite 存储历史，概率悬崖检测（变化 > 15%）
+- **EconomicCalendar** — FRED release dates API 同步经济数据发布日历，8 类高波动事件标记（FOMC/NFP/CPI/GDP 等）
 
-依赖：03-macro-data ✅（FRED 17 指标已连通）
+实现状态：已完成 ✅（2026-04-06）
+测试覆盖：22 个单元测试
 
 ## Constraints
 
-_待开发时确定_
+- **Polymarket API 无需认证** — 公开 REST API (gamma-api.polymarket.com)
+- **概率悬崖阈值 15%** — abs(current - previous) >= 0.15
+- **高波动事件 8 类** — FOMC, NFP, CPI, PPI, GDP, Treasury Yield, Industrial Production, M2
 
 ## Decisions
 
-- **FRED/BLS/RSS 不在本 Room 实现** — 已被 03-macro-data 完全覆盖（2026-04-06 重新定义）
+- **FRED/BLS/RSS 不在本 Room 实现** — 已被 03-macro-data 完全覆盖
+- **Polymarket REST API > 爬虫** — 公开 API 更稳定
+- **FRED release calendar API > 静态维护** — 自动同步，无需手动更新
 
 ## Contracts
 
-_待开发时确定_
+- **PolymarketFetcher** — fetch_macro_events(limit) → list[MarketEvent]; save_events; detect_cliffs; get_latest_events
+- **EconomicCalendar** — sync(days_ahead) → int; get_events(start, end, hv_only); is_high_volatility_day(d); get_next_high_volatility(after)
 
 ---
-_spec 状态: active（intent 已重新定义）_
+_所有 spec 状态: active_
 _spec.md 最后更新: 2026-04-06_

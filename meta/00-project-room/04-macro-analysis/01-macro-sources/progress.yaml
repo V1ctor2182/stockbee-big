@@ -1,5 +1,5 @@
 progress:
-  completion: 0.0
+  completion: 1.0
   milestones:
     - id: "m1-polymarket-and-calendar"
       name: "Polymarket 事件概率 + FRED 经济日历"
@@ -20,8 +20,8 @@ progress:
 
     - id: "m2-tests"
       name: "测试"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-06"
       estimated_files:
         - "tests/test_macro_sources.py"
       estimated_lines: 150
