@@ -867,9 +867,10 @@ html, body {
   <div class="tooltip-inner" id="tooltipInner"></div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
 <script>
 // ══════════════════════════════════════════════════════════════
-// DATA
+// DATA — loaded dynamically from timeline.yaml
 // ══════════════════════════════════════════════════════════════
 
 const CATEGORIES = {
@@ -892,80 +893,8 @@ const CRITICAL_PATH = [
   '01-decision-orchestration','02-validation-layer','04-approval-workflow','03-trade-execution'
 ];
 
-const PHASES = [
-  {
-    id: 'phase-1', name: 'Phase 1 — MVP 完整交易流程跑通',
-    start: '2026-04-01', end: '2026-07-31',
-    sprints: [
-      { name: 'Sprint 1: 数据基座', rooms: [
-        { id:'07-provider-arch', parent:'02-data-architecture', start:'2026-04-01', end:'2026-04-11', status:'completed', completion:1.0, depends:[], note:'核心架构已实现，测试完成' },
-        { id:'01-stock-data', parent:'02-data-architecture', start:'2026-04-07', end:'2026-04-18', status:'planning', completion:0, depends:['07-provider-arch'], note:'研究完成，四层漏斗+Parquet' },
-        { id:'02-news-data', parent:'02-data-architecture', start:'2026-04-07', end:'2026-04-16', status:'planning', completion:0, depends:['07-provider-arch'], note:'研究完成，与 stock-data 并行' },
-        { id:'03-macro-data', parent:'02-data-architecture', start:'2026-04-07', end:'2026-04-16', status:'planning', completion:0, depends:['07-provider-arch'], note:'研究完成，与 stock-data 并行' },
-        { id:'04-factor-storage', parent:'02-data-architecture', start:'2026-04-14', end:'2026-04-25', status:'planning', completion:0, depends:['01-stock-data','07-provider-arch'], note:'研究完成，表达式引擎+预计算' },
-      ]},
-      { name: 'Sprint 2: 模型层 + 宏观', rooms: [
-        { id:'01-llm-routing', parent:'03-model-system', start:'2026-04-21', end:'2026-05-02', status:'planning', completion:0, depends:['02-news-data'], note:'研究完成，多模型路由+降级链' },
-        { id:'02-small-models', parent:'03-model-system', start:'2026-04-21', end:'2026-05-02', status:'planning', completion:0, depends:['04-factor-storage'], note:'研究完成，可与 llm-routing 并行' },
-        { id:'04-alpha-mining', parent:'03-model-system', start:'2026-04-28', end:'2026-05-09', status:'planning', completion:0, depends:['04-factor-storage','02-small-models'], note:'研究完成，Alpha158+IC/ICIR' },
-        { id:'01-macro-sources', parent:'04-macro-analysis', start:'2026-04-21', end:'2026-04-28', status:'planning', completion:0, depends:['03-macro-data','07-provider-arch'], note:'研究完成' },
-        { id:'02-macro-scoring', parent:'04-macro-analysis', start:'2026-04-28', end:'2026-05-09', status:'planning', completion:0, depends:['01-macro-sources','01-llm-routing'] },
-        { id:'03-sector-tilts', parent:'04-macro-analysis', start:'2026-05-05', end:'2026-05-12', status:'planning', completion:0, depends:['02-macro-scoring'] },
-        { id:'04-style-tilts', parent:'04-macro-analysis', start:'2026-05-05', end:'2026-05-12', status:'planning', completion:0, depends:['02-macro-scoring'] },
-      ]},
-      { name: 'Sprint 3: 因子评分 + 知识图谱', rooms: [
-        { id:'06-knowledge-graph', parent:'02-data-architecture', start:'2026-05-05', end:'2026-05-16', status:'planning', completion:0, depends:['01-stock-data','03-macro-data'], note:'Phase 1 仅静态图可查询' },
-        { id:'01-multi-factor-fusion', parent:'05-factor-scoring', start:'2026-05-12', end:'2026-05-23', status:'planning', completion:0, depends:['02-small-models','04-alpha-mining','02-macro-scoring'] },
-        { id:'02-rolling-ic-ir', parent:'05-factor-scoring', start:'2026-05-19', end:'2026-05-28', status:'planning', completion:0, depends:['01-multi-factor-fusion','04-factor-storage'] },
-      ]},
-      { name: 'Sprint 4: 投资组合 + 决策层', rooms: [
-        { id:'01-universe-mgmt', parent:'01-portfolio-management', start:'2026-05-19', end:'2026-05-28', status:'planning', completion:0, depends:['01-stock-data'] },
-        { id:'02-portfolio-construction', parent:'01-portfolio-management', start:'2026-05-26', end:'2026-06-08', status:'planning', completion:0, depends:['01-multi-factor-fusion','02-macro-scoring','01-universe-mgmt'], note:'Phase 1 无 RL，用规则+因子构建' },
-        { id:'01-decision-orchestration', parent:'06-llm-agent-decision', start:'2026-06-01', end:'2026-06-10', status:'planning', completion:0, depends:['01-llm-routing','02-portfolio-construction'] },
-        { id:'02-validation-layer', parent:'06-llm-agent-decision', start:'2026-06-08', end:'2026-06-17', status:'planning', completion:0, depends:['01-decision-orchestration'] },
-        { id:'03-decision-log', parent:'06-llm-agent-decision', start:'2026-06-08', end:'2026-06-15', status:'planning', completion:0, depends:['01-decision-orchestration'], note:'护城河种子，与 validation 并行' },
-        { id:'04-approval-workflow', parent:'06-llm-agent-decision', start:'2026-06-15', end:'2026-06-22', status:'planning', completion:0, depends:['02-validation-layer'] },
-      ]},
-      { name: 'Sprint 5: 交易执行 + 收尾', rooms: [
-        { id:'03-trade-execution', parent:'01-portfolio-management', start:'2026-06-15', end:'2026-06-26', status:'planning', completion:0, depends:['02-portfolio-construction'] },
-        { id:'04-short-mode', parent:'01-portfolio-management', start:'2026-06-22', end:'2026-06-29', status:'planning', completion:0, depends:['03-trade-execution'] },
-        { id:'04-risk-controls', parent:'07-realtime-monitoring', start:'2026-06-22', end:'2026-07-01', status:'planning', completion:0, depends:['02-portfolio-construction'] },
-        { id:'01-session-mgmt', parent:'09-market-calendar', start:'2026-06-22', end:'2026-06-29', status:'planning', completion:0, depends:['07-provider-arch'] },
-        { id:'02-holiday-rebalance', parent:'09-market-calendar', start:'2026-06-29', end:'2026-07-04', status:'planning', completion:0, depends:['01-session-mgmt'] },
-      ]},
-    ]
-  },
-  {
-    id: 'phase-2', name: 'Phase 2 — 增强 实时监控 + RL + 知识图谱',
-    start: '2026-08-01', end: '2026-11-30',
-    sprints: [
-      { name: null, rooms: [
-        { id:'05-experience-buffer', parent:'02-data-architecture', start:'2026-08-01', end:'2026-08-14', status:'backlog', completion:0, depends:[] },
-        { id:'03-rl-algorithms', parent:'03-model-system', start:'2026-08-01', end:'2026-08-28', status:'backlog', completion:0, depends:['05-experience-buffer','02-portfolio-construction'] },
-        { id:'01-rt-data-sources', parent:'07-realtime-monitoring', start:'2026-08-15', end:'2026-08-28', status:'backlog', completion:0, depends:['02-news-data','07-provider-arch'] },
-        { id:'02-news-funnel', parent:'07-realtime-monitoring', start:'2026-08-25', end:'2026-09-11', status:'backlog', completion:0, depends:['01-llm-routing','02-small-models','01-rt-data-sources'] },
-        { id:'03-tiered-actions', parent:'07-realtime-monitoring', start:'2026-09-08', end:'2026-09-22', status:'backlog', completion:0, depends:['02-news-funnel','03-trade-execution'] },
-        { id:'03-xgboost-fusion', parent:'05-factor-scoring', start:'2026-09-01', end:'2026-09-14', status:'backlog', completion:0, depends:['01-multi-factor-fusion','02-small-models'] },
-        { id:'01-resource-tracking', parent:'08-budget-governance', start:'2026-09-15', end:'2026-09-26', status:'backlog', completion:0, depends:['07-provider-arch'] },
-        { id:'02-degradation', parent:'08-budget-governance', start:'2026-09-22', end:'2026-10-03', status:'backlog', completion:0, depends:['01-resource-tracking'] },
-        { id:'01-realtime-views', parent:'10-dashboard-reports', start:'2026-10-01', end:'2026-10-21', status:'backlog', completion:0, depends:['02-portfolio-construction','02-news-funnel'] },
-        { id:'02-analytics-views', parent:'10-dashboard-reports', start:'2026-10-15', end:'2026-11-04', status:'backlog', completion:0, depends:['02-macro-scoring','02-rolling-ic-ir'] },
-        { id:'01-info-sources', parent:'11-info-sources-memory', start:'2026-10-01', end:'2026-10-14', status:'backlog', completion:0, depends:['02-news-data','03-macro-data'] },
-      ]}
-    ]
-  },
-  {
-    id: 'phase-3', name: 'Phase 3 — 生产优化 + 开源整理',
-    start: '2026-12-01', end: '2027-02-28',
-    sprints: [
-      { name: null, rooms: [
-        { id:'03-report-generation', parent:'10-dashboard-reports', start:'2026-12-01', end:'2026-12-21', status:'backlog', completion:0, depends:['01-realtime-views','02-analytics-views'] },
-        { id:'02-decision-history', parent:'11-info-sources-memory', start:'2026-12-15', end:'2027-01-05', status:'backlog', completion:0, depends:['03-decision-log'] },
-        { id:'03-openclaw-crawler', parent:'11-info-sources-memory', start:'2027-01-05', end:'2027-01-26', status:'backlog', completion:0, depends:['01-info-sources','01-llm-routing'] },
-      ]}
-    ]
-  }
-];
+// PHASES will be populated from timeline.yaml
+let PHASES = [];
 
 // ══════════════════════════════════════════════════════════════
 // TIME UTILS
@@ -974,7 +903,39 @@ const PHASES = [
 const TIMELINE_START = new Date('2026-03-25');
 const TIMELINE_END   = new Date('2027-02-07');
 const DAY_WIDTH = 16;
-const TODAY = new Date('2026-03-31');
+const TODAY = new Date();
+
+// ══════════════════════════════════════════════════════════════
+// YAML → PHASES CONVERTER
+// ══════════════════════════════════════════════════════════════
+
+function yamlToPhases(yaml) {
+  const phases = [];
+  for (const phase of yaml.timeline.phases) {
+    const sprints = [];
+    // Group rooms into sprints by scanning for sprint comment patterns
+    // timeline.yaml doesn't have sprint grouping, so put all rooms in one sprint per phase
+    const rooms = (phase.rooms || []).map(r => ({
+      id: r.room,
+      parent: r.parent,
+      start: r.target_start,
+      end: r.target_end,
+      status: r.status || 'planning',
+      completion: r.completion || 0,
+      depends: r.depends_on || [],
+      note: r.note || '',
+    }));
+    sprints.push({ name: null, rooms });
+    phases.push({
+      id: phase.id,
+      name: phase.name,
+      start: phase.target_start,
+      end: phase.target_end,
+      sprints,
+    });
+  }
+  return phases;
+}
 
 function daysBetween(a, b) {
   return Math.round((b - a) / (1000*60*60*24));
@@ -1335,18 +1296,33 @@ document.addEventListener('mouseout', e => {
 });
 
 // ══════════════════════════════════════════════════════════════
-// INIT
+// INIT — load timeline.yaml then render
 // ══════════════════════════════════════════════════════════════
 
-renderSidebar();
-renderTimeHeader();
-renderChartBody();
+async function init() {
+  try {
+    const resp = await fetch('timeline.yaml');
+    const text = await resp.text();
+    const yaml = jsyaml.load(text);
+    PHASES = yamlToPhases(yaml);
+  } catch (e) {
+    console.error('Failed to load timeline.yaml, using empty data:', e);
+    document.getElementById('sidebar').innerHTML = '<div style="padding:20px;color:#f87171;">Failed to load timeline.yaml<br>Make sure this HTML is opened from the same directory.</div>';
+    return;
+  }
 
-// Scroll to today
-requestAnimationFrame(() => {
-  const todayX = dateToX(TODAY);
-  chart.scrollLeft = Math.max(0, todayX - 100);
-});
+  renderSidebar();
+  renderTimeHeader();
+  renderChartBody();
+
+  // Scroll to today
+  requestAnimationFrame(() => {
+    const todayX = dateToX(TODAY);
+    chart.scrollLeft = Math.max(0, todayX - 100);
+  });
+}
+
+init();
 </script>
 
 </body>
