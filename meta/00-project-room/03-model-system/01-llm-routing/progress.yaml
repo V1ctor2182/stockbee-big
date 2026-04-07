@@ -1,24 +1,36 @@
 progress:
   completion: 0.0
   milestones:
-    - id: "m1-路由器实现"
-      name: "路由器实现"
+    - id: "m1-llm-router-core"
+      name: "LLMRouter + TaskConfig 路由核心"
       status: pending
       completed_at: null
-    - id: "m2-G1-G2-G3-管道"
-      name: "G1/G2/G3 管道"
+      description: |
+        LLMRouter: route(task_type, prompt, output_schema) → response
+        统一调用接口（litellm），按 TaskType 选模型，降级链。
+        TaskConfig: 5 种任务类型的模型映射 + 参数配置。
+      estimated_files:
+        - "src/stockbee/llm_routing/__init__.py"
+        - "src/stockbee/llm_routing/router.py"
+        - "src/stockbee/llm_routing/task_config.py"
+      estimated_lines: 200
+
+    - id: "m2-cost-tracker"
+      name: "CostTracker + 响应缓存"
       status: pending
       completed_at: null
-    - id: "m3-降级链"
-      name: "降级链"
-      status: pending
-      completed_at: null
-    - id: "m4-Batch-API-优化"
-      name: "Batch API 优化"
-      status: pending
-      completed_at: null
-    - id: "m5-测试"
+      description: |
+        按任务类型累计 token 用量和成本。月度预算检查 ($15)。
+        响应缓存（prompt hash 复用）。SQLite 历史记录。
+      estimated_files:
+        - "src/stockbee/llm_routing/cost_tracker.py"
+      estimated_lines: 120
+
+    - id: "m3-tests"
       name: "测试"
       status: pending
       completed_at: null
+      estimated_files:
+        - "tests/test_llm_routing.py"
+      estimated_lines: 150
   commits: []
