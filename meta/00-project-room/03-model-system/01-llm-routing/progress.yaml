@@ -17,8 +17,8 @@ progress:
 
     - id: "m2-cost-tracker"
       name: "CostTracker + 响应缓存"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-07"
       description: |
         按任务类型累计 token 用量和成本。月度预算检查 ($15)。
         响应缓存（prompt hash 复用）。SQLite 历史记录。
