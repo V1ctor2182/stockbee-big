@@ -60,11 +60,29 @@ description: >
 
 ### Phase 2.5: 多方案规划 + 双重 Review（编码前必经）
 
-**不直接写代码。** 先用 sub-agent 生成方案，review 通过后再动手。
+**不直接写代码。** 先生成方案，review 通过后再动手。
 
-6. **Sub-agent 生成 ≥2 套实施方案**：
+6. **生成实施方案**：
 
-   对每个 milestone，启动 planning sub-agent（不写代码），产出两套方案：
+   **简单 milestone 走快速路径（主会话直接生成，不启动 sub-agent）**：
+   当 milestone 同时满足以下条件时，主会话直接生成**单方案**，跳过多方案对比和 sub-agent：
+   - 无 `complexity_flags`
+   - `estimated_lines ≤ 120`
+   - 有可参考的同类已完成 milestone（模式明确）
+
+   快速路径产出：
+   ```
+   Plan: {名称}
+     步骤: {numbered sub-tasks}
+     每步: 内容 / 预估行数 / 测试点
+     Corner cases: {简要列出}
+     总计: ~{N} 行 code + ~{N} 行 test
+   ```
+   → 直接进入 step 8 展示给开发者确认。
+
+   **复杂 milestone 走完整路径（启动 planning sub-agent）**：
+   当 milestone 有 `complexity_flags`、`estimated_lines > 120`、或无先例模式时，
+   启动 planning sub-agent（不写代码），产出两套方案：
 
    ```
    Plan A: {名称} (如 Bottom-Up)
@@ -91,7 +109,7 @@ description: >
    如果 milestone 有 `complexity_flags`（来自 plan-milestones），重点分析该类复杂度。
    如果有 `open_questions`，必须在方案中列出并标记需要开发者决定。
 
-7. **AI 自身 Review**：
+7. **AI 自身 Review**（仅完整路径，快速路径跳过此步）：
 
    对两套方案做对比 review，给出推荐并说明理由：
    - 哪个方案更适合当前代码量/复杂度
