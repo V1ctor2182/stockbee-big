@@ -13,6 +13,11 @@ from .g1_filter import G1Config, G1Filter, G1Result
 from .g2_classifier import G2Classifier, G2Config, G2Result
 from .g3_analyzer import G3Analyzer, G3Config, G3Result
 from .news_store import SqliteNewsProvider
+from .newsapi_source import NewsAPIConfig, NewsAPISource
+from .perigon_source import PerigonConfig, PerigonSource
+from .perplexity_source import PerplexityConfig, PerplexitySource
+from .sources import MockNewsSource, NewsSource  # noqa: F401
+from .sync import NewsDataSyncer, SyncResult
 
 __all__ = [
     "SqliteNewsProvider",
@@ -25,4 +30,14 @@ __all__ = [
     "G3Analyzer",
     "G3Config",
     "G3Result",
+    "NewsAPISource",
+    "NewsAPIConfig",
+    "PerigonSource",
+    "PerigonConfig",
+    "PerplexitySource",
+    "PerplexityConfig",
+    "NewsSource",
+    "MockNewsSource",
+    "NewsDataSyncer",
+    "SyncResult",
 ]

@@ -1,0 +1,37 @@
+spec_id: "change-2026-04-07-m5-sources-sync"
+type: change
+state: active
+intent:
+  summary: "3 新闻数据源 + NewsDataSyncer 编排管道 + 39 tests"
+  detail: |
+    NewsSource Protocol + MockSource — 统一数据源接口，backtest 可复用。
+    NewsAPISource — newsapi-python SDK 集成，lazy import + graceful degradation。
+    PerigonSource — REST API 直调，requests lazy import。
+    PerplexitySource — AI 搜索 API + citations 提取原始 publisher/URL，
+      prompt 要求返回结构化新闻列表，source 字段用原始 publisher（非 "perplexity"），
+      使 UNIQUE(headline, source) 与 NewsAPI/Perigon 正常去重。
+    NewsDataSyncer — fetch → 跨源去重(headline normalize) → G1 filter
+      → store(g_level=1) → G2 classify(g_level=2) → G3 analyze(条件, g_level=3)。
+    SyncResult dataclass 返回完整管道统计。
+    Graceful degradation: 单源失败不影响其他源，API key 缺失自动跳过。
+    39 tests: pipeline 7 + dedup 5 + degradation 3 + sources 16 + integration 3 + protocol 3 + normalize 3。
+constraints: []
+indexing:
+  type: change
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["newsapi", "perigon", "perplexity", "sync", "pipeline", "dedup"]
+provenance:
+  source_type: commit
+  confidence: 1.0
+  source_ref: "commit on news_data branch, 2026-04-07"
+relations:
+  - { type: implements, target: "intent-02-news-data-001", reason: "m5 数据源与同步" }
+anchors:
+  - { file: "src/stockbee/news_data/sources.py", type: implementation }
+  - { file: "src/stockbee/news_data/sync.py", type: implementation }
+  - { file: "src/stockbee/news_data/newsapi_source.py", type: implementation }
+  - { file: "src/stockbee/news_data/perigon_source.py", type: implementation }
+  - { file: "src/stockbee/news_data/perplexity_source.py", type: implementation }
+  - { file: "tests/test_news_data.py", type: test }

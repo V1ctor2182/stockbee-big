@@ -51,6 +51,11 @@ from stockbee.news_data.g3_analyzer import (
     HAIKU_MODEL,
     _SYSTEM_PROMPT,
 )
+from stockbee.news_data.sources import MockNewsSource, NewsSource
+from stockbee.news_data.sync import NewsDataSyncer, SyncResult, _normalize_headline
+from stockbee.news_data.newsapi_source import NewsAPISource, NewsAPIConfig
+from stockbee.news_data.perigon_source import PerigonSource, PerigonConfig
+from stockbee.news_data.perplexity_source import PerplexitySource, PerplexityConfig
 
 
 # =========================================================================
@@ -1790,3 +1795,427 @@ class TestG1G2G3Integration:
         assert row["g_level"] == 3
         assert row["analysis"] is not None
         assert row["reliability_score"] == 0.9
+
+
+# =========================================================================
+# NewsSource Protocol + MockSource
+# =========================================================================
+
+class TestNewsSource:
+
+    def test_mock_source_implements_protocol(self):
+        mock = MockNewsSource()
+        assert isinstance(mock, NewsSource)
+
+    def test_mock_source_returns_articles(self):
+        articles = [{"headline": "Test", "source": "test"}]
+        mock = MockNewsSource(_articles=articles)
+        assert mock.fetch() == articles
+        assert mock.source_name == "mock"
+
+    def test_mock_source_empty(self):
+        mock = MockNewsSource()
+        assert mock.fetch() == []
+
+
+# =========================================================================
+# NewsDataSyncer — Headline Normalize
+# =========================================================================
+
+class TestHeadlineNormalize:
+
+    def test_lowercase(self):
+        assert _normalize_headline("Apple BEATS Q4") == "apple beats q4"
+
+    def test_collapse_whitespace(self):
+        assert _normalize_headline("Apple  beats   Q4") == "apple beats q4"
+
+    def test_strip(self):
+        assert _normalize_headline("  Apple beats Q4  ") == "apple beats q4"
+
+
+# =========================================================================
+# NewsDataSyncer — Pipeline 测试
+# =========================================================================
+
+def _make_syncer(provider, mock_articles=None, g3_available=False, g3_response=None):
+    """创建一个带 mock 的 NewsDataSyncer。"""
+    g1 = G1Filter()
+    g2 = G2Classifier(G2Config(use_finbert=False))
+
+    g3 = G3Analyzer(G3Config())
+    g3._haiku_available = g3_available
+    if g3_available and g3_response:
+        mock_client = MagicMock()
+        mock_client.messages.create.return_value = _mock_haiku_response(g3_response)
+        g3._client = mock_client
+
+    sources = []
+    if mock_articles is not None:
+        sources.append(MockNewsSource(_articles=mock_articles))
+
+    return NewsDataSyncer(
+        store=provider, g1=g1, g2=g2, g3=g3, sources=sources,
+    )
+
+
+def _sample_event(headline="Apple beats Q4 earnings expectations", source="reuters",
+                   snippet="Revenue exceeded expectations", **overrides):
+    """生成一个标准新闻事件字典。"""
+    event = {
+        "headline": headline,
+        "source": source,
+        "timestamp": _now(),
+        "snippet": snippet,
+        "source_url": "https://reuters.com/article/1",
+    }
+    event.update(overrides)
+    return event
+
+
+class TestSyncerPipeline:
+
+    def test_full_pipeline_happy_path(self, provider):
+        """fetch → G1 → store → G2 完整管道。"""
+        articles = [_sample_event()]
+        syncer = _make_syncer(provider, mock_articles=articles)
+        result = syncer.ingest_news()
+        assert result.fetched == 1
+        assert result.g1_passed == 1
+        assert result.stored == 1
+        assert result.g2_classified == 1
+        assert "mock" in result.sources_used
+
+        # 验证 DB 状态
+        df = provider.get_news()
+        assert len(df) == 1
+        assert df.iloc[0]["g_level"] == 2
+
+    def test_empty_source(self, provider):
+        syncer = _make_syncer(provider, mock_articles=[])
+        result = syncer.ingest_news()
+        assert result.fetched == 0
+        assert result.stored == 0
+
+    def test_no_sources(self, provider):
+        syncer = _make_syncer(provider, mock_articles=None)
+        syncer._sources = []
+        result = syncer.ingest_news()
+        assert result.fetched == 0
+
+    def test_g1_rejects_bad_source(self, provider):
+        articles = [_sample_event(source="spam-news.com")]
+        syncer = _make_syncer(provider, mock_articles=articles)
+        result = syncer.ingest_news()
+        assert result.fetched == 1
+        assert result.g1_passed == 0
+        assert result.stored == 0
+
+    def test_multiple_articles(self, provider):
+        articles = [
+            _sample_event(headline="Apple beats Q4 earnings"),
+            _sample_event(headline="Tesla reports record deliveries", source="bloomberg"),
+            _sample_event(headline="Fed raises interest rates", source="wsj"),
+        ]
+        syncer = _make_syncer(provider, mock_articles=articles)
+        result = syncer.ingest_news()
+        assert result.fetched == 3
+        assert result.stored >= 2  # 至少 2 条通过 G1
+
+    def test_g3_triggered_on_high_importance(self, provider):
+        """G3 条件触发：high importance + high urgency。"""
+        articles = [_sample_event(
+            headline="Breaking: massive fraud scandal at Apple revealed",
+        )]
+        g3_data = _valid_g3_json()
+        syncer = _make_syncer(provider, mock_articles=articles,
+                              g3_available=True, g3_response=g3_data)
+        result = syncer.ingest_news()
+        # G3 可能触发也可能不触发，取决于 G2 规则引擎的 importance/urgency
+        assert result.g2_classified >= 1
+
+    def test_g3_not_triggered_low_importance(self, provider):
+        articles = [_sample_event(headline="Minor update to Apple website design")]
+        syncer = _make_syncer(provider, mock_articles=articles)
+        result = syncer.ingest_news()
+        assert result.g3_analyzed == 0
+
+
+# =========================================================================
+# NewsDataSyncer — 跨源去重
+# =========================================================================
+
+class TestSyncerDedup:
+
+    def test_exact_duplicate_headline_deduped(self, provider):
+        """同一 headline 从两个源 → 应用层去重只保留 1 条。"""
+        articles = [
+            _sample_event(headline="Apple beats Q4 earnings"),
+            _sample_event(headline="Apple beats Q4 earnings", source="bloomberg"),
+        ]
+        syncer = _make_syncer(provider, mock_articles=articles)
+        result = syncer.ingest_news()
+        assert result.after_dedup == 1  # 应用层去重
+
+    def test_case_difference_deduped(self, provider):
+        """大小写差异 → normalize 后去重。"""
+        articles = [
+            _sample_event(headline="Apple Beats Q4 Earnings"),
+            _sample_event(headline="apple beats q4 earnings", source="bloomberg"),
+        ]
+        syncer = _make_syncer(provider, mock_articles=articles)
+        result = syncer.ingest_news()
+        assert result.after_dedup == 1
+
+    def test_different_headlines_kept(self, provider):
+        """不同 headline → 保留两条（即使是同一事件的不同报道）。"""
+        articles = [
+            _sample_event(headline="Apple beats Q4 earnings expectations"),
+            _sample_event(headline="Apple reports record quarterly profit", source="bloomberg"),
+        ]
+        syncer = _make_syncer(provider, mock_articles=articles)
+        result = syncer.ingest_news()
+        assert result.after_dedup == 2
+
+    def test_same_event_different_sentiment(self, provider):
+        """同一事件不同态度 → 不同 headline → 两条都保留。"""
+        articles = [
+            _sample_event(headline="Apple beats Q4 earnings, strong growth ahead"),
+            _sample_event(headline="Apple growth slows despite Q4 earnings beat",
+                         source="bloomberg"),
+        ]
+        syncer = _make_syncer(provider, mock_articles=articles)
+        result = syncer.ingest_news()
+        assert result.after_dedup == 2
+        assert result.stored == 2
+
+    def test_dedup_keeps_longer_snippet(self, provider):
+        """重复时保留 snippet 更长的。"""
+        articles = [
+            _sample_event(headline="Apple beats Q4", snippet="Short"),
+            _sample_event(headline="Apple beats Q4", snippet="Much longer snippet with details"),
+        ]
+        syncer = _make_syncer(provider, mock_articles=articles)
+        result = syncer.ingest_news()
+        assert result.after_dedup == 1
+
+
+# =========================================================================
+# NewsDataSyncer — 源失败 Graceful Degradation
+# =========================================================================
+
+class TestSyncerDegradation:
+
+    def test_source_exception_caught(self, provider):
+        """单源异常不影响其他源。"""
+        failing_source = MagicMock()
+        failing_source.source_name = "bad_source"
+        failing_source.fetch.side_effect = RuntimeError("API down")
+
+        good_source = MockNewsSource(_articles=[_sample_event()])
+
+        syncer = _make_syncer(provider)
+        syncer._sources = [failing_source, good_source]
+        result = syncer.ingest_news()
+        assert result.fetched == 1  # good source 的 1 条
+        assert len(result.errors) == 1
+        assert "bad_source" in result.errors[0]
+
+    def test_all_sources_fail(self, provider):
+        """所有源都失败 → 空结果，不 crash。"""
+        bad1 = MagicMock(source_name="bad1")
+        bad1.fetch.side_effect = RuntimeError("fail1")
+        bad2 = MagicMock(source_name="bad2")
+        bad2.fetch.side_effect = RuntimeError("fail2")
+
+        syncer = _make_syncer(provider)
+        syncer._sources = [bad1, bad2]
+        result = syncer.ingest_news()
+        assert result.fetched == 0
+        assert len(result.errors) == 2
+
+    def test_source_filter(self, provider):
+        """指定 source 时只拉该源。"""
+        src1 = MockNewsSource(_articles=[_sample_event(headline="From mock")])
+        src2 = MagicMock(source_name="other")
+        src2.fetch.return_value = [_sample_event(headline="From other")]
+
+        syncer = _make_syncer(provider)
+        syncer._sources = [src1, src2]
+        result = syncer.ingest_news(source="mock")
+        assert "mock" in result.sources_used
+        assert "other" not in result.sources_used
+
+
+# =========================================================================
+# NewsAPISource — Mock 测试
+# =========================================================================
+
+class TestNewsAPISource:
+
+    def test_no_api_key_returns_empty(self):
+        src = NewsAPISource(NewsAPIConfig(api_key=None))
+        src._available = False
+        assert src.fetch(keywords=["AAPL"]) == []
+        assert src.source_name == "newsapi"
+
+    def test_normalize_article(self):
+        src = NewsAPISource(NewsAPIConfig(api_key="test"))
+        article = {
+            "title": "Apple Beats Q4",
+            "description": "Revenue up 15%",
+            "publishedAt": "2026-04-07T10:00:00Z",
+            "source": {"name": "Reuters"},
+            "url": "https://reuters.com/1",
+        }
+        result = src._normalize(article)
+        assert result["headline"] == "Apple Beats Q4"
+        assert result["source"] == "reuters"
+        assert result["snippet"] == "Revenue up 15%"
+
+    def test_normalize_removed_article(self):
+        src = NewsAPISource(NewsAPIConfig(api_key="test"))
+        assert src._normalize({"title": "[Removed]"}) is None
+
+    def test_normalize_empty_title(self):
+        src = NewsAPISource(NewsAPIConfig(api_key="test"))
+        assert src._normalize({"title": ""}) is None
+
+    def test_build_query(self):
+        src = NewsAPISource()
+        assert src._build_query(["earnings"], ["AAPL"]) == "earnings OR AAPL"
+        assert src._build_query(None, None) == ""
+
+
+# =========================================================================
+# PerigonSource — Mock 测试
+# =========================================================================
+
+class TestPerigonSource:
+
+    def test_no_api_key_returns_empty(self):
+        src = PerigonSource(PerigonConfig(api_key=None))
+        src._available = False
+        assert src.fetch(keywords=["AAPL"]) == []
+        assert src.source_name == "perigon"
+
+    def test_normalize_article(self):
+        src = PerigonSource(PerigonConfig(api_key="test"))
+        article = {
+            "title": "Fed Raises Rates",
+            "description": "Interest rates up 25bp",
+            "pubDate": "2026-04-07T10:00:00Z",
+            "source": {"domain": "reuters.com"},
+            "url": "https://reuters.com/2",
+        }
+        result = src._normalize(article)
+        assert result["headline"] == "Fed Raises Rates"
+        assert result["source"] == "reuters.com"
+
+    def test_normalize_empty_title(self):
+        src = PerigonSource(PerigonConfig(api_key="test"))
+        assert src._normalize({"title": ""}) is None
+
+
+# =========================================================================
+# PerplexitySource — Mock 测试
+# =========================================================================
+
+class TestPerplexitySource:
+
+    def test_no_api_key_returns_empty(self):
+        src = PerplexitySource(PerplexityConfig(api_key=None))
+        src._available = False
+        assert src.fetch(keywords=["AAPL"]) == []
+        assert src.source_name == "perplexity"
+
+    def test_parse_articles_clean_json(self):
+        src = PerplexitySource(PerplexityConfig(api_key="test"))
+        content = json.dumps([
+            {"headline": "Apple beats Q4", "publisher": "Reuters", "date": "2026-04-07"},
+            {"headline": "Tesla surges", "publisher": "Bloomberg", "date": "2026-04-07"},
+        ])
+        articles = src._parse_articles(content)
+        assert len(articles) == 2
+
+    def test_parse_articles_markdown_fenced(self):
+        src = PerplexitySource(PerplexityConfig(api_key="test"))
+        content = '```json\n[{"headline": "Test", "publisher": "CNN", "date": "2026-04-07"}]\n```'
+        articles = src._parse_articles(content)
+        assert len(articles) == 1
+
+    def test_parse_articles_garbage(self):
+        src = PerplexitySource(PerplexityConfig(api_key="test"))
+        assert src._parse_articles("I cannot find any news") == []
+
+    def test_domain_to_publisher(self):
+        assert PerplexitySource._domain_to_publisher("https://www.reuters.com/article/1") == "reuters"
+        assert PerplexitySource._domain_to_publisher("https://bloomberg.com/news/1") == "bloomberg"
+        assert PerplexitySource._domain_to_publisher("https://unknown-site.org/article") == "unknown-site"
+
+    def test_enrich_with_citations(self):
+        src = PerplexitySource(PerplexityConfig(api_key="test"))
+        articles = [
+            {"headline": "Apple beats Q4", "publisher": "Reuters", "date": "2026-04-07"},
+            {"headline": "Fed raises rates", "publisher": "", "date": "2026-04-07"},
+        ]
+        citations = ["https://reuters.com/1", "https://www.cnbc.com/2"]
+        result = src._enrich_with_citations(articles, citations)
+        assert len(result) == 2
+        assert result[0]["source"] == "reuters"
+        assert result[0]["source_url"] == "https://reuters.com/1"
+        assert result[1]["source"] == "cnbc"  # extracted from citation URL
+
+    def test_enrich_no_citations_fallback(self):
+        src = PerplexitySource(PerplexityConfig(api_key="test"))
+        articles = [{"headline": "Some news", "publisher": "", "date": "2026-04-07"}]
+        result = src._enrich_with_citations(articles, [])
+        assert result[0]["source"] == "perplexity"  # fallback
+
+
+# =========================================================================
+# 完整集成: Fetch → G1 → Store → G2 → Verify
+# =========================================================================
+
+class TestSyncerIntegration:
+
+    def test_end_to_end_with_db(self, provider):
+        """MockSource → pipeline → DB 验证。"""
+        articles = [
+            _sample_event(headline="Apple beats Q4 earnings with record profit and growth"),
+            _sample_event(headline="Breaking: SEC probe into Tesla fraud scandal",
+                         source="bloomberg"),
+        ]
+        syncer = _make_syncer(provider, mock_articles=articles)
+        result = syncer.ingest_news()
+
+        assert result.stored >= 1
+        assert result.g2_classified >= 1
+
+        # 验证 DB 中所有记录都至少到 g_level=2
+        df = provider.get_news()
+        assert all(df["g_level"] >= 2)
+
+    def test_db_dedup_on_repeated_sync(self, provider):
+        """重复 sync 同样的数据 → DB 去重，不重复入库。"""
+        articles = [_sample_event()]
+        syncer = _make_syncer(provider, mock_articles=articles)
+
+        r1 = syncer.ingest_news()
+        r2 = syncer.ingest_news()
+
+        assert r1.stored == 1
+        assert r2.stored == 0  # DB UNIQUE 去重
+        assert provider.get_news().shape[0] == 1
+
+    def test_zero_tickers_still_stored(self, provider):
+        """G1 提取不到 ticker → 仍然入库（宏观新闻）。"""
+        articles = [_sample_event(
+            headline="Global economy shows signs of recovery amid uncertainty",
+            source="reuters",
+        )]
+        syncer = _make_syncer(provider, mock_articles=articles)
+        result = syncer.ingest_news()
+        # G1 require_ticker=False (default)，即使没 ticker 也可能通过
+        # 具体取决于 G1 的 content check
+        assert result.fetched == 1

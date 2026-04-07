@@ -46,9 +46,9 @@ timeline:
           target_end: "2026-04-16"
           estimated_days: 7
           status: in_progress
-          completion: 0.67
+          completion: 0.83
           depends_on: ["07-provider-arch"]
-          note: "m1-m4 completed (G3 Analyzer), m5+m6 remaining"
+          note: "m1-m5 completed, m6 tests remaining"
 
         - room: "03-macro-data"
           parent: "02-data-architecture"
@@ -475,4 +475,4 @@ timeline:
     in_progress: 0
     planning: 25
     backlog: 14
-    completion: 0.047
+    completion: 0.050

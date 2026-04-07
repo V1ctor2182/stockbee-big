@@ -1,5 +1,5 @@
 progress:
-  completion: 0.67
+  completion: 0.83
   milestones:
     - id: "m1-SqliteNewsProvider"
       name: "SqliteNewsProvider — news_events 表 + 查询接口"
@@ -57,9 +57,9 @@ progress:
         （按 importance 排序缓冲）、API key 缺失时优雅降级（跳过 G3）、
         Haiku 返回格式异常时的 fallback 解析、极长新闻的 token 截断。
     - id: "m5-数据源与同步"
-      name: "NewsAPI + Perplexity + NewsDataSyncer"
-      status: pending
-      completed_at: null
+      name: "NewsAPI + Perigon + Perplexity + NewsDataSyncer"
+      status: completed
+      completed_at: "2026-04-07"
       estimated_files: ["src/stockbee/news_data/newsapi_source.py", "src/stockbee/news_data/perplexity_source.py", "src/stockbee/news_data/sync.py"]
       estimated_lines: 220
       depends_on: ["m4-G3-深度分析"]
@@ -110,3 +110,11 @@ progress:
         - change-2026-04-07-g3-analyzer (created)
       milestones_affected:
         - m4-G3-深度分析 (→ completed)
+    - hash: "8e904b6"
+      date: "2026-04-07"
+      message: "[02-news-data] feat: add 3 news sources + NewsDataSyncer pipeline + 39 tests"
+      files_changed: 7
+      specs_affected:
+        - change-2026-04-07-m5-sources-sync (created)
+      milestones_affected:
+        - m5-数据源与同步 (→ completed)
