@@ -1,5 +1,5 @@
 progress:
-  completion: 0.83
+  completion: 1.0
   milestones:
     - id: "m1-SqliteNewsProvider"
       name: "SqliteNewsProvider — news_events 表 + 查询接口"
@@ -73,8 +73,8 @@ progress:
         增量同步时间窗口重叠（避免漏取）。
     - id: "m6-测试"
       name: "测试"
-      status: in_progress
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-07"
       estimated_files: ["tests/test_news_data.py"]
       estimated_lines: 280
       depends_on: ["m5-数据源与同步"]
@@ -118,3 +118,11 @@ progress:
         - change-2026-04-07-m5-sources-sync (created)
       milestones_affected:
         - m5-数据源与同步 (→ completed)
+    - hash: "fdbc33e"
+      date: "2026-04-07"
+      message: "[02-news-data] test: add 25 edge case tests — security, integrity, boundary, timezone"
+      files_changed: 1
+      specs_affected:
+        - change-2026-04-07-m6-edge-cases (created)
+      milestones_affected:
+        - m6-测试 (→ completed)

@@ -41,6 +41,6 @@
 - **SqliteNewsProvider** — get_news(tickers, start, end, min_importance, g_level, limit) -> DataFrame; insert_news(headline, source, timestamp, ...) -> id|None; insert_news_batch(events) -> int; update_g_level(news_id, g_level, scores) -> bool; get_g3_daily_count/increment; get_news_by_id; count_by_g_level
 
 ---
-_spec 状态: intent (active), decision (active), change x4 (active)_
-_spec.md 最后更新: 2026-04-07 (m5 sources + sync)_
-_specs 目录: 1 intent + 1 decision + 4 change = 6 个 spec 文件_
+_spec 状态: intent (active), decision (active), change x5 (active)_
+_spec.md 最后更新: 2026-04-07 (m6 edge case tests — Room 完成)_
+_specs 目录: 1 intent + 1 decision + 5 change = 7 个 spec 文件_
