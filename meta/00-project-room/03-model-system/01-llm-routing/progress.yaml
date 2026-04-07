@@ -3,8 +3,8 @@ progress:
   milestones:
     - id: "m1-llm-router-core"
       name: "LLMRouter + TaskConfig 路由核心"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-07"
       description: |
         LLMRouter: route(task_type, prompt, output_schema) → response
         统一调用接口（litellm），按 TaskType 选模型，降级链。
