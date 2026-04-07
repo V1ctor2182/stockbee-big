@@ -172,10 +172,15 @@ class PerplexitySource:
             if not publisher:
                 publisher = "perplexity"
 
+            # Perplexity AI 输出不保证有 date 字段，fallback 到当前时间
+            timestamp = (article.get("date") or "").strip()
+            if not timestamp:
+                timestamp = datetime.now(timezone.utc).isoformat()
+
             result.append({
                 "headline": headline,
                 "source": publisher,
-                "timestamp": article.get("date", ""),
+                "timestamp": timestamp,
                 "snippet": "",
                 "source_url": source_url,
             })

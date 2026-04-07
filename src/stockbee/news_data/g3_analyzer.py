@@ -180,8 +180,8 @@ class G3Analyzer:
         raw_text = response.content[0].text
         result = self._parse_response(raw_text)
 
-        # 6. 成功后递增日计数
-        if self._provider is not None:
+        # 6. 只在有意义的结果时递增日计数（tier 3 garbage 不消耗额度）
+        if result.reliability_score > 0.0 and self._provider is not None:
             self._provider.increment_g3_daily_count()
 
         return result

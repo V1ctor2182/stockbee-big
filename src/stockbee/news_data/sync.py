@@ -155,7 +155,7 @@ class NewsDataSyncer:
         return all_events
 
     def _dedup_cross_source(self, events: list[dict]) -> list[dict]:
-        """跨源去重：headline normalize 后精确匹配，保留最早的一条。"""
+        """跨源去重：headline normalize 后精确匹配，保留 snippet 最长的一条。"""
         seen: dict[str, dict] = {}
         for event in events:
             headline = event.get("headline", "")

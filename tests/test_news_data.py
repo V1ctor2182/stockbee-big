@@ -2627,3 +2627,39 @@ class TestReviewFixes:
             sanitized = err_msg.replace(src._api_key, "***")
         assert "sk-secret-key-12345" not in sanitized
         assert "***" in sanitized
+
+    def test_fix7_garbage_parse_no_increment(self):
+        """#7: tier 3 garbage parse 不递增日计数。"""
+        mock_provider = MagicMock()
+        mock_provider.get_g3_daily_count.return_value = 0
+        g3 = _make_g3(response_data=_valid_g3_json(), provider=mock_provider)
+        # Mock 返回垃圾文本 → tier 3 → reliability=0.0
+        garbage_resp = MagicMock()
+        garbage_resp.content = [MagicMock(text="I cannot analyze this")]
+        g3._client.messages.create.return_value = garbage_resp
+        result = g3.analyze("Apple beats earnings")
+        assert result is not None
+        assert result.reliability_score == 0.0
+        mock_provider.increment_g3_daily_count.assert_not_called()
+
+    def test_fix7_good_parse_increments(self):
+        """#7: 正常 parse 仍然递增日计数。"""
+        mock_provider = MagicMock()
+        mock_provider.get_g3_daily_count.return_value = 0
+        g3 = _make_g3(response_data=_valid_g3_json(), provider=mock_provider)
+        result = g3.analyze("Apple beats earnings")
+        assert result is not None
+        assert result.reliability_score > 0.0
+        mock_provider.increment_g3_daily_count.assert_called_once()
+
+    def test_fix13_perplexity_empty_date_fallback(self):
+        """#13: Perplexity 空 date 字段 fallback 到当前时间。"""
+        src = PerplexitySource(PerplexityConfig(api_key="test"))
+        articles = [
+            {"headline": "No date article", "publisher": "Reuters", "date": ""},
+            {"headline": "Null date article", "publisher": "Bloomberg"},
+        ]
+        result = src._enrich_with_citations(articles, [])
+        for item in result:
+            assert item["timestamp"] != ""
+            assert "T" in item["timestamp"]  # ISO 格式
