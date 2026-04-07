@@ -15,9 +15,10 @@ import json
 import logging
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from urllib.error import URLError
 
@@ -108,7 +109,7 @@ class PolymarketFetcher:
         if not raw_markets:
             return []
 
-        now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         events: list[MarketEvent] = []
 
         for market in raw_markets:
@@ -194,8 +195,7 @@ class PolymarketFetcher:
         """调用 Gamma API。"""
         url = GAMMA_API_BASE + path
         if params:
-            query = "&".join(f"{k}={v}" for k, v in params.items())
-            url += "?" + query
+            url += "?" + urlencode(params)
 
         req = Request(url, headers={"Accept": "application/json"})
         try:

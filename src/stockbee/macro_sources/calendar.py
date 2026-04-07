@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from urllib.error import URLError
 
@@ -176,14 +177,14 @@ class EconomicCalendar:
 
     def _fetch_release_dates(self, start: date, end: date) -> list[dict]:
         """从 FRED API 获取发布日期。"""
-        url = (
-            f"{FRED_API_BASE}/releases/dates"
-            f"?api_key={self._api_key}"
-            f"&realtime_start={start.isoformat()}"
-            f"&realtime_end={end.isoformat()}"
-            f"&include_release_dates_with_no_data=true"
-            f"&file_type=json"
-        )
+        params = {
+            "api_key": self._api_key,
+            "realtime_start": start.isoformat(),
+            "realtime_end": end.isoformat(),
+            "include_release_dates_with_no_data": "true",
+            "file_type": "json",
+        }
+        url = f"{FRED_API_BASE}/releases/dates?{urlencode(params)}"
 
         req = Request(url, headers={"Accept": "application/json"})
         try:
@@ -191,7 +192,7 @@ class EconomicCalendar:
                 data = json.loads(resp.read().decode())
                 return data.get("release_dates", [])
         except (URLError, json.JSONDecodeError):
-            logger.exception("FRED release dates API error")
+            logger.warning("FRED release dates API error (url redacted)")
             return []
 
     def _parse_release_dates(self, dates_data: list[dict]) -> list[ReleaseEvent]:
