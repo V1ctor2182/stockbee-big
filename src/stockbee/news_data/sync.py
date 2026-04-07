@@ -191,21 +191,8 @@ class NewsDataSyncer:
         return passed
 
     def _store_g1(self, events: list[dict]) -> list[tuple[dict, int]]:
-        """批量写入 g_level=1，返回 (event, news_id) 对。"""
-        stored: list[tuple[dict, int]] = []
-        for event in events:
-            news_id = self._store.insert_news(
-                headline=event["headline"],
-                source=event.get("source", ""),
-                timestamp=event.get("timestamp", ""),
-                tickers=event.get("tickers"),
-                snippet=event.get("snippet"),
-                source_url=event.get("source_url"),
-                g_level=1,
-            )
-            if news_id is not None:
-                stored.append((event, news_id))
-        return stored
+        """批量写入 g_level=1（单事务），返回 (event, news_id) 对。"""
+        return self._store.insert_news_batch_with_ids(events)
 
     def _run_g2(self, items: list[tuple[dict, int]]) -> list[tuple[dict, int, G2Result]]:
         """G2 分类并更新 g_level=2。"""

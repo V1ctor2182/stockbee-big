@@ -386,6 +386,56 @@ class SqliteNewsProvider(NewsProvider):
             cur.close()
         return inserted
 
+    def insert_news_batch_with_ids(self, events: list[dict[str, Any]]) -> list[tuple[dict, int]]:
+        """批量插入并返回 (原始 event, news_id) 对。单事务，跳过重复。"""
+        if not self._conn:
+            raise RuntimeError("Provider not initialized")
+        results: list[tuple[dict, int]] = []
+        cur = self._conn.cursor()
+        try:
+            for event in events:
+                headline = event.get("headline", "")
+                if not headline or not str(headline).strip():
+                    continue
+                headline = _truncate(str(headline).strip(), MAX_HEADLINE_LENGTH)
+                source = event.get("source", "")
+                snippet = _truncate(event.get("snippet"), MAX_SNIPPET_LENGTH)
+                ts = _normalize_timestamp(event.get("timestamp", ""))
+                if ts is None:
+                    continue
+                ticker_list = _parse_tickers(event.get("tickers"))
+                now = datetime.now(timezone.utc).isoformat()
+                try:
+                    cur.execute(
+                        """INSERT INTO news_events
+                           (timestamp, source, source_url, headline, snippet,
+                            sentiment_score, importance_score, reliability_score,
+                            g_level, analysis, created_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            ts, source, event.get("source_url"),
+                            headline, snippet, event.get("sentiment_score"),
+                            event.get("importance_score"), event.get("reliability_score"),
+                            event.get("g_level", 0), event.get("analysis"), now,
+                        ),
+                    )
+                    row_id = cur.lastrowid
+                    if ticker_list:
+                        cur.executemany(
+                            "INSERT OR IGNORE INTO news_tickers (news_id, ticker) VALUES (?, ?)",
+                            [(row_id, t) for t in ticker_list],
+                        )
+                    results.append((event, row_id))
+                except sqlite3.IntegrityError:
+                    continue
+            self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
+        finally:
+            cur.close()
+        return results
+
     def update_g_level(
         self,
         news_id: int,

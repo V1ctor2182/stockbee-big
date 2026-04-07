@@ -85,7 +85,11 @@ class PerigonSource:
                 self._available = False
                 return all_articles
             except Exception as e:
-                logger.warning("Perigon request failed (page %d): %s", page, e)
+                # 避免 API key 泄露到日志（key 在 URL query params 里）
+                err_msg = str(e)
+                if self._api_key and self._api_key in err_msg:
+                    err_msg = err_msg.replace(self._api_key, "***")
+                logger.warning("Perigon request failed (page %d): %s", page, err_msg)
                 break
 
             articles = data.get("articles", [])

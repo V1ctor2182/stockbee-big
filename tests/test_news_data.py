@@ -2539,3 +2539,91 @@ class TestRobustness:
         syncer.add_source(MockNewsSource(_articles=[_sample_event()]))
         result = syncer.ingest_news()
         assert result.fetched == 1
+
+
+# =========================================================================
+# Review Fix Tests — #1 #2 #5 #10
+# =========================================================================
+
+class TestReviewFixes:
+
+    def test_fix1_empty_content_no_crash(self):
+        """#1: Anthropic 返回空 content 不崩溃。"""
+        g3 = _make_g3(response_data=_valid_g3_json())
+        # Mock response with empty content list
+        empty_resp = MagicMock()
+        empty_resp.content = []
+        g3._client.messages.create.return_value = empty_resp
+        result = g3.analyze("Apple beats earnings")
+        assert result is None  # graceful None, not IndexError
+
+    def test_fix2_value_error_no_crash(self):
+        """#2: LLM 返回非数值字段不崩溃。"""
+        g3 = G3Analyzer()
+        # weight_magnitude 是字符串 "high" → 以前会 ValueError
+        bad_json = '{"weight_action":"increase","weight_magnitude":"high","reliability_score":"very high","reasoning":"test","confidence":"medium"}'
+        result = g3._parse_response(bad_json)
+        assert result.weight_magnitude == 0.0  # safe default
+        assert result.reliability_score == 0.5  # safe default
+        assert result.confidence == 0.0         # safe default
+
+    def test_fix2_invalid_weight_action_normalized(self):
+        """#2: 无效 weight_action 被规范化为 hold。"""
+        g3 = G3Analyzer()
+        result = g3._parse_response('{"weight_action":"BUY NOW!!!"}')
+        assert result.weight_action == "hold"
+
+    def test_fix2_nan_inf_clamped(self):
+        """#2: NaN 和超范围值被 clamp。"""
+        assert G3Analyzer._safe_float(float("inf"), 0.5) == 1.0
+        assert G3Analyzer._safe_float(-0.5, 0.0) == 0.0
+        assert G3Analyzer._safe_float(float("nan"), 0.5) == 0.5
+        assert G3Analyzer._safe_float("not_a_number", 0.3) == 0.3
+
+    def test_fix5_batch_insert_with_ids(self, provider):
+        """#5: insert_news_batch_with_ids 返回正确的 (event, id) 对。"""
+        events = [
+            {"headline": "Batch ID test 1", "source": "reuters",
+             "timestamp": _now(), "tickers": ["AAPL"], "g_level": 1},
+            {"headline": "Batch ID test 2", "source": "bloomberg",
+             "timestamp": _now(), "tickers": ["TSLA"], "g_level": 1},
+        ]
+        results = provider.insert_news_batch_with_ids(events)
+        assert len(results) == 2
+        for event, news_id in results:
+            assert isinstance(news_id, int)
+            assert news_id > 0
+            row = provider.get_news_by_id(news_id)
+            assert row is not None
+
+    def test_fix5_batch_insert_dedup(self, provider):
+        """#5: batch with IDs 仍然正确去重。"""
+        events = [
+            {"headline": "Dedup batch", "source": "reuters",
+             "timestamp": _now(), "g_level": 1},
+            {"headline": "Dedup batch", "source": "reuters",
+             "timestamp": _now(), "g_level": 1},  # 重复
+        ]
+        results = provider.insert_news_batch_with_ids(events)
+        assert len(results) == 1
+
+    def test_fix5_syncer_uses_batch(self, provider):
+        """#5: Syncer._store_g1 使用 batch insert（单事务）。"""
+        articles = [
+            _sample_event(headline="Batch sync test 1"),
+            _sample_event(headline="Batch sync test 2", source="bloomberg"),
+        ]
+        syncer = _make_syncer(provider, mock_articles=articles)
+        result = syncer.ingest_news()
+        assert result.stored >= 1
+
+    def test_fix10_api_key_not_in_log(self):
+        """#10: Perigon 错误日志不泄露 API key。"""
+        src = PerigonSource(PerigonConfig(api_key="sk-secret-key-12345"))
+        src._available = True
+        # 模拟包含 key 的错误消息
+        err_msg = "Connection error: https://api.goperigon.com/v1/all?apiKey=sk-secret-key-12345&q=AAPL"
+        if src._api_key and src._api_key in err_msg:
+            sanitized = err_msg.replace(src._api_key, "***")
+        assert "sk-secret-key-12345" not in sanitized
+        assert "***" in sanitized

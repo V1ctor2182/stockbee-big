@@ -174,6 +174,9 @@ class G3Analyzer:
             return None
 
         # 5. 解析响应
+        if not response.content:
+            logger.warning("G3 API returned empty content (content filtering?)")
+            return None
         raw_text = response.content[0].text
         result = self._parse_response(raw_text)
 
@@ -255,17 +258,17 @@ class G3Analyzer:
         try:
             data = json.loads(raw_text)
             return self._dict_to_result(data)
-        except (json.JSONDecodeError, KeyError, TypeError):
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
             pass
 
         # Tier 2: regex 提取 JSON 块（Haiku 有时加 markdown fence）
-        match = re.search(r"\{.*\}", raw_text, re.DOTALL)
+        match = re.search(r"\{.*?\}", raw_text, re.DOTALL)
         if match:
             try:
                 data = json.loads(match.group())
                 logger.warning("G3 parse tier 2: extracted JSON from response")
                 return self._dict_to_result(data)
-            except (json.JSONDecodeError, KeyError, TypeError):
+            except (json.JSONDecodeError, KeyError, TypeError, ValueError):
                 pass
 
         # Tier 3: 降级 — 标记为不可靠
@@ -277,14 +280,28 @@ class G3Analyzer:
         )
 
     @staticmethod
+    def _safe_float(value: object, default: float) -> float:
+        """安全的 float 转换，处理 LLM 返回的非数值字符串。"""
+        try:
+            f = float(value)
+            if f != f:  # NaN check
+                return default
+            return max(0.0, min(1.0, f))  # clamp to [0, 1]
+        except (ValueError, TypeError):
+            return default
+
+    @staticmethod
     def _dict_to_result(data: dict) -> G3Result:
-        """从字典构建 G3Result，容忍缺失字段。"""
+        """从字典构建 G3Result，容忍缺失字段和错误类型。"""
+        action = str(data.get("weight_action", "hold")).lower()
+        if action not in ("increase", "decrease", "hedge", "hold"):
+            action = "hold"
         return G3Result(
-            weight_action=str(data.get("weight_action", "hold")),
-            weight_magnitude=float(data.get("weight_magnitude", 0.0)),
-            reliability_score=float(data.get("reliability_score", 0.5)),
-            reasoning=str(data.get("reasoning", "")),
-            confidence=float(data.get("confidence", 0.0)),
+            weight_action=action,
+            weight_magnitude=G3Analyzer._safe_float(data.get("weight_magnitude"), 0.0),
+            reliability_score=G3Analyzer._safe_float(data.get("reliability_score"), 0.5),
+            reasoning=str(data.get("reasoning", ""))[:500],
+            confidence=G3Analyzer._safe_float(data.get("confidence"), 0.0),
         )
 
     # ------ 懒加载 ------
