@@ -11,6 +11,7 @@
 
 from .g1_filter import G1Config, G1Filter, G1Result
 from .g2_classifier import G2Classifier, G2Config, G2Result
+from .g3_analyzer import G3Analyzer, G3Config, G3Result
 from .news_store import SqliteNewsProvider
 
 __all__ = [
@@ -21,4 +22,7 @@ __all__ = [
     "G2Classifier",
     "G2Config",
     "G2Result",
+    "G3Analyzer",
+    "G3Config",
+    "G3Result",
 ]

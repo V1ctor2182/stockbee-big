@@ -1,5 +1,5 @@
 progress:
-  completion: 0.50
+  completion: 0.67
   milestones:
     - id: "m1-SqliteNewsProvider"
       name: "SqliteNewsProvider — news_events 表 + 查询接口"
@@ -44,8 +44,8 @@ progress:
         置信度低时的降级处理、batch 推理优化（多条新闻一次处理）。
     - id: "m4-G3-深度分析"
       name: "G3 深度分析 (Claude Haiku)"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-07"
       estimated_files: ["src/stockbee/news_data/g3_analyzer.py"]
       estimated_lines: 120
       depends_on: ["m3-G2-FinBERT-分类"]
@@ -101,3 +101,12 @@ progress:
       specs_affected:
         - change-2026-04-05-word-boundary (created)
       milestones_affected: []
+    - hash: "54cb445"
+      date: "2026-04-07"
+      message: "[02-news-data] feat: add G3 Analyzer — Claude Haiku deep analysis + 40 tests"
+      files_changed: 3
+      specs_affected:
+        - intent-02-news-data-001 (draft → active)
+        - change-2026-04-07-g3-analyzer (created)
+      milestones_affected:
+        - m4-G3-深度分析 (→ completed)

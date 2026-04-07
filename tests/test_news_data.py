@@ -1,12 +1,15 @@
 # tests/test_news_data.py
-"""News Data 模块测���。
+"""News Data 模块测试。
 # PYTHONPATH=src python -m pytest tests/test_news_data.py -v
 
-测试对象：SqliteNewsProvider、G1Filter、G2Classifier
+测试对象：SqliteNewsProvider、G1Filter、G2Classifier、G3Analyzer
 不测 NewsAPI/Perplexity（需要 API key），不测 NewsDataSyncer（集成测试）。
 G2 测试使用 mock FinBERT（不依赖 transformers/torch 安装）。
+G3 测试使用 mock Anthropic（不依赖 anthropic SDK 安装）。
 """
 
+import json
+import os
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
@@ -40,6 +43,13 @@ from stockbee.news_data.g2_classifier import (
     _TOPIC_KEYWORDS,
     _URGENCY_HIGH_KEYWORDS,
     _URGENCY_MEDIUM_KEYWORDS,
+)
+from stockbee.news_data.g3_analyzer import (
+    G3Analyzer,
+    G3Config,
+    G3Result,
+    HAIKU_MODEL,
+    _SYSTEM_PROMPT,
 )
 
 
@@ -1302,3 +1312,481 @@ class TestG2SubstringEdgeCases:
 
         r2 = g2_rules.classify("Stock surge and profit beat expectations with growth")
         assert r2.sentiment == "positive"
+
+
+# =========================================================================
+# G3Analyzer — Helpers
+# =========================================================================
+
+def _mock_haiku_response(data: dict) -> MagicMock:
+    """构造一个 mock Anthropic API response。"""
+    content_block = MagicMock()
+    content_block.text = json.dumps(data)
+    resp = MagicMock()
+    resp.content = [content_block]
+    return resp
+
+
+def _valid_g3_json(**overrides) -> dict:
+    """生成有效的 G3 JSON 响应字典。"""
+    base = {
+        "weight_action": "increase",
+        "weight_magnitude": 0.6,
+        "reliability_score": 0.9,
+        "reasoning": "Strong earnings beat with raised guidance.",
+        "confidence": 0.85,
+    }
+    base.update(overrides)
+    return base
+
+
+def _make_g3(
+    haiku_available: bool = True,
+    response_data: dict | None = None,
+    config: G3Config | None = None,
+    provider: MagicMock | None = None,
+) -> G3Analyzer:
+    """创建一个 mock 好的 G3Analyzer 实例。"""
+    g3 = G3Analyzer(config=config or G3Config(), provider=provider)
+    g3._haiku_available = haiku_available
+    if haiku_available:
+        mock_client = MagicMock()
+        if response_data is not None:
+            mock_client.messages.create.return_value = _mock_haiku_response(response_data)
+        g3._client = mock_client
+    return g3
+
+
+# =========================================================================
+# G3Analyzer — G3Config 默认值
+# =========================================================================
+
+class TestG3Config:
+
+    def test_default_model(self):
+        cfg = G3Config()
+        assert cfg.model == HAIKU_MODEL
+
+    def test_default_daily_limit(self):
+        assert G3Config().daily_limit == 10
+
+    def test_default_thresholds(self):
+        cfg = G3Config()
+        assert cfg.importance_threshold == 0.7
+        assert cfg.sentiment_high == 0.9
+        assert cfg.sentiment_low == 0.1
+        assert cfg.urgency_trigger == "high"
+
+    def test_default_retry(self):
+        cfg = G3Config()
+        assert cfg.max_retries == 3
+        assert cfg.retry_base_delay == 1.0
+
+    def test_default_tokens(self):
+        cfg = G3Config()
+        assert cfg.max_tokens == 512
+        assert cfg.max_input_chars == 4096
+
+    def test_custom_config(self):
+        cfg = G3Config(daily_limit=50, model="custom-model")
+        assert cfg.daily_limit == 50
+        assert cfg.model == "custom-model"
+
+
+# =========================================================================
+# G3Analyzer — G3Result 默认值
+# =========================================================================
+
+class TestG3Result:
+
+    def test_default_values(self):
+        r = G3Result()
+        assert r.weight_action == "hold"
+        assert r.weight_magnitude == 0.0
+        assert r.reliability_score == 0.5
+        assert r.reasoning == ""
+        assert r.confidence == 0.0
+
+
+# =========================================================================
+# G3Analyzer — should_analyze 触发逻辑
+# =========================================================================
+
+class TestG3ShouldAnalyze:
+
+    def test_high_importance_high_urgency(self):
+        g3 = G3Analyzer()
+        g2r = G2Result(importance_score=0.8, urgency="high")
+        assert g3.should_analyze(g2r)
+
+    def test_high_importance_low_urgency_not_triggered(self):
+        g3 = G3Analyzer()
+        g2r = G2Result(importance_score=0.8, urgency="low")
+        assert not g3.should_analyze(g2r)
+
+    def test_low_importance_high_urgency_not_triggered(self):
+        g3 = G3Analyzer()
+        g2r = G2Result(importance_score=0.5, urgency="high")
+        assert not g3.should_analyze(g2r)
+
+    def test_extreme_positive_sentiment(self):
+        g3 = G3Analyzer()
+        g2r = G2Result(sentiment_score=0.95)
+        assert g3.should_analyze(g2r)
+
+    def test_extreme_negative_sentiment(self):
+        g3 = G3Analyzer()
+        g2r = G2Result(sentiment_score=0.05)
+        assert g3.should_analyze(g2r)
+
+    def test_neutral_not_triggered(self):
+        g3 = G3Analyzer()
+        g2r = G2Result(sentiment_score=0.5, importance_score=0.5, urgency="low")
+        assert not g3.should_analyze(g2r)
+
+    def test_custom_thresholds(self):
+        cfg = G3Config(importance_threshold=0.5, urgency_trigger="medium")
+        g3 = G3Analyzer(config=cfg)
+        g2r = G2Result(importance_score=0.6, urgency="medium")
+        assert g3.should_analyze(g2r)
+
+    def test_boundary_importance_exact_threshold(self):
+        g3 = G3Analyzer()
+        g2r = G2Result(importance_score=0.7, urgency="high")
+        assert g3.should_analyze(g2r)
+
+
+# =========================================================================
+# G3Analyzer — 文本处理
+# =========================================================================
+
+class TestG3TextPrep:
+
+    def test_headline_only(self):
+        g3 = G3Analyzer()
+        assert g3._prepare_text("Apple beats earnings") == "Apple beats earnings"
+
+    def test_headline_plus_snippet(self):
+        g3 = G3Analyzer()
+        text = g3._prepare_text("Headline", "Snippet details")
+        assert "Headline" in text
+        assert "Snippet details" in text
+
+    def test_truncation(self):
+        g3 = G3Analyzer(config=G3Config(max_input_chars=50))
+        text = g3._prepare_text("A" * 100)
+        assert len(text) == 50
+
+    def test_empty_headline(self):
+        g3 = G3Analyzer()
+        assert g3._prepare_text("") == ""
+
+    def test_none_headline(self):
+        g3 = G3Analyzer()
+        assert g3._prepare_text(None, "snippet") == "snippet"
+
+    def test_classifiable_english(self):
+        assert G3Analyzer._is_classifiable("Apple beats Q4 earnings")
+
+    def test_not_classifiable_chinese(self):
+        assert not G3Analyzer._is_classifiable("苹果公司公布财报超预期")
+
+    def test_not_classifiable_empty(self):
+        assert not G3Analyzer._is_classifiable("")
+
+
+# =========================================================================
+# G3Analyzer — Prompt 构建
+# =========================================================================
+
+class TestG3Prompt:
+
+    def test_contains_headline(self):
+        g3 = G3Analyzer()
+        msgs = g3._build_messages("Fed raises rates", ["SPY", "TLT"])
+        user_msg = msgs[0]["content"]
+        assert "Fed raises rates" in user_msg
+
+    def test_contains_tickers(self):
+        g3 = G3Analyzer()
+        msgs = g3._build_messages("Headline", ["AAPL", "MSFT"])
+        user_msg = msgs[0]["content"]
+        assert "AAPL" in user_msg
+        assert "MSFT" in user_msg
+
+    def test_no_tickers(self):
+        g3 = G3Analyzer()
+        msgs = g3._build_messages("Headline", None)
+        user_msg = msgs[0]["content"]
+        assert "Tickers" not in user_msg
+
+    def test_system_prompt_has_json_schema(self):
+        assert "weight_action" in _SYSTEM_PROMPT
+        assert "reliability_score" in _SYSTEM_PROMPT
+        assert "reasoning" in _SYSTEM_PROMPT
+
+
+# =========================================================================
+# G3Analyzer — 响应解析
+# =========================================================================
+
+class TestG3Parse:
+
+    def test_tier1_clean_json(self):
+        g3 = G3Analyzer()
+        data = _valid_g3_json()
+        result = g3._parse_response(json.dumps(data))
+        assert result.weight_action == "increase"
+        assert result.reliability_score == 0.9
+        assert result.confidence == 0.85
+
+    def test_tier2_markdown_fenced(self):
+        g3 = G3Analyzer()
+        data = _valid_g3_json()
+        raw = f"```json\n{json.dumps(data)}\n```"
+        result = g3._parse_response(raw)
+        assert result.weight_action == "increase"
+        assert result.reliability_score == 0.9
+
+    def test_tier2_with_preamble(self):
+        g3 = G3Analyzer()
+        data = _valid_g3_json()
+        raw = f"Here is my analysis:\n{json.dumps(data)}\nEnd."
+        result = g3._parse_response(raw)
+        assert result.weight_action == "increase"
+
+    def test_tier3_garbage(self):
+        g3 = G3Analyzer()
+        result = g3._parse_response("I cannot process this request")
+        assert result.reliability_score == 0.0
+        assert result.confidence == 0.0
+        assert "I cannot process" in result.reasoning
+
+    def test_tier3_empty(self):
+        g3 = G3Analyzer()
+        result = g3._parse_response("")
+        assert result.reliability_score == 0.0
+
+    def test_missing_fields_use_defaults(self):
+        g3 = G3Analyzer()
+        result = g3._parse_response('{"weight_action": "decrease"}')
+        assert result.weight_action == "decrease"
+        assert result.weight_magnitude == 0.0  # default
+        assert result.reliability_score == 0.5  # default
+
+
+# =========================================================================
+# G3Analyzer — Happy Path (mock Anthropic)
+# =========================================================================
+
+class TestG3HappyPath:
+
+    def test_full_roundtrip(self):
+        data = _valid_g3_json()
+        g3 = _make_g3(response_data=data)
+        result = g3.analyze("Apple beats Q4 earnings expectations", tickers=["AAPL"])
+        assert result is not None
+        assert result.weight_action == "increase"
+        assert result.reliability_score == 0.9
+        assert result.confidence == 0.85
+        g3._client.messages.create.assert_called_once()
+
+    def test_haiku_unavailable_returns_none(self):
+        g3 = _make_g3(haiku_available=False)
+        result = g3.analyze("Apple beats earnings")
+        assert result is None
+
+    def test_force_bypasses_trigger(self):
+        data = _valid_g3_json()
+        g3 = _make_g3(response_data=data)
+        # g2_result 不满足触发条件
+        g2r = G2Result(importance_score=0.3, urgency="low", sentiment_score=0.5)
+        result = g3.analyze("Minor update", g2_result=g2r, force=True)
+        assert result is not None
+
+    def test_trigger_not_met_returns_none(self):
+        g3 = _make_g3(response_data=_valid_g3_json())
+        g2r = G2Result(importance_score=0.3, urgency="low", sentiment_score=0.5)
+        result = g3.analyze("Minor update", g2_result=g2r)
+        assert result is None
+
+    def test_non_english_returns_none(self):
+        g3 = _make_g3(response_data=_valid_g3_json())
+        result = g3.analyze("苹果公司公布第四季度财报超预期增长数据报告")
+        assert result is None
+
+
+# =========================================================================
+# G3Analyzer — 日限额
+# =========================================================================
+
+class TestG3DailyLimit:
+
+    def test_limit_blocks_when_reached(self):
+        provider = MagicMock()
+        provider.get_g3_daily_count.return_value = 10
+        g3 = _make_g3(response_data=_valid_g3_json(), provider=provider)
+        result = g3.analyze("Apple beats earnings")
+        assert result is None
+        g3._client.messages.create.assert_not_called()
+
+    def test_limit_allows_when_under(self):
+        provider = MagicMock()
+        provider.get_g3_daily_count.return_value = 5
+        g3 = _make_g3(response_data=_valid_g3_json(), provider=provider)
+        result = g3.analyze("Apple beats earnings")
+        assert result is not None
+
+    def test_increment_on_success(self):
+        provider = MagicMock()
+        provider.get_g3_daily_count.return_value = 0
+        g3 = _make_g3(response_data=_valid_g3_json(), provider=provider)
+        g3.analyze("Apple beats earnings")
+        provider.increment_g3_daily_count.assert_called_once()
+
+    def test_force_bypasses_limit(self):
+        provider = MagicMock()
+        provider.get_g3_daily_count.return_value = 100
+        g3 = _make_g3(response_data=_valid_g3_json(), provider=provider)
+        result = g3.analyze("Apple beats earnings", force=True)
+        assert result is not None
+
+
+# =========================================================================
+# G3Analyzer — Retry 与错误处理
+# =========================================================================
+
+class TestG3Retry:
+
+    @patch("stockbee.news_data.g3_analyzer.time.sleep")
+    def test_succeeds_on_second_attempt(self, mock_sleep):
+        g3 = _make_g3(response_data=_valid_g3_json())
+        # 第一次 429，第二次成功
+        rate_err = Exception("rate limited")
+        rate_err.status_code = 429
+        success_resp = _mock_haiku_response(_valid_g3_json())
+        g3._client.messages.create.side_effect = [rate_err, success_resp]
+        result = g3.analyze("Apple beats earnings")
+        assert result is not None
+        assert mock_sleep.call_count == 1
+
+    @patch("stockbee.news_data.g3_analyzer.time.sleep")
+    def test_permanent_error_no_retry(self, mock_sleep):
+        g3 = _make_g3(response_data=_valid_g3_json())
+        auth_err = Exception("unauthorized")
+        auth_err.status_code = 401
+        g3._client.messages.create.side_effect = auth_err
+        result = g3.analyze("Apple beats earnings")
+        assert result is None  # analyze catches and returns None
+        assert mock_sleep.call_count == 0
+
+    @patch("stockbee.news_data.g3_analyzer.time.sleep")
+    def test_all_retries_exhausted(self, mock_sleep):
+        g3 = _make_g3(response_data=_valid_g3_json())
+        rate_err = Exception("overloaded")
+        rate_err.status_code = 529
+        g3._client.messages.create.side_effect = [rate_err] * 3
+        result = g3.analyze("Apple beats earnings")
+        assert result is None
+        assert mock_sleep.call_count == 2  # 3 attempts, 2 sleeps between
+
+    @patch("stockbee.news_data.g3_analyzer.time.sleep")
+    def test_server_error_retried(self, mock_sleep):
+        g3 = _make_g3(response_data=_valid_g3_json())
+        server_err = Exception("internal error")
+        server_err.status_code = 500
+        success_resp = _mock_haiku_response(_valid_g3_json())
+        g3._client.messages.create.side_effect = [server_err, success_resp]
+        result = g3.analyze("Apple beats earnings")
+        assert result is not None
+
+
+# =========================================================================
+# G3Analyzer — 降级处理
+# =========================================================================
+
+class TestG3Degradation:
+
+    def test_no_api_key(self):
+        g3 = G3Analyzer(config=G3Config(api_key=None))
+        g3._haiku_available = None  # 强制重检测
+        with patch.dict(os.environ, {}, clear=True):
+            # _ensure_haiku 会因没有 key 返回 False
+            with patch("stockbee.news_data.g3_analyzer.os.environ.get", return_value=None):
+                result = g3.analyze("Apple beats earnings")
+        assert result is None
+
+    def test_import_error(self):
+        g3 = G3Analyzer()
+        g3._haiku_available = False
+        result = g3.analyze("Apple beats earnings")
+        assert result is None
+
+
+# =========================================================================
+# G1 → G2 → G3 → Store 集成测试
+# =========================================================================
+
+class TestG1G2G3Integration:
+
+    def test_full_pipeline(self, provider, g2_rules):
+        """G1 → G2 → G3(mock) → Store 完整管道。"""
+        g1 = G1Filter()
+        event = {
+            "headline": "Breaking: Apple beats Q4 earnings with record profit and strong growth",
+            "source": "reuters",
+            "timestamp": _now(),
+            "snippet": "Revenue exceeded all expectations with raised guidance",
+        }
+
+        # G1 过滤
+        g1r = g1.filter(**event)
+        assert g1r.passed
+        assert "AAPL" in g1r.tickers
+
+        # G2 分类
+        g2r = g2_rules.classify(event["headline"], event["snippet"])
+        assert g2r.topic == "earnings"
+        assert g2r.sentiment == "positive"
+
+        # G3 分析 (mock)
+        g3_data = _valid_g3_json()
+        g3 = _make_g3(response_data=g3_data, provider=provider)
+        g3r = g3.analyze(event["headline"], event["snippet"], g1r.tickers, force=True)
+        assert g3r is not None
+        assert g3r.weight_action == "increase"
+
+        # Store: insert → G2 update → G3 update
+        news_id = provider.insert_news(
+            headline=event["headline"],
+            source=event["source"],
+            timestamp=event["timestamp"],
+            tickers=g1r.tickers,
+            g_level=1,
+        )
+        assert news_id is not None
+
+        ok2 = provider.update_g_level(
+            news_id, g_level=2,
+            sentiment_score=g2r.sentiment_score,
+            importance_score=g2r.importance_score,
+        )
+        assert ok2
+
+        ok3 = provider.update_g_level(
+            news_id, g_level=3,
+            analysis=json.dumps({
+                "weight_action": g3r.weight_action,
+                "weight_magnitude": g3r.weight_magnitude,
+                "reliability_score": g3r.reliability_score,
+                "reasoning": g3r.reasoning,
+                "confidence": g3r.confidence,
+            }),
+            reliability_score=g3r.reliability_score,
+        )
+        assert ok3
+
+        row = provider.get_news_by_id(news_id)
+        assert row["g_level"] == 3
+        assert row["analysis"] is not None
+        assert row["reliability_score"] == 0.9

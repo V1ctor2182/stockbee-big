@@ -1,0 +1,44 @@
+spec_id: "change-2026-04-07-g3-analyzer"
+type: change
+state: active
+intent:
+  summary: "G3 Analyzer — Claude Haiku 深度分析 + 40 tests"
+  detail: |
+    新增 G3Analyzer 模块，实现新闻漏斗第三级：
+    - G3Config: 10+ 可配置参数（model、daily_limit、trigger 阈值、retry、token 限制）
+    - G3Result: 5 字段（weight_action/magnitude, reliability_score, reasoning, confidence）
+      - impact_pct 字段 deferred，等 portfolio 模块就绪后加
+    - G3Analyzer:
+      - should_analyze(): importance≥0.7 AND urgency==high, OR sentiment 极端
+      - analyze(): prompt → Haiku → parse → G3Result | None
+      - _ensure_haiku(): lazy import anthropic SDK，同 G2 的 _ensure_finbert 模式
+      - _call_with_retry(): 3 次指数退避（1s/2s/4s + jitter），只 retry 429/529/5xx
+      - _parse_response(): 3-tier fallback（json.loads → regex 提取 → 降级 reliability=0.0）
+      - _build_messages(): 全英文 prompt，不传 G2 结果（避免 anchoring bias）
+      - force=True 绕过 trigger + 日限额
+    - 40 tests（mock Anthropic SDK，零真实 API 调用）:
+      Config/Result 默认值、should_analyze 8 cases、文本处理 8 cases、
+      prompt 4 cases、parse 6 cases、happy path 5 cases、日限额 4 cases、
+      retry 4 cases、降级 2 cases、G1→G2→G3→Store 集成 1 case
+
+    设计决策（已锁定）：
+    - Model: claude-haiku-4-5-20251001
+    - 日限额: 10 篇/天 (~$0.30/月)
+    - Prompt: 全英文（全链路一致）
+    - impact_pct: deferred（后续提 issue）
+constraints: []
+indexing:
+  type: change
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["g3-analyzer", "claude-haiku", "llm", "deep-analysis"]
+provenance:
+  source_type: commit
+  confidence: 1.0
+  source_ref: "commit on news_data branch, 2026-04-07"
+relations:
+  - { type: implements, target: "intent-02-news-data-001", reason: "m4 G3 深度分析" }
+anchors:
+  - { file: "src/stockbee/news_data/g3_analyzer.py", type: implementation }
+  - { file: "tests/test_news_data.py", type: test }

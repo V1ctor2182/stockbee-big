@@ -1,5 +1,5 @@
 progress:
-  completion: 0.50
+  completion: 0.52
   milestones:
     - id: "m1-Provider-架构"
       name: "Provider 架构"
