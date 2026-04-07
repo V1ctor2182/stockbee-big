@@ -953,21 +953,25 @@ const TOTAL_WIDTH = daysBetween(TIMELINE_START, TIMELINE_END) * DAY_WIDTH;
 // ══════════════════════════════════════════════════════════════
 
 // Each entry: { type: 'phase'|'sprint'|'task', ... }
-const rows = [];
-const taskRowMap = {}; // id -> row index (among all rows)
+let rows = [];
+let taskRowMap = {}; // id -> row index (among all rows)
 
-let phaseNum = 0;
-for (const phase of PHASES) {
-  phaseNum++;
-  rows.push({ type:'phase', phase, phaseNum });
-  for (const sprint of phase.sprints) {
-    if (sprint.name) {
-      rows.push({ type:'sprint', sprint });
-    }
-    for (const room of sprint.rooms) {
-      const idx = rows.length;
-      rows.push({ type:'task', room, phaseNum });
-      taskRowMap[room.id] = idx;
+function buildRows() {
+  rows = [];
+  taskRowMap = {};
+  let phaseNum = 0;
+  for (const phase of PHASES) {
+    phaseNum++;
+    rows.push({ type:'phase', phase, phaseNum });
+    for (const sprint of phase.sprints) {
+      if (sprint.name) {
+        rows.push({ type:'sprint', sprint });
+      }
+      for (const room of sprint.rooms) {
+        const idx = rows.length;
+        rows.push({ type:'task', room, phaseNum });
+        taskRowMap[room.id] = idx;
+      }
     }
   }
 }
@@ -1327,6 +1331,7 @@ async function init() {
   }
 
   PHASES = yamlToPhases(yaml);
+  buildRows();
 
   renderSidebar();
   renderTimeHeader();
