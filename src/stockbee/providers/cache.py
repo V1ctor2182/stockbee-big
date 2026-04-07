@@ -117,7 +117,7 @@ class L2ParquetCache:
         self._cache_dir.mkdir(parents=True, exist_ok=True)
 
     def _key_to_path(self, key: str) -> Path:
-        safe_name = hashlib.md5(key.encode()).hexdigest()
+        safe_name = hashlib.sha256(key.encode()).hexdigest()
         return self._cache_dir / f"{safe_name}.parquet"
 
     def get(self, key: str) -> pd.DataFrame | None:

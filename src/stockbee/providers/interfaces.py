@@ -86,6 +86,16 @@ class UniverseProvider(BaseProvider):
         """刷新指定层级的股票池，返回更新的股票数量。"""
         ...
 
+    @abstractmethod
+    def upsert_members(
+        self,
+        level: str,
+        members: pd.DataFrame,
+        snapshot_date: date | None = None,
+    ) -> int:
+        """批量更新某层级的股票池成员，返回更新后的成员数。"""
+        ...
+
 
 # ---------------------------------------------------------------------------
 # 3. MarketDataProvider — OHLCV 行情数据
