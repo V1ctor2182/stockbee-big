@@ -39,8 +39,8 @@ FRED_INDICATORS: dict[str, FredIndicator] = {
     "INDPRO": FredIndicator("INDPRO", "工业产值指数", "增长", "monthly", "index"),
 
     # 信用 (2)
-    "BAMLH0A0HY2": FredIndicator("BAMLH0A0HY2", "高收益债利差", "信用", "daily", "percent"),
-    "EXHYLD": FredIndicator("EXHYLD", "高收益杠杆率", "信用", "monthly", "percent"),
+    "BAMLH0A0HYM2": FredIndicator("BAMLH0A0HYM2", "高收益债利差(OAS)", "信用", "daily", "percent"),
+    "DRTSCILM": FredIndicator("DRTSCILM", "银行信贷收紧比例", "信用", "quarterly", "percent"),
 
     # 流动性 (2)
     "M2SL": FredIndicator("M2SL", "M2货币供应量", "流动性", "monthly", "billions"),
@@ -51,7 +51,7 @@ FRED_INDICATORS: dict[str, FredIndicator] = {
 
     # 商品 (2)
     "DCOILWTICO": FredIndicator("DCOILWTICO", "WTI原油价格", "商品", "daily", "dollars"),
-    "GOLDAMGBD228NLBM": FredIndicator("GOLDAMGBD228NLBM", "黄金现货价格", "商品", "daily", "dollars"),
+    "PCOPPUSDM": FredIndicator("PCOPPUSDM", "铜价(全球)", "商品", "monthly", "dollars"),
 }
 
 # 按经济维度分组

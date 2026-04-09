@@ -1,23 +1,38 @@
 spec_id: "intent-01-macro-sources-001"
 type: intent
-state: draft
+state: active
 intent:
-  summary: "FRED API + BLS + 美联储 RSS 数据采集"
+  summary: "补充宏观数据源：Polymarket 事件概率 + 经济日历"
   detail: |
-    通过 MacroProvider 采集 19 个 FRED 指标，日度更新。央行语调分析覆盖 FOMC 声明。
+    原定义（FRED API + BLS + 美联储 RSS）已被 03-macro-data 完全覆盖：
+    - FRED API: FredMacroProvider 17 指标已连通
+    - BLS: NFP/UNRATE/CPI/PPI 通过 FRED 镜像获取
+    - 美联储 RSS: Tech Design 未明确要求
 
-来源：Feature Hierarchy §4.1
-研究状态：研究完成 (research-macro-features.md)
+    重新定义为两个补充数据源：
+
+    1. Polymarket 事件概率
+       - 爬取前 30 大宏观事件的隐含概率（Tech Design §4.3）
+       - 检测"概率悬崖"（概率突然大幅变化）
+       - 作为 MacroTiltEngine 的外生补充因子
+       - 例：降息概率从 20% 跳升至 70% → 增加高 duration 金融股权重
+       - 免费 API
+
+    2. 经济日历
+       - FOMC 会议日期、非农发布日、CPI 发布日等
+       - 标记高波动事件日，供 risk control 和 portfolio rebalancing 使用
+       - 避免在重大数据发布前后执行再平衡
 constraints: []
 indexing:
   type: intent
   priority: high
-  layer: epic
+  layer: feature
   domain: "quantitative-trading"
-  tags: []
+  tags: ["polymarket", "economic-calendar", "supplementary-data"]
 provenance:
-  source_type: prd_extraction
-  confidence: 0.8
-  source_ref: "PRD + Feature Hierarchy + Tech Design"
-relations: []
+  source_type: redesign
+  confidence: 0.9
+  source_ref: "Tech Design §4.3, plan-milestones 分析 2026-04-05"
+relations:
+  - { type: depends_on, target: "intent-03-macro-data-001", reason: "FRED 数据已由 macro-data 提供" }
 anchors: []

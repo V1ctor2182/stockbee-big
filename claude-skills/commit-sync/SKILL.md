@@ -224,6 +224,18 @@ Feature Room progress 更新
 - 不执行 Phase 6（不做任何文件修改和 git 操作）
 - 用户可以先修完问题再 call 正式提交
 
+## Spec Type 参考
+
+| Spec Type | 含义 | 示例 |
+|-----------|------|------|
+| **intent** | 做什么，功能目标 | "用户可以将商品加入购物车并结算" |
+| **decision** | 已确认的技术/产品决策 | "使用 Stripe Checkout server-side 模式" |
+| **constraint** | 不做什么，边界限制（must / must_not / should / should_not） | "Phase 1 不含优惠券计算" |
+| **convention** | 团队约定/编码规范 | "所有 API 使用 JSON:API 规范" |
+| **contract** | 接口契约、API Schema、模块间协议 | "RefundService 接口定义" |
+| **context** | 背景信息、实验记录、数据假设 | "模型基线准确率 92%" |
+| **change** | 一次具体变更的记录 | "本次 PR 把 session 改为 stateless" |
+
 ## progress.yaml commit 记录格式
 
 ```yaml

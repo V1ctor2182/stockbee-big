@@ -1,20 +1,31 @@
 progress:
   completion: 0.0
   milestones:
-    - id: "m1-FRED-API-接入"
-      name: "FRED API 接入"
+    - id: "m1-polymarket-fetcher"
+      name: "Polymarket 事件概率抓取"
       status: pending
       completed_at: null
-    - id: "m2-BLS-数据采集"
-      name: "BLS 数据采集"
+      description: |
+        爬取 Polymarket 前 30 大宏观事件的隐含概率。
+        存储到 SQLite（event_id, title, probability, fetched_at）。
+        检测概率悬崖（前后差值 > 阈值）。
+      estimated_files: ["src/stockbee/macro_sources/polymarket.py"]
+      estimated_lines: 150
+
+    - id: "m2-economic-calendar"
+      name: "经济日历集成"
       status: pending
       completed_at: null
-    - id: "m3-美联储-RSS-解析"
-      name: "美联储 RSS 解析"
-      status: pending
-      completed_at: null
-    - id: "m4-测试"
+      description: |
+        FOMC 会议、非农、CPI 等关键事件日历。
+        标记高波动事件日。可从 FRED release calendar 或静态维护。
+      estimated_files: ["src/stockbee/macro_sources/calendar.py"]
+      estimated_lines: 100
+
+    - id: "m3-tests"
       name: "测试"
       status: pending
       completed_at: null
+      estimated_files: ["tests/test_macro_sources.py"]
+      estimated_lines: 150
   commits: []

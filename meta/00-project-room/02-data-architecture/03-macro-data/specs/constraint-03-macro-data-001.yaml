@@ -1,19 +1,25 @@
 spec_id: "constraint-03-macro-data-001"
 type: constraint
-state: draft
+state: active
 intent:
   summary: "point-in-time 对齐无未来偏差"
-  detail: ""
-constraints: []
+  detail: |
+    get_macro_indicators(end=T) 只返回 T-1 及之前的数据。
+    实现方式：end 参数减 1 天后截断 DataFrame。
+    确保回测中因子计算不使用未来的宏观数据。
+constraints:
+  - "end=T 时 DataFrame 最后一行日期 <= T-1"
+  - "各 FRED 指标发布频率不同，forward-fill 后仍须满足此约束"
 indexing:
   type: constraint
   priority: high
-  layer: epic
+  layer: feature
   domain: "quantitative-trading"
-  tags: []
+  tags: ["point-in-time", "look-ahead-bias"]
 provenance:
-  source_type: prd_extraction
-  confidence: 0.9
+  source_type: implementation_verified
+  confidence: 1.0
   source_ref: "Tech Design §2.4"
 relations: []
-anchors: []
+anchors:
+  - { file: "src/stockbee/macro_data/parquet_macro.py", type: implementation }

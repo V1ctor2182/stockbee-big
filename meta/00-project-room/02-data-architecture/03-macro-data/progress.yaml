@@ -26,4 +26,5 @@ progress:
     - { date: "2026-04-04", hash: "b6f7aff", message: "[03-macro-data] feat: add FredMacroProvider" }
     - { date: "2026-04-04", hash: "72ff006", message: "[03-macro-data] feat: add MacroDataSyncer" }
     - { date: "2026-04-04", hash: "d9cde5b", message: "[03-macro-data] test: 23 tests" }
-    - { date: "2026-04-04", hash: "62a5690", message: "[01-stock-data][03-macro-data] fix: leap year crash, private method access, tight coupling", files_changed: 1, specs_affected: [], milestones_affected: [] }
+    - { date: "2026-04-04", hash: "62a5690", message: "fix: leap year crash, private method access" }
+    - { date: "2026-04-05", hash: "1da2218", message: "fix: correct 3 invalid FRED series IDs (14/17 → 17/17)" }

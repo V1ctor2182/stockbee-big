@@ -1,22 +1,27 @@
-# 宏观数据源 (01-macro-sources)
+# 补充宏观数据源 (01-macro-sources)
 
 ## Intent
 
-**FRED API + BLS + 美联储 RSS 数据采集**
+**Polymarket 事件概率 + 经济日历**（原 FRED/BLS/RSS 已被 03-macro-data 覆盖）
 
-通过 MacroProvider 采集 19 个 FRED 指标，日度更新。央行语调分析覆盖 FOMC 声明。
+两个补充数据源：
+- **Polymarket 事件概率** — 爬取前 30 大宏观事件，检测"概率悬崖"，作为 MacroTiltEngine 外生因子
+- **经济日历** — FOMC/非农/CPI 等事件日，标记高波动日，避免在数据发布前后再平衡
 
-来源：Feature Hierarchy §4.1
-研究状态：研究完成 (research-macro-features.md)
+依赖：03-macro-data ✅（FRED 17 指标已连通）
+
+## Constraints
+
+_待开发时确定_
 
 ## Decisions
 
-_暂无决策记录_
+- **FRED/BLS/RSS 不在本 Room 实现** — 已被 03-macro-data 完全覆盖（2026-04-06 重新定义）
 
 ## Contracts
 
-_暂无接口约定_
+_待开发时确定_
 
 ---
-_所有 spec 状态: draft（需要 review 后升为 active）_
-_spec.md 由 room-init 自动生成，specs/*.yaml 为源数据_
+_spec 状态: active（intent 已重新定义）_
+_spec.md 最后更新: 2026-04-06_
