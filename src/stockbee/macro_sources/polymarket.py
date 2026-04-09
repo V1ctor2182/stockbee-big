@@ -27,6 +27,14 @@ logger = logging.getLogger(__name__)
 GAMMA_API_BASE = "https://gamma-api.polymarket.com"
 DEFAULT_CLIFF_THRESHOLD = 0.15  # 概率变化 > 15% 视为悬崖
 
+# 宏观事件关键词过滤（question 中包含任一即视为宏观相关）
+MACRO_KEYWORDS = [
+    "fed ", "federal reserve", "fomc", "interest rate", "rate cut", "rate hike",
+    "recession", "inflation", "cpi", "gdp", "unemployment", "tariff",
+    "trade war", "treasury", "debt ceiling", "deficit", "stimulus",
+    "central bank", "monetary policy", "fiscal",
+]
+
 
 @dataclass
 class MarketEvent:
@@ -93,26 +101,32 @@ class PolymarketFetcher:
             self._conn.close()
             self._conn = None
 
-    def fetch_macro_events(self, limit: int = 30) -> list[MarketEvent]:
+    def fetch_macro_events(self, limit: int = 30, fetch_size: int = 200) -> list[MarketEvent]:
         """从 Gamma API 抓取宏观相关事件。
 
+        拉取 fetch_size 个热门市场，本地用关键词过滤出宏观事件，返回前 limit 个。
+
         Args:
-            limit: 最多返回的事件数
+            limit: 最多返回的宏观事件数
+            fetch_size: 从 API 拉取的总市场数（过滤前）
 
         Returns:
             MarketEvent 列表，按 volume 降序
         """
         raw_markets = self._call_api(
             "/markets",
-            params={"limit": limit, "active": "true", "order": "volume", "ascending": "false"},
+            params={"limit": fetch_size, "active": "true", "order": "volume", "ascending": "false"},
         )
         if not raw_markets:
             return []
 
+        # 本地关键词过滤
+        raw_markets = [m for m in raw_markets if self._is_macro_related(m)]
+
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         events: list[MarketEvent] = []
 
-        for market in raw_markets:
+        for market in raw_markets[:limit]:
             event_id = market.get("id", "")
             question = market.get("question", "")
             if not event_id or not question:
@@ -197,7 +211,10 @@ class PolymarketFetcher:
         if params:
             url += "?" + urlencode(params)
 
-        req = Request(url, headers={"Accept": "application/json"})
+        req = Request(url, headers={
+            "Accept": "application/json",
+            "User-Agent": "StockBEE/1.0",
+        })
         try:
             with urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode())
@@ -235,6 +252,12 @@ class PolymarketFetcher:
         )
         row = cur.fetchone()
         return row[0] if row else None
+
+    @staticmethod
+    def _is_macro_related(market: dict) -> bool:
+        """判断一个市场是否和宏观经济相关。"""
+        text = (market.get("question", "") + " " + market.get("description", "")).lower()
+        return any(kw in text for kw in MACRO_KEYWORDS)
 
     def _is_cliff(self, current: float, previous: float | None) -> bool:
         """判断是否为概率悬崖。"""
