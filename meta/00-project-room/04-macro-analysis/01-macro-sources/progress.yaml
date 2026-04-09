@@ -25,4 +25,8 @@ progress:
       estimated_files:
         - "tests/test_macro_sources.py"
       estimated_lines: 150
-  commits: []
+  commits:
+    - { date: "2026-04-06", hash: "222215a", message: "plan: 2 milestones" }
+    - { date: "2026-04-06", hash: "2ad071a", message: "feat: Polymarket + FRED calendar" }
+    - { date: "2026-04-06", hash: "973bbf4", message: "docs: Room completed" }
+    - { date: "2026-04-07", hash: "c45713c", message: "fix: API key sanitization, URL encoding, datetime" }

@@ -1,0 +1,27 @@
+spec_id: "constraint-01-macro-sources-001"
+type: constraint
+state: active
+intent:
+  summary: "Polymarket API 无需认证，概率悬崖阈值 15%"
+  detail: |
+    - Gamma API (gamma-api.polymarket.com) 公开 REST API，无需 API key
+    - 概率悬崖检测：abs(current - previous) >= 0.15
+    - 阈值可通过 cliff_threshold 参数配置
+    - 首次抓取（无 previous）不算悬崖
+constraints:
+  - "Polymarket API 无需认证"
+  - "概率悬崖默认阈值 15%"
+  - "首次出现的事件 is_cliff=False"
+indexing:
+  type: constraint
+  priority: medium
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["polymarket", "cliff-detection"]
+provenance:
+  source_type: implementation_verified
+  confidence: 1.0
+  source_ref: "src/stockbee/macro_sources/polymarket.py"
+relations: []
+anchors:
+  - { file: "src/stockbee/macro_sources/polymarket.py", type: implementation }
