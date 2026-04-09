@@ -499,7 +499,8 @@ class SqliteNewsProvider(NewsProvider):
             cur.execute(
                 "SELECT count FROM g3_daily_counts WHERE date = ?", (date_str,)
             )
-            return cur.fetchone()[0]
+            row = cur.fetchone()
+            return row[0] if row else 0
 
     # ------ 辅助查询 ------
 
@@ -508,7 +509,8 @@ class SqliteNewsProvider(NewsProvider):
         if not self._conn:
             return 0
         cur = self._conn.execute("SELECT COUNT(*) FROM news_events")
-        return cur.fetchone()[0]
+        row = cur.fetchone()
+        return row[0] if row else 0
 
     def get_news_by_id(self, news_id: int) -> dict[str, Any] | None:
         """按 id 查询单条新闻。"""

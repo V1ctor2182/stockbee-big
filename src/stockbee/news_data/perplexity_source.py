@@ -101,7 +101,10 @@ class PerplexitySource:
             self._available = False
             return []
         except Exception as e:
-            logger.warning("Perplexity request failed: %s", e)
+            err_msg = str(e)
+            if self._api_key and self._api_key in err_msg:
+                err_msg = err_msg.replace(self._api_key, "***")
+            logger.warning("Perplexity request failed: %s", err_msg)
             return []
 
         # 提取 citations URLs（用于匹配 source）

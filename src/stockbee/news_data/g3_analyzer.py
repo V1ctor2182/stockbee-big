@@ -261,15 +261,38 @@ class G3Analyzer:
         except (json.JSONDecodeError, KeyError, TypeError, ValueError):
             pass
 
-        # Tier 2: regex 提取 JSON 块（Haiku 有时加 markdown fence）
-        match = re.search(r"\{.*?\}", raw_text, re.DOTALL)
-        if match:
+        # Tier 2: strip markdown fences then re-parse
+        cleaned = raw_text.strip()
+        if cleaned.startswith("```"):
+            # Remove ```json ... ``` or ``` ... ```
+            cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+            cleaned = re.sub(r"\s*```$", "", cleaned)
             try:
-                data = json.loads(match.group())
-                logger.warning("G3 parse tier 2: extracted JSON from response")
+                data = json.loads(cleaned)
+                logger.warning("G3 parse tier 2: extracted JSON from fenced response")
                 return self._dict_to_result(data)
             except (json.JSONDecodeError, KeyError, TypeError, ValueError):
                 pass
+
+        # Tier 2b: find outermost { ... } using brace balancing
+        start = raw_text.find("{")
+        if start != -1:
+            depth, end = 0, start
+            for i in range(start, len(raw_text)):
+                if raw_text[i] == "{":
+                    depth += 1
+                elif raw_text[i] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        end = i + 1
+                        break
+            if depth == 0:
+                try:
+                    data = json.loads(raw_text[start:end])
+                    logger.warning("G3 parse tier 2b: extracted JSON via brace matching")
+                    return self._dict_to_result(data)
+                except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+                    pass
 
         # Tier 3: 降级 — 标记为不可靠
         logger.warning("G3 parse tier 3: returning default (raw: %.200s)", raw_text)
