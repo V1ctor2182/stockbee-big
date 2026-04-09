@@ -30,3 +30,5 @@ progress:
     - { date: "2026-04-06", hash: "2ad071a", message: "feat: Polymarket + FRED calendar" }
     - { date: "2026-04-06", hash: "973bbf4", message: "docs: Room completed" }
     - { date: "2026-04-07", hash: "c45713c", message: "fix: API key sanitization, URL encoding, datetime" }
+    - { date: "2026-04-09", hash: "18f8d8b", message: "docs: comprehensive spec update — 6 specs" }
+    - { date: "2026-04-09", hash: "4b46421", message: "fix: User-Agent header + macro keyword filtering" }
