@@ -1,6 +1,6 @@
 spec_id: "intent-02-news-data-001"
 type: intent
-state: draft
+state: active
 intent:
   summary: "news_events 表，结构化字段，分级存储 G1/G2/G3"
   detail: |
