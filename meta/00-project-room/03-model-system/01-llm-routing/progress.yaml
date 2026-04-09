@@ -33,4 +33,8 @@ progress:
       estimated_files:
         - "tests/test_llm_routing.py"
       estimated_lines: 150
-  commits: []
+  commits:
+    - { date: "2026-04-07", hash: "d72471e", message: "[01-llm-routing] plan: 3 milestones" }
+    - { date: "2026-04-07", hash: "e5e4396", message: "[01-llm-routing] feat: LLMRouter + TaskConfig" }
+    - { date: "2026-04-07", hash: "8a11056", message: "[01-llm-routing] feat: CostTracker" }
+    - { date: "2026-04-08", hash: "39740a4", message: "[01-llm-routing] feat+docs: 28 tests + Room completed" }
