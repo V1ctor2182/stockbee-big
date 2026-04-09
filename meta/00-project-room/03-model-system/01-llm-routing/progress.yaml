@@ -1,5 +1,5 @@
 progress:
-  completion: 0.0
+  completion: 1.0
   milestones:
     - id: "m1-llm-router-core"
       name: "LLMRouter + TaskConfig 路由核心"
@@ -28,8 +28,8 @@ progress:
 
     - id: "m3-tests"
       name: "测试"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-08"
       estimated_files:
         - "tests/test_llm_routing.py"
       estimated_lines: 150
