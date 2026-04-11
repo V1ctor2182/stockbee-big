@@ -1,20 +1,77 @@
 progress:
   completion: 0.0
   milestones:
-    - id: "m1-表达式引擎"
-      name: "表达式引擎"
+    - id: "m1-expression-engine-core"
+      name: "表达式引擎核心"
       status: pending
       completed_at: null
-    - id: "m2-预计算-Parquet-存储"
-      name: "预计算 Parquet 存储"
+      estimated_files: ["src/stockbee/factor_data/expression_engine.py"]
+      estimated_lines: 220
+      depends_on: []
+      complexity_flags: [first_of_kind]
+      description: |
+        Tokenizer (regex) → Parser (递归下降) → Evaluator (MultiIndex DF)。
+        变量映射: CLOSE→adj_close, OPEN→open, HIGH→high, LOW→low, VOLUME→volume, VWAP→典型价。
+        基础函数 (16): REF/DELAY, MA/MEAN, STD, SUM, MAX, MIN, DELTA, ABS, LOG, SIGN。
+        MAX/MIN 重载: 整数≥2 → rolling, 否则 → element-wise。
+
+    - id: "m2-advanced-functions"
+      name: "高级表达式函数"
       status: pending
       completed_at: null
-    - id: "m3-因子读取-API"
-      name: "因子读取 API"
+      estimated_files: ["src/stockbee/factor_data/expression_engine.py"]
+      estimated_lines: 200
+      depends_on: [m1-expression-engine-core]
+      complexity_flags: [first_of_kind]
+      description: |
+        追加 10 个函数: EMA, SLOPE, RSQUARE, RESI, CORR, RANK, IF, QUANTILE, IDXMAX, IDXMIN。
+        SLOPE/RSQUARE/RESI 共享 rolling OLS 计算。
+
+    - id: "m3-alpha158-full"
+      name: "Alpha158 全量因子定义"
       status: pending
       completed_at: null
-    - id: "m4-测试"
-      name: "测试"
+      estimated_files: ["src/stockbee/factor_data/alpha158.py", "config/factors-alpha158.yaml"]
+      estimated_lines: 350
+      depends_on: [m1-expression-engine-core, m2-advanced-functions]
+      complexity_flags: []
+      description: |
+        alpha158.py: YAML 加载, factor registry, max_lookback()。
+        factors-alpha158.yaml: 全部 158 因子 (9 KBAR + 27组×5窗口)。
+
+    - id: "m4-parquet-factor-store"
+      name: "预计算因子 Parquet 存储"
       status: pending
       completed_at: null
+      estimated_files: ["src/stockbee/factor_data/parquet_factor.py"]
+      estimated_lines: 150
+      depends_on: []
+      complexity_flags: []
+      description: |
+        参照 parquet_macro.py。存储: data/factors/{group}.parquet。
+        接口: read_factors, write_factors (merge-write), list_precomputed_factors。
+
+    - id: "m5-local-provider"
+      name: "LocalFactorProvider + IC 评估"
+      status: pending
+      completed_at: null
+      estimated_files: ["src/stockbee/factor_data/local_provider.py", "src/stockbee/factor_data/ic_evaluator.py"]
+      estimated_lines: 200
+      depends_on: [m1-expression-engine-core, m2-advanced-functions, m3-alpha158-full, m4-parquet-factor-store]
+      complexity_flags: []
+      description: |
+        实现 FactorProvider 接口。MarketDataProvider setter 注入。
+        get_factors 路由 expression/precomputed。IC/ICIR 仅离线评估。
+
+    - id: "m6-tests"
+      name: "测试 + 模块导出"
+      status: pending
+      completed_at: null
+      estimated_files: ["tests/test_factor_data.py", "src/stockbee/factor_data/__init__.py"]
+      estimated_lines: 350
+      depends_on: [m1-expression-engine-core, m2-advanced-functions, m3-alpha158-full, m4-parquet-factor-store, m5-local-provider]
+      complexity_flags: []
+      description: |
+        5 个 TestClass (~30 tests): ExpressionEngine, Alpha158Config,
+        ParquetFactorStore, LocalFactorProvider, ICEvaluator。__init__.py 导出。
   commits: []
