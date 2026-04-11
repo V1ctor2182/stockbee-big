@@ -129,12 +129,12 @@ class ParquetMarketData(MarketDataProvider):
             combined = combined[~combined.index.duplicated(keep="last")]
             combined.sort_index(inplace=True)
             combined.to_parquet(tmp_path)
-            tmp_path.rename(path)  # atomic replace
+            tmp_path.replace(path)  # cross-platform atomic replace
             logger.debug("Updated %s: %d rows", ticker, len(combined))
         else:
             df.sort_index(inplace=True)
             df.to_parquet(tmp_path)
-            tmp_path.rename(path)  # atomic replace
+            tmp_path.replace(path)  # cross-platform atomic replace
             logger.debug("Created %s: %d rows", ticker, len(df))
 
     def list_tickers(self) -> list[str]:
