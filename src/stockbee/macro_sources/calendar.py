@@ -97,17 +97,26 @@ class EconomicCalendar:
             self._conn.close()
             self._conn = None
 
-    def sync(self, days_ahead: int = 90) -> int:
+    def sync(self, days_ahead: int = 90, strict: bool = False) -> int:
         """从 FRED API 同步经济数据发布日历。
 
         Args:
             days_ahead: 同步未来多少天的事件
+            strict: 生产模式；为 True 时 API key 缺失会 raise RuntimeError，
+                避免调度层把"0 事件"误解为"今天没有高波动事件"。
+                默认 False 保留开发态的 graceful skip 行为。
 
         Returns:
             同步的事件数
+
+        Raises:
+            RuntimeError: strict=True 且 API key 未配置
         """
         if not self._api_key:
-            logger.warning("No FRED API key, skipping calendar sync")
+            msg = "No FRED API key, skipping calendar sync"
+            if strict:
+                raise RuntimeError(msg)
+            logger.warning(msg)
             return 0
 
         end = date.today() + timedelta(days=days_ahead)
