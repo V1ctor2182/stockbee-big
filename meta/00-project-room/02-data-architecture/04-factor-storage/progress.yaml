@@ -1,77 +1,137 @@
 progress:
-  completion: 0.0
+  completion: 0.125   # 1/8 milestones done
   milestones:
-    - id: "m1-expression-engine-core"
-      name: "表达式引擎核心"
-      status: pending
-      completed_at: null
-      estimated_files: ["src/stockbee/factor_data/expression_engine.py"]
-      estimated_lines: 220
+    - id: "m1a-tokenizer-parser"
+      name: "Tokenizer + Parser + AST"
+      status: completed
+      completed_at: "2026-04-11"
+      actual_files:
+        - "src/stockbee/factor_data/__init__.py"
+        - "src/stockbee/factor_data/expression_engine.py"
+        - "tests/test_factor_data.py"
+      actual_lines: 740   # expression_engine ~500 + tests ~240
+      estimated_files: ["src/stockbee/factor_data/expression_engine.py", "tests/test_factor_data.py"]
+      estimated_lines: 200
       depends_on: []
       complexity_flags: [first_of_kind]
       description: |
-        Tokenizer (regex) → Parser (递归下降) → Evaluator (MultiIndex DF)。
-        变量映射: CLOSE→adj_close, OPEN→open, HIGH→high, LOW→low, VOLUME→volume, VWAP→典型价。
-        基础函数 (16): REF/DELAY, MA/MEAN, STD, SUM, MAX, MIN, DELTA, ABS, LOG, SIGN。
-        MAX/MIN 重载: 整数≥2 → rolling, 否则 → element-wise。
+        Tokenizer (regex) → 递归下降 Parser → AST 节点。
+        AST 必须暴露 walk() / lookback() 方法，供 max_lookback 和集成测试使用。
+        测试：只验证 AST 形状，不跑 OHLCV 数据（纯 parser 单元测试）。
+        注：m3 的 max_lookback() 依赖此处暴露的 walk() 接口，需在本 milestone 锁定。
+
+    - id: "m1b-evaluator-basic-funcs"
+      name: "Evaluator + 16 基础函数"
+      status: pending
+      completed_at: null
+      estimated_files: ["src/stockbee/factor_data/expression_engine.py", "tests/test_factor_data.py"]
+      estimated_lines: 250
+      depends_on: [m1a-tokenizer-parser]
+      complexity_flags: [first_of_kind]
+      description: |
+        Evaluator：遍历 AST，变量映射 CLOSE→adj_close/OPEN/HIGH/LOW/VOLUME/VWAP，
+        在 MultiIndex DataFrame (date, ticker) 上执行，rolling 必须 groupby(ticker)。
+        16 基础函数：REF/DELAY, MA/MEAN, STD, SUM, MAX, MIN, DELTA, ABS, LOG, SIGN。
+        MAX/MIN 重载：第二参数整数≥2 → rolling，否则 → element-wise。
+        测试：造假 OHLCV（内存 DataFrame，2 tickers）验证各函数数值。
 
     - id: "m2-advanced-functions"
       name: "高级表达式函数"
       status: pending
       completed_at: null
-      estimated_files: ["src/stockbee/factor_data/expression_engine.py"]
-      estimated_lines: 200
-      depends_on: [m1-expression-engine-core]
+      estimated_files: ["src/stockbee/factor_data/expression_engine.py", "tests/test_factor_data.py"]
+      estimated_lines: 300
+      depends_on: [m1b-evaluator-basic-funcs]
       complexity_flags: [first_of_kind]
       description: |
-        追加 10 个函数: EMA, SLOPE, RSQUARE, RESI, CORR, RANK, IF, QUANTILE, IDXMAX, IDXMIN。
-        SLOPE/RSQUARE/RESI 共享 rolling OLS 计算。
+        追加 10 个函数：EMA, SLOPE, RSQUARE, RESI, CORR, RANK, IF, QUANTILE, IDXMAX, IDXMIN。
+        SLOPE/RSQUARE/RESI 共享 rolling OLS（用 rolling sum 代数展开，非 apply(lstsq)）。
+        RANK/QUANTILE 默认横截面（cross-section at each date），非时序。
+        测试：≥2 tickers 验证横截面 RANK；rolling OLS 用 numpy 线性数据验证斜率精度。
 
     - id: "m3-alpha158-full"
       name: "Alpha158 全量因子定义"
       status: pending
       completed_at: null
-      estimated_files: ["src/stockbee/factor_data/alpha158.py", "config/factors-alpha158.yaml"]
+      estimated_files: ["src/stockbee/factor_data/alpha158.py", "config/factors-alpha158.yaml", "tests/test_factor_data.py"]
       estimated_lines: 350
-      depends_on: [m1-expression-engine-core, m2-advanced-functions]
+      depends_on: [m1a-tokenizer-parser, m2-advanced-functions]
       complexity_flags: []
       description: |
-        alpha158.py: YAML 加载, factor registry, max_lookback()。
-        factors-alpha158.yaml: 全部 158 因子 (9 KBAR + 27组×5窗口)。
+        alpha158.py：YAML 加载，factor registry，max_lookback()。
+        max_lookback()：调用 AST.walk() 沿嵌套链相加（MA(REF(c,5),20) → 25 非 20）。
+        config/factors-alpha158.yaml：全部 158 因子（9 KBAR + 27组×5窗口）。
+        测试：最小 YAML 片段测 loader；嵌套表达式验证 max_lookback 相加语义。
 
     - id: "m4-parquet-factor-store"
       name: "预计算因子 Parquet 存储"
       status: pending
       completed_at: null
-      estimated_files: ["src/stockbee/factor_data/parquet_factor.py"]
-      estimated_lines: 150
+      estimated_files: ["src/stockbee/factor_data/parquet_factor.py", "tests/test_factor_data.py"]
+      estimated_lines: 250
       depends_on: []
       complexity_flags: []
       description: |
-        参照 parquet_macro.py。存储: data/factors/{group}.parquet。
-        接口: read_factors, write_factors (merge-write), list_precomputed_factors。
+        参照 parquet_macro.py（234行）。存储路径：data/factors/{group}.parquet。
+        group 粒度：按数据来源分组（e.g. fundamental, sentiment, ml_score），每组一文件。
+        接口：read_factors(group, tickers, start, end)，write_factors(group, df)（merge-write
+        按 (date, ticker) 主键去重），list_precomputed_factors() → list[str]。
+        测试：tmp Parquet 路径，写入后读取对比，merge 去重验证。
 
-    - id: "m5-local-provider"
-      name: "LocalFactorProvider + IC 评估"
+    - id: "m5-ic-evaluator"
+      name: "IC / ICIR 离线评估"
       status: pending
       completed_at: null
-      estimated_files: ["src/stockbee/factor_data/local_provider.py", "src/stockbee/factor_data/ic_evaluator.py"]
+      estimated_files: ["src/stockbee/factor_data/ic_evaluator.py", "tests/test_factor_data.py"]
       estimated_lines: 200
-      depends_on: [m1-expression-engine-core, m2-advanced-functions, m3-alpha158-full, m4-parquet-factor-store]
+      depends_on: []
       complexity_flags: []
       description: |
-        实现 FactorProvider 接口。MarketDataProvider setter 注入。
-        get_factors 路由 expression/precomputed。IC/ICIR 仅离线评估。
+        纯数值模块，无 provider 依赖，可与 m1-m4 并行开发。
+        接口：compute(factor_df, prices_df, shift=1) → ic_mean, ic_std, icir。
+        shift=1 在本层做（factor at t vs return at t+1），禁止让 caller shift。
+        rolling IC（默认 window=252），IC 序列 NaN 处理：少于 20 个有效值时返回 NaN。
+        测试：合成 golden data（factor = true_return * 0.8 + noise），断言 |ic_mean - 0.8| < 0.05。
 
-    - id: "m6-tests"
-      name: "测试 + 模块导出"
+    - id: "m6-local-provider"
+      name: "LocalFactorProvider + 模块导出"
       status: pending
       completed_at: null
-      estimated_files: ["tests/test_factor_data.py", "src/stockbee/factor_data/__init__.py"]
-      estimated_lines: 350
-      depends_on: [m1-expression-engine-core, m2-advanced-functions, m3-alpha158-full, m4-parquet-factor-store, m5-local-provider]
+      estimated_files: ["src/stockbee/factor_data/local_provider.py", "src/stockbee/factor_data/__init__.py", "tests/test_factor_data.py"]
+      estimated_lines: 280
+      depends_on: [m1b-evaluator-basic-funcs, m2-advanced-functions, m3-alpha158-full, m4-parquet-factor-store, m5-ic-evaluator]
       complexity_flags: []
       description: |
-        5 个 TestClass (~30 tests): ExpressionEngine, Alpha158Config,
-        ParquetFactorStore, LocalFactorProvider, ICEvaluator。__init__.py 导出。
+        实现 FactorProvider 接口。MarketDataProvider setter 注入（未注入时 expression 请求
+        raise RuntimeError，错误信息明确）。
+        get_factors 路由：expression → Alpha158.get_expression → Evaluator（+ lookback trim）；
+        precomputed → ParquetFactorStore。merge 时统一 (date, ticker) 索引顺序，
+        保持调用方请求的列顺序，unknown factor name 直接 raise。
+        get_ic_report() wire 到 ic_evaluator.compute()。
+        __init__.py 增量导出本模块全部公共类。
+        集成测试（happy path）：2 tickers，2 expression + 1 precomputed，验证输出 shape 和列顺序。
+
+    - id: "m7-integration-tests"
+      name: "集成层 edge case 测试"
+      status: pending
+      completed_at: null
+      estimated_files: ["tests/test_factor_integration.py"]
+      estimated_lines: 250
+      depends_on: [m6-local-provider]
+      complexity_flags: []
+      description: |
+        专用集成测试文件，覆盖单元测试无法发现的跨模块 edge case。
+        每个 case 显式命名，场景清单：
+        1. test_nested_ref_lookback：MA(REF(c,5),20) lookback=25，trim 后 start 正确
+        2. test_lookback_calendar_vs_trading：lookback 用交易日延伸，trim 回 user start
+        3. test_multiindex_groupby_isolation：2 tickers 不同起止日，rolling 不跨 ticker 串数据
+        4. test_cross_section_rank_multi_ticker：RANK 按日做 cross-section，单 ticker 退化边界
+        5. test_precomputed_expression_index_merge：Parquet (ticker,date) 与 (date,ticker) 对齐
+        6. test_adjusted_price_split_boundary：split 日前后 adj_close ratio 正确，volume 不复权
+        7. test_ic_forward_shift_no_lookahead：shift=1 无前瞻，手工算参考值断言
+        8. test_setter_not_injected_raises：无 MarketData 调 expression 因子 → RuntimeError
+        9. test_unknown_factor_raises：未知 factor name → 明确异常
+        10. test_column_order_preserved：factor_names=["B","A"] 返回 [B,A] 列顺序
+        11. test_open_zero_div_nan：$open=0 → inf → 因子值 NaN 不崩
+        12. test_empty_date_range：无数据日期 → 返回空 MultiIndex DataFrame，不 crash
   commits: []

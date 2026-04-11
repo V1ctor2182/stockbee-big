@@ -1,0 +1,46 @@
+spec_id: "change-2026-04-11-milestone-replan"
+type: change
+state: active
+intent:
+  summary: "04-factor-storage milestone 重规划：6→8，补集成测试，锁定跨模块 contract"
+  detail: |
+    基于 design review 发现的问题，将 6 个 milestone 重拆为 8 个：
+
+    主要变动：
+    1. m1 拆为 m1a(tokenizer/parser/AST) + m1b(evaluator/基础函数)
+       - AST 在 m1a 锁定 walk()/lookback() 接口，供 m3 max_lookback 和 m7 集成测试使用
+    2. 删除旧 m6-tests（测试堆在最后破坏独立可测性）
+       - 每个 milestone 自带本模块单元测试
+    3. m5 拆出为独立的 m5-ic-evaluator（纯数值，无 provider 依赖，可与 m1-m4 并行）
+    4. m6-local-provider 专注路由/胶水层，带 happy-path 集成测试
+    5. 新增 m7-integration-tests：12 个跨模块 edge case（lookback trim, groupby,
+       index merge, split boundary, IC forward-shift, 异常路径, 空数据等）
+
+    锁定 4 个之前 spec 未决的 contract：
+    - RANK/QUANTILE 默认横截面（非时序）
+    - IC shift=1 在 ic_evaluator 层做
+    - max_lookback 用嵌套相加（MA(REF(c,5),20)→25）
+    - Parquet group 按数据来源分组
+
+    估算修正：
+    - 原 1470 行 → 新 2080 行（反映 2-2.5x PRD 偏差修正）
+    - m4 从 150→250（参考 parquet_macro.py 234行基线）
+    - m2 从 200→300（rolling OLS + cross-section 实现量）
+
+constraints: []
+indexing:
+  type: change
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["planning", "factor-storage", "milestone-replan", "integration-tests", "contracts"]
+provenance:
+  source_type: design_review
+  confidence: 1.0
+  source_ref: "design review 2026-04-11: integration edge cases + testability analysis"
+relations:
+  - { type: supersedes, target: "change-2026-04-10-factor-storage-plan", reason: "8-milestone 方案替换旧 6-milestone 方案" }
+  - { type: refines, target: "intent-04-factor-storage-001", reason: "补充跨模块 contract 和集成测试策略" }
+anchors:
+  - { file: "meta/00-project-room/02-data-architecture/04-factor-storage/progress.yaml", type: planning }
+  - { file: "meta/00-project-room/02-data-architecture/04-factor-storage/spec.md", type: docs }

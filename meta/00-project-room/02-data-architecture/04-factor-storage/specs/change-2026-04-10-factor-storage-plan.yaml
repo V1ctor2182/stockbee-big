@@ -1,6 +1,6 @@
 spec_id: "change-2026-04-10-factor-storage-plan"
 type: change
-state: active
+state: superseded
 intent:
   summary: "04-factor-storage 里程碑重规划 + pytest 根目录配置"
   detail: |
