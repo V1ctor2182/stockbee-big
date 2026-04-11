@@ -1,14 +1,20 @@
 """TaskConfig — 任务类型定义 + 模型映射配置。
 
-5 种任务类型，每种指定主模型、备选模型、token 限制、输出格式。
+5 种任务类型，每种指定主模型、备选模型、token 限制、输出格式、per-task 预算、timeout。
 成本估算基于 Tech Design §3.2。
+
+模型 ID 策略：
+- Anthropic：使用当前旗舰别名（claude-sonnet-4-6 / claude-opus-4-6 /
+  claude-haiku-4-5-20251001），而不是过期的 2025-05 snapshot。日后模型
+  升级只需改这个文件。
+- OpenAI：沿用 gpt-4.1 / gpt-4.1-nano（上线于 2025，nano 作为 G1 廉价入口）。
 
 来源：Tech Design §3.2, research-llm-selection.md
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 
@@ -25,12 +31,13 @@ class TaskType(str, Enum):
 class TaskConfig:
     """单个任务类型的模型配置。"""
     task_type: TaskType
-    model: str                     # litellm 模型 ID（如 "openai/gpt-4.1-nano"）
+    model: str                     # litellm 模型 ID
     fallback_model: str | None     # 备选模型
     max_tokens: int                # 最大输出 token
     temperature: float = 0.0       # 默认确定性输出
     output_format: str = "json"    # "json" | "text"
-    monthly_budget: float = 0.0    # 月度预算上限（美元）
+    monthly_budget: float = 0.0    # 月度预算上限（美元，per task type）
+    timeout_seconds: float = 30.0  # 单次调用超时
     description: str = ""
 
 
@@ -39,51 +46,56 @@ DEFAULT_TASK_CONFIGS: dict[TaskType, TaskConfig] = {
     TaskType.G1_FILTER: TaskConfig(
         task_type=TaskType.G1_FILTER,
         model="openai/gpt-4.1-nano",
-        fallback_model="google/gemini-2.0-flash",
+        fallback_model="anthropic/claude-haiku-4-5-20251001",
         max_tokens=100,
         temperature=0.0,
         output_format="json",
         monthly_budget=1.0,
+        timeout_seconds=15.0,
         description="新闻快速过滤：标题+摘要 → {relevant: bool}",
     ),
     TaskType.G2_CLASSIFY: TaskConfig(
         task_type=TaskType.G2_CLASSIFY,
-        model="anthropic/claude-sonnet-4-20250514",
-        fallback_model="openai/gpt-4o-mini",
+        model="anthropic/claude-haiku-4-5-20251001",
+        fallback_model="openai/gpt-4.1-nano",
         max_tokens=500,
         temperature=0.0,
         output_format="json",
         monthly_budget=2.0,
+        timeout_seconds=20.0,
         description="新闻分类：摘要+部分正文 → {sentiment, category, urgency}",
     ),
     TaskType.G3_ANALYSIS: TaskConfig(
         task_type=TaskType.G3_ANALYSIS,
-        model="openai/gpt-4.1",
-        fallback_model="anthropic/claude-opus-4-20250514",
+        model="anthropic/claude-sonnet-4-6",
+        fallback_model="openai/gpt-4.1",
         max_tokens=2000,
         temperature=0.3,
         output_format="text",
         monthly_budget=5.0,
+        timeout_seconds=60.0,
         description="深度基本面分析：完整新闻+持仓情景 → 影响评估",
     ),
     TaskType.SEC_PARSE: TaskConfig(
         task_type=TaskType.SEC_PARSE,
-        model="openai/gpt-4.1",
-        fallback_model="anthropic/claude-sonnet-4-20250514",
+        model="anthropic/claude-sonnet-4-6",
+        fallback_model="openai/gpt-4.1",
         max_tokens=3000,
         temperature=0.0,
         output_format="json",
         monthly_budget=3.0,
+        timeout_seconds=60.0,
         description="SEC 10-K/10-Q 解析 → 关键财务指标 JSON",
     ),
     TaskType.MACRO_ANALYSIS: TaskConfig(
         task_type=TaskType.MACRO_ANALYSIS,
-        model="anthropic/claude-sonnet-4-20250514",
-        fallback_model="openai/gpt-4.1",
+        model="anthropic/claude-opus-4-6",
+        fallback_model="anthropic/claude-sonnet-4-6",
         max_tokens=1500,
         temperature=0.2,
         output_format="text",
         monthly_budget=4.0,
+        timeout_seconds=90.0,
         description="周度宏观环境分析：FRED 指标 → 经济周期判断",
     ),
 }
