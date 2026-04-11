@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -27,11 +28,26 @@ logger = logging.getLogger(__name__)
 GAMMA_API_BASE = "https://gamma-api.polymarket.com"
 DEFAULT_CLIFF_THRESHOLD = 0.15  # 概率变化 > 15% 视为悬崖
 
-# 宏观事件关键词过滤（question 中包含任一即视为宏观相关）
-MACRO_KEYWORDS = [
-    "fed ", "federal reserve", "fomc", "interest rate", "rate cut", "rate hike",
-    "recession", "inflation", "cpi", "gdp", "unemployment", "tariff",
-    "trade war", "treasury", "debt ceiling", "deficit", "stimulus",
+# Yes-side labels recognised when parsing Polymarket outcomes.
+_YES_LABELS = {"yes", "y", "true"}
+
+# 宏观事件关键词过滤（question/description 中命中任一即视为宏观相关）
+# 短 token 需要 \b 词边界保护，避免被子串误命中（fed → fedex、cpi → cpix）。
+_MACRO_TOKENS = [
+    r"\bfed\b", r"federal reserve", r"\bfomc\b", r"interest rate",
+    r"rate cut", r"rate hike", r"\brecession\b", r"\binflation\b",
+    r"\bcpi\b", r"\bppi\b", r"\bgdp\b", r"\bunemployment\b",
+    r"\btariff\b", r"trade war", r"\btreasury\b", r"debt ceiling",
+    r"\bdeficit\b", r"\bstimulus\b", r"central bank", r"monetary policy",
+    r"\bfiscal\b",
+]
+_MACRO_RE = re.compile("|".join(_MACRO_TOKENS), re.IGNORECASE)
+
+# 保留为公开常量供 spec / docs 引用；列表内容与 _MACRO_TOKENS 一一对应。
+MACRO_KEYWORDS: list[str] = [
+    "fed", "federal reserve", "fomc", "interest rate", "rate cut", "rate hike",
+    "recession", "inflation", "cpi", "ppi", "gdp", "unemployment",
+    "tariff", "trade war", "treasury", "debt ceiling", "deficit", "stimulus",
     "central bank", "monetary policy", "fiscal",
 ]
 
@@ -123,7 +139,10 @@ class PolymarketFetcher:
         # 本地关键词过滤
         raw_markets = [m for m in raw_markets if self._is_macro_related(m)]
 
-        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        # Microsecond precision avoids same-second collisions on the
+        # (event_id, fetched_at) primary key when retries / debugging reruns
+        # fire within the same wall-clock second.
+        now = datetime.now(timezone.utc).isoformat(timespec="microseconds")
         events: list[MarketEvent] = []
 
         for market in raw_markets[:limit]:
@@ -132,12 +151,12 @@ class PolymarketFetcher:
             if not event_id or not question:
                 continue
 
-            # 提取概率（outcomePrices 是 JSON 字符串 "[yes_price, no_price]"）
+            # 提取概率：显式读取 outcomes 字段确认 Yes 索引，而不是盲信 [0]。
             probability = self._extract_probability(market)
             if probability is None:
                 continue
 
-            previous = self._get_previous_probability(event_id)
+            previous = self._get_last_saved_probability(event_id)
 
             event = MarketEvent(
                 event_id=event_id,
@@ -156,23 +175,30 @@ class PolymarketFetcher:
         return events
 
     def save_events(self, events: list[MarketEvent]) -> int:
-        """保存事件到 SQLite。返回保存的数量。"""
+        """保存事件到 SQLite。返回保存的数量。
+
+        使用 INSERT OR IGNORE：同一 (event_id, fetched_at) 的重复保存是幂等的，
+        不会静默覆盖已写入的历史行。
+        """
         if not self._conn or not events:
             return 0
 
+        rows = [
+            (e.event_id, e.question, e.slug, e.probability,
+             e.previous_probability, e.volume, e.liquidity,
+             int(e.is_cliff), e.fetched_at)
+            for e in events
+        ]
         cur = self._conn.cursor()
-        for e in events:
-            cur.execute(
-                """INSERT OR REPLACE INTO polymarket_events
-                   (event_id, question, slug, probability, previous_probability,
-                    volume, liquidity, is_cliff, fetched_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (e.event_id, e.question, e.slug, e.probability,
-                 e.previous_probability, e.volume, e.liquidity,
-                 int(e.is_cliff), e.fetched_at),
-            )
+        cur.executemany(
+            """INSERT OR IGNORE INTO polymarket_events
+               (event_id, question, slug, probability, previous_probability,
+                volume, liquidity, is_cliff, fetched_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            rows,
+        )
         self._conn.commit()
-        return len(events)
+        return cur.rowcount if cur.rowcount != -1 else len(events)
 
     def detect_cliffs(self, events: list[MarketEvent] | None = None) -> list[MarketEvent]:
         """返回概率悬崖事件（概率变化 > threshold）。"""
@@ -221,27 +247,60 @@ class PolymarketFetcher:
                 if isinstance(data, list):
                     return data
                 return data.get("data", data.get("markets", []))
-        except (URLError, json.JSONDecodeError):
-            logger.exception("Polymarket API error: %s", url)
+        except (URLError, json.JSONDecodeError) as exc:
+            # Log path only, not full URL (matches calendar.py's redaction style).
+            logger.warning("Polymarket API error on %s: %s", path, type(exc).__name__)
             return []
 
-    def _extract_probability(self, market: dict) -> float | None:
-        """从 market 数据提取 Yes 概率。"""
-        prices = market.get("outcomePrices")
-        if prices:
-            try:
-                parsed = json.loads(prices) if isinstance(prices, str) else prices
-                return float(parsed[0])  # Yes price = probability
-            except (json.JSONDecodeError, IndexError, TypeError):
-                pass
-        # Fallback
-        best_ask = market.get("bestAsk")
-        if best_ask:
-            return float(best_ask)
-        return None
+    @staticmethod
+    def _extract_probability(market: dict) -> float | None:
+        """从 market 数据提取 Yes 概率。
 
-    def _get_previous_probability(self, event_id: str) -> float | None:
-        """从 SQLite 获取该事件的上一次概率。"""
+        只处理二元市场，且必须通过 ``outcomes`` 字段显式定位 Yes 索引 —
+        不能盲信 ``outcomePrices[0]`` 等于 Yes 概率，因为非二元或自定义
+        outcomes 顺序的市场会写错值。
+        """
+        prices_raw = market.get("outcomePrices")
+        outcomes_raw = market.get("outcomes")
+        if prices_raw is None or outcomes_raw is None:
+            return None
+
+        try:
+            prices = json.loads(prices_raw) if isinstance(prices_raw, str) else prices_raw
+            outcomes = json.loads(outcomes_raw) if isinstance(outcomes_raw, str) else outcomes_raw
+        except (json.JSONDecodeError, TypeError):
+            return None
+
+        if not isinstance(prices, list) or not isinstance(outcomes, list):
+            return None
+        if len(prices) != 2 or len(outcomes) != 2:
+            # Skip non-binary markets — no single "event probability" to report.
+            return None
+
+        try:
+            labels = [str(o).strip().lower() for o in outcomes]
+        except Exception:  # noqa: BLE001 — defensive, outcomes may contain weird values
+            return None
+
+        if labels[0] in _YES_LABELS:
+            yes_index = 0
+        elif labels[1] in _YES_LABELS:
+            yes_index = 1
+        else:
+            return None
+
+        try:
+            return float(prices[yes_index])
+        except (TypeError, ValueError):
+            return None
+
+    def _get_last_saved_probability(self, event_id: str) -> float | None:
+        """返回该事件在 SQLite 里最新一次保存的概率，用作 cliff 比对的"前值"。
+
+        Note: 名字里是 "last saved"，因为语义上返回的是"DB 里最新的一行"，
+        而不是抽象意义上的"上一次"。只有在 *保存前* 调用才等同于"上一次抓取"；
+        保存后再调用会拿到当前值，``is_cliff`` 会恒为 False。
+        """
         if not self._conn:
             return None
         cur = self._conn.execute(
@@ -255,9 +314,9 @@ class PolymarketFetcher:
 
     @staticmethod
     def _is_macro_related(market: dict) -> bool:
-        """判断一个市场是否和宏观经济相关。"""
-        text = (market.get("question", "") + " " + market.get("description", "")).lower()
-        return any(kw in text for kw in MACRO_KEYWORDS)
+        """判断一个市场是否和宏观经济相关（question + description 命中任一关键词）。"""
+        text = market.get("question", "") + " " + market.get("description", "")
+        return _MACRO_RE.search(text) is not None
 
     def _is_cliff(self, current: float, previous: float | None) -> bool:
         """判断是否为概率悬崖。"""

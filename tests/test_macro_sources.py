@@ -109,23 +109,64 @@ class TestPolymarketFetcher:
         # 20% change — is a cliff
         assert polymarket._is_cliff(0.70, 0.50)
 
-    def test_previous_probability_from_db(self, polymarket, sample_events):
+    def test_last_saved_probability_from_db(self, polymarket, sample_events):
         polymarket.save_events(sample_events)
 
-        prev = polymarket._get_previous_probability("evt1")
-        assert prev == 0.65  # last saved probability
+        # Method returns the most recent row — after save that equals the value
+        # we just wrote. The name reflects "latest saved", not an abstract
+        # "previous" (regression test for the rename / semantic clarification).
+        prev = polymarket._get_last_saved_probability("evt1")
+        assert prev == 0.65
 
-    def test_previous_probability_missing(self, polymarket):
-        prev = polymarket._get_previous_probability("nonexistent")
+    def test_last_saved_probability_missing(self, polymarket):
+        prev = polymarket._get_last_saved_probability("nonexistent")
         assert prev is None
 
-    def test_extract_probability(self, polymarket):
-        market = {"outcomePrices": json.dumps([0.72, 0.28])}
+    def test_extract_probability_binary_yes_first(self, polymarket):
+        market = {
+            "outcomes": json.dumps(["Yes", "No"]),
+            "outcomePrices": json.dumps(["0.72", "0.28"]),
+        }
         assert polymarket._extract_probability(market) == 0.72
 
-    def test_extract_probability_fallback(self, polymarket):
-        market = {"bestAsk": 0.55}
-        assert polymarket._extract_probability(market) == 0.55
+    def test_extract_probability_binary_yes_second(self, polymarket):
+        # Some markets list "No" first — probability must track the Yes index
+        # rather than blindly returning outcomePrices[0].
+        market = {
+            "outcomes": json.dumps(["No", "Yes"]),
+            "outcomePrices": json.dumps(["0.28", "0.72"]),
+        }
+        assert polymarket._extract_probability(market) == 0.72
+
+    def test_extract_probability_skip_multi_outcome(self, polymarket):
+        # Non-binary market (e.g. "Fed May decision" with hold/-25/-50 bp
+        # outcomes) has no single event probability — must return None instead
+        # of the meaningless outcomePrices[0].
+        market = {
+            "outcomes": json.dumps(["Hold", "-25bp", "-50bp"]),
+            "outcomePrices": json.dumps(["0.30", "0.50", "0.20"]),
+        }
+        assert polymarket._extract_probability(market) is None
+
+    def test_extract_probability_skip_non_yes_binary(self, polymarket):
+        # Two outcomes but neither is a Yes-like label → skip.
+        market = {
+            "outcomes": json.dumps(["Trump", "Biden"]),
+            "outcomePrices": json.dumps(["0.55", "0.45"]),
+        }
+        assert polymarket._extract_probability(market) is None
+
+    def test_extract_probability_missing_outcomes_field(self, polymarket):
+        # outcomePrices alone is no longer enough — bestAsk fallback was a bug.
+        market = {"outcomePrices": json.dumps(["0.72", "0.28"])}
+        assert polymarket._extract_probability(market) is None
+
+    def test_extract_probability_malformed_json(self, polymarket):
+        market = {
+            "outcomes": "not json",
+            "outcomePrices": "[0.72, 0.28]",
+        }
+        assert polymarket._extract_probability(market) is None
 
     def test_extract_probability_none(self, polymarket):
         market = {}
@@ -247,7 +288,15 @@ class TestEconomicCalendar:
         cal = EconomicCalendar(api_key="", db_path=str(tmp_path / "test.db"))
         cal.initialize()
         count = cal.sync()
-        assert count == 0  # should skip gracefully
+        assert count == 0  # should skip gracefully in default (dev) mode
+
+    def test_sync_without_api_key_strict_raises(self, tmp_path):
+        # Production callers pass strict=True so a missing key fails loudly
+        # instead of silently returning "zero events".
+        cal = EconomicCalendar(api_key="", db_path=str(tmp_path / "test.db"))
+        cal.initialize()
+        with pytest.raises(RuntimeError, match="No FRED API key"):
+            cal.sync(strict=True)
 
     def test_date_range_query(self, calendar):
         events = [
@@ -269,3 +318,167 @@ class TestEconomicCalendar:
         calendar.initialize()
         result = calendar.get_events()
         assert len(result) == 1
+
+
+# =========================================================================
+# PolymarketFetcher — keyword regex + API error path + same-microsecond
+# collision regression tests.
+# =========================================================================
+
+class TestMacroKeywordRegex:
+    """Guard the MACRO_KEYWORDS matcher against substring false positives and
+    word-boundary false negatives."""
+
+    def _match(self, polymarket, question, description=""):
+        return polymarket._is_macro_related(
+            {"question": question, "description": description}
+        )
+
+    def test_matches_fed_with_punctuation(self, polymarket):
+        # The old `"fed "` substring missed these; \bfed\b catches them.
+        assert self._match(polymarket, "Fed's decision in May?")
+        assert self._match(polymarket, "Will the Fed cut rates?")
+        assert self._match(polymarket, "Fed, acting alone, is unlikely")
+
+    def test_does_not_match_fedex(self, polymarket):
+        # Substring match would have been fine here (the old code used "fed "
+        # with trailing space), but the new regex with \b must keep this
+        # negative.
+        assert not self._match(polymarket, "Will FedEx stock rally?")
+
+    def test_matches_description_field(self, polymarket):
+        assert self._match(
+            polymarket,
+            question="Will ABC happen in 2026?",
+            description="Event depends on FOMC decision in June.",
+        )
+
+    def test_case_insensitive(self, polymarket):
+        assert self._match(polymarket, "CPI PRINT ABOVE 3%?")
+        assert self._match(polymarket, "cpi print above 3%?")
+
+    def test_cpi_word_boundary_not_substring(self, polymarket):
+        # "cpix" (fictional ticker) must not be treated as macro.
+        assert not self._match(polymarket, "Will CPIX stock break 100?")
+
+    def test_missing_keyword(self, polymarket):
+        assert not self._match(polymarket, "Who will win the Super Bowl?")
+
+
+class TestPolymarketCallApi:
+    """Exercise the network error handling paths without hitting real API."""
+
+    def test_url_error_returns_empty(self, polymarket, caplog):
+        import urllib.error
+        with patch("stockbee.macro_sources.polymarket.urlopen") as mock_open:
+            mock_open.side_effect = urllib.error.URLError("network down")
+            result = polymarket._call_api("/markets", params={"limit": 10})
+        assert result == []
+        # Error log must NOT leak the full URL (only the path prefix).
+        messages = " ".join(r.getMessage() for r in caplog.records)
+        assert "gamma-api.polymarket.com" not in messages
+        assert "/markets" in messages
+
+    def test_json_decode_error_returns_empty(self, polymarket):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b"not json"
+        mock_resp.__enter__ = lambda self: self
+        mock_resp.__exit__ = lambda *a: None
+        with patch("stockbee.macro_sources.polymarket.urlopen", return_value=mock_resp):
+            result = polymarket._call_api("/markets")
+        assert result == []
+
+    def test_envelope_data_key(self, polymarket):
+        # API may return either a bare list or {"data": [...]}.
+        envelope = {"data": [{"id": "x", "question": "Fed cut?"}]}
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps(envelope).encode()
+        mock_resp.__enter__ = lambda self: self
+        mock_resp.__exit__ = lambda *a: None
+        with patch("stockbee.macro_sources.polymarket.urlopen", return_value=mock_resp):
+            result = polymarket._call_api("/markets")
+        assert result == [{"id": "x", "question": "Fed cut?"}]
+
+
+class TestPolymarketFetchedAtCollision:
+    """Same-microsecond / same-second fetches must not silently overwrite
+    history rows."""
+
+    def _make_event(self, prob, fetched_at):
+        return MarketEvent(
+            event_id="evt-collide", question="Fed cut?",
+            slug="fed-cut", probability=prob,
+            previous_probability=None, volume=1000.0,
+            liquidity=100.0, is_cliff=False, fetched_at=fetched_at,
+        )
+
+    def test_distinct_microsecond_preserves_history(self, polymarket):
+        # Two rows with different microsecond suffixes must both survive.
+        e1 = self._make_event(0.50, "2026-04-10T12:00:00.100000+00:00")
+        e2 = self._make_event(0.70, "2026-04-10T12:00:00.200000+00:00")
+        assert polymarket.save_events([e1]) == 1
+        assert polymarket.save_events([e2]) == 1
+
+        conn = polymarket._conn
+        rows = conn.execute(
+            "SELECT probability FROM polymarket_events WHERE event_id = ? ORDER BY fetched_at",
+            ("evt-collide",),
+        ).fetchall()
+        assert [r[0] for r in rows] == [0.50, 0.70]
+
+    def test_identical_fetched_at_is_idempotent_not_destructive(self, polymarket):
+        # Re-saving the *same* (event_id, fetched_at) row must not clobber it
+        # with a newer probability — INSERT OR IGNORE preserves the original.
+        ts = "2026-04-10T12:00:00.000000+00:00"
+        e_first = self._make_event(0.50, ts)
+        e_retry = self._make_event(0.99, ts)  # same timestamp, different value
+
+        assert polymarket.save_events([e_first]) == 1
+        # Retry at same timestamp: row exists, INSERT OR IGNORE no-ops.
+        polymarket.save_events([e_retry])
+
+        conn = polymarket._conn
+        rows = conn.execute(
+            "SELECT probability FROM polymarket_events WHERE event_id = ?",
+            ("evt-collide",),
+        ).fetchall()
+        assert len(rows) == 1
+        # Original value wins (not silently overwritten by retry).
+        assert rows[0][0] == 0.50
+
+    def test_fetch_macro_events_uses_microsecond_precision(self):
+        # The real fetch path stamps events with microsecond-precision ISO
+        # strings so back-to-back fetches in the same second never collide.
+        from stockbee.macro_sources import polymarket as pmod
+
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps([
+            {
+                "id": "e1",
+                "question": "Will the Fed cut rates?",
+                "description": "",
+                "slug": "fed-cut",
+                "outcomes": json.dumps(["Yes", "No"]),
+                "outcomePrices": json.dumps(["0.60", "0.40"]),
+                "volume": 1000,
+                "liquidity": 100,
+            }
+        ]).encode()
+        mock_resp.__enter__ = lambda self: self
+        mock_resp.__exit__ = lambda *a: None
+
+        fetcher = pmod.PolymarketFetcher(db_path=":memory:")
+        fetcher.initialize()
+        try:
+            with patch("stockbee.macro_sources.polymarket.urlopen", return_value=mock_resp):
+                events = fetcher.fetch_macro_events(limit=5, fetch_size=5)
+            assert len(events) == 1
+            # Microsecond precision → 6 fractional digits after the dot.
+            ts = events[0].fetched_at
+            assert "." in ts, f"expected microsecond suffix, got {ts}"
+            frac = ts.split(".", 1)[1]
+            # Strip tz suffix (+00:00) before counting fractional digits.
+            frac_digits = frac.split("+", 1)[0].split("Z", 1)[0]
+            assert len(frac_digits) == 6
+        finally:
+            fetcher.shutdown()
