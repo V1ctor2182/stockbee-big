@@ -18,6 +18,8 @@ m1b 造 2 tickers 合成 OHLCV，验证：
     pytest tests/test_factor_data.py -v
 """
 
+import math
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -1818,3 +1820,230 @@ class TestParquetFactorStore:
         # 文件不应被创建
         assert not (tmp_path / "fundamental.parquet").exists()
         assert store.list_precomputed_factors() == []
+
+
+# ===========================================================================
+# IC Evaluator（12 个 case）
+# ===========================================================================
+
+from stockbee.factor_data.ic_evaluator import compute
+
+
+def _make_ic_data(
+    n_tickers: int = 5,
+    n_dates: int = 60,
+    seed: int = 42,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """构造 IC 测试用的 factor + prices 数据。
+
+    Returns:
+        (prices_df, fwd_returns) — prices 有 adj_close 列，
+        fwd_returns 是每 ticker 的前向收益（方便外部构造 factor）。
+    """
+    rng = np.random.default_rng(seed)
+    dates = pd.bdate_range("2024-01-01", periods=n_dates)
+    tickers = [f"T{i:03d}" for i in range(n_tickers)]
+
+    rows = []
+    for t in tickers:
+        price = 100.0
+        for d in dates:
+            rows.append((d, t, price))
+            price *= 1 + rng.normal(0, 0.02)  # ~2% daily vol
+
+    idx = pd.MultiIndex.from_tuples(
+        [(d, t) for d, t, _ in rows], names=["date", "ticker"]
+    )
+    prices_df = pd.DataFrame({"adj_close": [p for _, _, p in rows]}, index=idx)
+
+    # 前向收益（shift=-1）
+    fwd_price = prices_df["adj_close"].groupby(level="ticker").shift(-1)
+    fwd_ret = fwd_price / prices_df["adj_close"] - 1
+
+    return prices_df, fwd_ret
+
+
+class TestICEvaluator:
+    """m5: IC / ICIR 离线评估。"""
+
+    def test_perfect_positive_ic(self):
+        """factor == fwd_return → IC ≈ 1.0（完美正相关）。"""
+        prices_df, fwd_ret = _make_ic_data(n_tickers=10, n_dates=80)
+        # factor = forward return 本身
+        factor_df = pd.DataFrame({"f": fwd_ret}, index=fwd_ret.index).dropna()
+        # prices 需要对齐到 factor 的日期范围
+        result = compute(factor_df, prices_df, shift=1)
+        assert result["ic_mean"] > 0.9
+
+    def test_perfect_negative_ic(self):
+        """factor == -fwd_return → IC ≈ -1.0（完美负相关）。"""
+        prices_df, fwd_ret = _make_ic_data(n_tickers=10, n_dates=80)
+        factor_df = pd.DataFrame({"f": -fwd_ret}, index=fwd_ret.index).dropna()
+        result = compute(factor_df, prices_df, shift=1)
+        assert result["ic_mean"] < -0.9
+
+    def test_noisy_positive_ic(self):
+        """factor = return + noise → ic_mean > 0.5（有信号但有噪声）。"""
+        rng = np.random.default_rng(123)
+        prices_df, fwd_ret = _make_ic_data(n_tickers=10, n_dates=80, seed=123)
+        noise = pd.Series(
+            rng.normal(0, 0.01, size=len(fwd_ret)), index=fwd_ret.index
+        )
+        factor_df = pd.DataFrame(
+            {"f": fwd_ret + noise}, index=fwd_ret.index
+        ).dropna()
+        result = compute(factor_df, prices_df, shift=1)
+        assert result["ic_mean"] > 0.5
+
+    def test_zero_correlation(self):
+        """随机因子 → |ic_mean| 应接近 0。"""
+        rng = np.random.default_rng(7777)  # 不同于 prices seed，避免序列相关
+        prices_df, _ = _make_ic_data(n_tickers=10, n_dates=80, seed=99)
+        random_factor = pd.Series(
+            rng.standard_normal(len(prices_df)), index=prices_df.index
+        )
+        result = compute(random_factor, prices_df, shift=1)
+        assert abs(result["ic_mean"]) < 0.3
+
+    def test_single_ticker_nan(self):
+        """截面只有 1 个 ticker → 每日 IC 全 NaN → 结果全 NaN。"""
+        prices_df, fwd_ret = _make_ic_data(n_tickers=1, n_dates=80)
+        factor_df = pd.DataFrame({"f": fwd_ret}, index=fwd_ret.index).dropna()
+        result = compute(factor_df, prices_df, shift=1)
+        assert math.isnan(result["ic_mean"])
+        assert math.isnan(result["ic_std"])
+        assert math.isnan(result["icir"])
+
+    def test_sparse_below_min_valid(self):
+        """有效 IC 恰好 19 个（< 20）→ 全 NaN。"""
+        # 构造只有 19 个有效日期的数据
+        prices_df, fwd_ret = _make_ic_data(n_tickers=5, n_dates=21)
+        # shift=1 → 最后 1 天无前向收益 → 20 天有返回，但第一天 fwd_ret 可能也会 dropna
+        # 用 21 天数据 shift=1 → 20 天有 fwd_ret → IC 序列 20 个
+        # 为确保恰好 19 个，手动截取
+        factor_df = pd.DataFrame({"f": fwd_ret}, index=fwd_ret.index).dropna()
+        # 手动减少到 19 天
+        dates = factor_df.index.get_level_values("date").unique()[:19]
+        mask = factor_df.index.get_level_values("date").isin(dates)
+        factor_19 = factor_df[mask]
+        result = compute(factor_19, prices_df, shift=1, window=252)
+        assert math.isnan(result["ic_mean"])
+
+    def test_sparse_at_min_valid(self):
+        """有效 IC 恰好 20 个 → 应返回有效值。"""
+        prices_df, fwd_ret = _make_ic_data(n_tickers=5, n_dates=22)
+        factor_df = pd.DataFrame({"f": fwd_ret}, index=fwd_ret.index).dropna()
+        dates = factor_df.index.get_level_values("date").unique()[:20]
+        mask = factor_df.index.get_level_values("date").isin(dates)
+        factor_20 = factor_df[mask]
+        result = compute(factor_20, prices_df, shift=1, window=252)
+        assert not math.isnan(result["ic_mean"])
+
+    def test_shift_2(self):
+        """shift=2 → 使用 t+2 收益。"""
+        prices_df, _ = _make_ic_data(n_tickers=5, n_dates=80)
+        # 手动算 shift=2 的前向收益作为 factor
+        fwd2 = prices_df["adj_close"].groupby(level="ticker").shift(-2)
+        fwd_ret2 = fwd2 / prices_df["adj_close"] - 1
+        factor_df = pd.DataFrame({"f": fwd_ret2}, index=fwd_ret2.index).dropna()
+        result = compute(factor_df, prices_df, shift=2)
+        assert result["ic_mean"] > 0.9
+
+    def test_small_window(self):
+        """window=5 → 只用最近 5 天 IC 计算汇总。"""
+        prices_df, fwd_ret = _make_ic_data(n_tickers=10, n_dates=80)
+        factor_df = pd.DataFrame({"f": fwd_ret}, index=fwd_ret.index).dropna()
+        # window=5 低于 min_valid=20 → 应返回 NaN
+        result = compute(factor_df, prices_df, shift=1, window=5)
+        assert math.isnan(result["ic_mean"])
+
+    def test_constant_factor_nan(self):
+        """所有 ticker 因子值相同 → rank 无区分度 → IC = NaN。"""
+        prices_df, _ = _make_ic_data(n_tickers=5, n_dates=80)
+        # 每天所有 ticker 因子值都是 1.0
+        factor_df = pd.DataFrame(
+            {"f": [1.0] * len(prices_df)}, index=prices_df.index
+        )
+        result = compute(factor_df, prices_df, shift=1)
+        assert math.isnan(result["ic_mean"])
+
+    def test_wrong_index_raises(self):
+        """非 MultiIndex → ValueError。"""
+        bad_factor = pd.DataFrame(
+            {"f": [1.0, 2.0]}, index=pd.date_range("2024-01-01", periods=2)
+        )
+        prices_df, _ = _make_ic_data(n_tickers=2, n_dates=5)
+        with pytest.raises(ValueError, match="MultiIndex"):
+            compute(bad_factor, prices_df)
+
+    def test_multi_column_factor_raises(self):
+        """factor_df 有 2+ 列 → ValueError。"""
+        prices_df, fwd_ret = _make_ic_data(n_tickers=5, n_dates=30)
+        factor_df = pd.DataFrame(
+            {"f1": fwd_ret, "f2": fwd_ret}, index=fwd_ret.index
+        ).dropna()
+        with pytest.raises(ValueError, match="exactly 1 column"):
+            compute(factor_df, prices_df)
+
+    def test_price_col_missing_raises(self):
+        """prices_df 无 adj_close 列 → ValueError。"""
+        prices_df, fwd_ret = _make_ic_data(n_tickers=5, n_dates=30)
+        prices_no_col = prices_df.rename(columns={"adj_close": "close"})
+        factor_df = pd.DataFrame({"f": fwd_ret}, index=fwd_ret.index).dropna()
+        with pytest.raises(ValueError, match="adj_close"):
+            compute(factor_df, prices_no_col)
+
+    def test_shift_zero_raises(self):
+        """shift=0 → ValueError。"""
+        prices_df, fwd_ret = _make_ic_data(n_tickers=5, n_dates=30)
+        factor_df = pd.DataFrame({"f": fwd_ret}, index=fwd_ret.index).dropna()
+        with pytest.raises(ValueError, match="shift must be >= 1"):
+            compute(factor_df, prices_df, shift=0)
+
+    def test_negative_shift_raises(self):
+        """shift=-1 → ValueError。"""
+        prices_df, fwd_ret = _make_ic_data(n_tickers=5, n_dates=30)
+        factor_df = pd.DataFrame({"f": fwd_ret}, index=fwd_ret.index).dropna()
+        with pytest.raises(ValueError, match="shift must be >= 1"):
+            compute(factor_df, prices_df, shift=-1)
+
+    def test_window_zero_raises(self):
+        """window=0 → ValueError。"""
+        prices_df, fwd_ret = _make_ic_data(n_tickers=5, n_dates=30)
+        factor_df = pd.DataFrame({"f": fwd_ret}, index=fwd_ret.index).dropna()
+        with pytest.raises(ValueError, match="window must be >= 1"):
+            compute(factor_df, prices_df, window=0)
+
+    def test_partial_overlap(self):
+        """factor 只覆盖 prices 的部分日期 → 用交集计算，不 crash。"""
+        prices_df, fwd_ret = _make_ic_data(n_tickers=10, n_dates=80)
+        # factor 只取后 40 天
+        dates = fwd_ret.index.get_level_values("date").unique()
+        late_dates = dates[-40:]
+        mask = fwd_ret.index.get_level_values("date").isin(late_dates)
+        factor_df = pd.DataFrame({"f": fwd_ret[mask]}, index=fwd_ret.index[mask]).dropna()
+        result = compute(factor_df, prices_df, shift=1)
+        # 40 天减去最后 1 天无 fwd_ret = 39 天 IC，>= 20 → 有值
+        assert not math.isnan(result["ic_mean"])
+        assert result["ic_mean"] > 0.9  # 完美因子
+
+    def test_flat_prices_nan(self):
+        """常量价格 → fwd_ret=0 → ranks 全 tied → IC = NaN。"""
+        dates = pd.bdate_range("2024-01-01", periods=60)
+        tickers = ["A", "B", "C", "D", "E"]
+        idx = pd.MultiIndex.from_product([dates, tickers], names=["date", "ticker"])
+        prices_df = pd.DataFrame({"adj_close": 100.0}, index=idx)
+        factor_df = pd.DataFrame(
+            {"f": np.arange(len(idx), dtype=float)}, index=idx
+        )
+        result = compute(factor_df, prices_df, shift=1)
+        assert math.isnan(result["ic_mean"])
+
+    def test_duplicate_index_raises(self):
+        """prices_df 有重复 (date, ticker) 行 → ValueError。"""
+        prices_df, fwd_ret = _make_ic_data(n_tickers=3, n_dates=30)
+        # 人为制造重复行
+        dup_prices = pd.concat([prices_df, prices_df.iloc[:3]])
+        factor_df = pd.DataFrame({"f": fwd_ret}, index=fwd_ret.index).dropna()
+        with pytest.raises(ValueError, match="duplicate"):
+            compute(factor_df, dup_prices)

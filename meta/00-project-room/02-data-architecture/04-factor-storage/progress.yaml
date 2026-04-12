@@ -1,5 +1,5 @@
 progress:
-  completion: 0.625   # 5/8 milestones done
+  completion: 0.75   # 6/8 milestones done
   milestones:
     - id: "m1a-tokenizer-parser"
       name: "Tokenizer + Parser + AST"
@@ -116,18 +116,25 @@ progress:
 
     - id: "m5-ic-evaluator"
       name: "IC / ICIR 离线评估"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-12"
+      actual_files:
+        - "src/stockbee/factor_data/ic_evaluator.py"
+        - "src/stockbee/factor_data/__init__.py"
+        - "tests/test_factor_data.py"
+      actual_lines: 248   # ic_evaluator ~125 + __init__ +3 + tests ~120 (19 cases)
       estimated_files: ["src/stockbee/factor_data/ic_evaluator.py", "tests/test_factor_data.py"]
       estimated_lines: 200
       depends_on: []
       complexity_flags: []
       description: |
         纯数值模块，无 provider 依赖，可与 m1-m4 并行开发。
-        接口：compute(factor_df, prices_df, shift=1) → ic_mean, ic_std, icir。
-        shift=1 在本层做（factor at t vs return at t+1），禁止让 caller shift。
-        rolling IC（默认 window=252），IC 序列 NaN 处理：少于 20 个有效值时返回 NaN。
-        测试：合成 golden data（factor = true_return * 0.8 + noise），断言 |ic_mean - 0.8| < 0.05。
+        接口：compute(factor_df, prices_df, shift=1, window=252) → dict(ic_mean, ic_std, icir)。
+        shift 在本层做（factor at t vs return at t+shift），禁止让 caller shift。
+        逐日截面 Spearman rank IC，纯 pandas rank().corr()（零 scipy 依赖）。
+        NaN gate：有效 IC < 20 → 全 NaN。ICIR = mean/std(ddof=1)，std=0 → NaN。
+        输入校验：shift>=1, window>=1, duplicate index, 单列 factor, adj_close 存在。
+        19 个测试 case（含 golden ±1.0、noisy、边界 19/20、corner case），203 全量 pass。
 
     - id: "m6-local-provider"
       name: "LocalFactorProvider + 模块导出"
@@ -180,3 +187,12 @@ progress:
         - "change-2026-04-12-m4-parquet-store (created)"
       milestones_affected:
         - "m4-parquet-factor-store (→ completed)"
+    - hash: "461ebfc"
+      date: "2026-04-12"
+      message: "[04-factor-storage] feat: m5 IC/ICIR evaluator — 纯数值离线评估 + 19 tests"
+      files_changed: 3
+      specs_affected:
+        - "intent-04-factor-storage-001 (anchor updated)"
+        - "change-2026-04-12-m5-ic-evaluator (created)"
+      milestones_affected:
+        - "m5-ic-evaluator (→ completed)"

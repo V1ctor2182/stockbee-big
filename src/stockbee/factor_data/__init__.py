@@ -5,6 +5,7 @@
                      + Evaluator + 基础/高级/TS 函数（m1b/m2/m3）
 - alpha158: Alpha158 因子注册表 + max_lookback（m3）
 - parquet_factor: 预计算因子 Parquet 存储（m4）
+- ic_evaluator: IC / ICIR 离线评估（m5）
 """
 
 from .alpha158 import Alpha158
@@ -16,6 +17,7 @@ from .expression_engine import (
     parse,
     tokenize,
 )
+from .ic_evaluator import compute as compute_ic
 from .parquet_factor import ParquetFactorStore
 
 __all__ = [
@@ -24,6 +26,7 @@ __all__ = [
     "ExpressionError",
     "Node",
     "ParquetFactorStore",
+    "compute_ic",
     "evaluate",
     "parse",
     "tokenize",

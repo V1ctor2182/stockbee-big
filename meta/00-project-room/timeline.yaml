@@ -68,9 +68,9 @@ timeline:
           target_end: "2026-04-25"
           estimated_days: 9
           status: implementing
-          completion: 0.625
+          completion: 0.75
           depends_on: ["01-stock-data", "07-provider-arch"]
-          note: "5/8 milestones done (m1a,m1b,m2,m3,m4). 剩余: m5-ic, m6-provider, m7-integration"
+          note: "6/8 milestones done (m1a,m1b,m2,m3,m4,m5). 剩余: m6-provider, m7-integration"
 
         # --- Sprint 2: 模型层 + 宏观 (Week 3-6) ---
         - room: "01-llm-routing"

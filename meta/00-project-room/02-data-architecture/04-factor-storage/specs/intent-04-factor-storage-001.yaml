@@ -24,5 +24,6 @@ anchors:
   - { file: "src/stockbee/factor_data/expression_engine.py", type: source }
   - { file: "src/stockbee/factor_data/alpha158.py", type: source }
   - { file: "src/stockbee/factor_data/parquet_factor.py", type: source }
+  - { file: "src/stockbee/factor_data/ic_evaluator.py", type: source }
   - { file: "config/factors-alpha158.yaml", type: config }
   - { file: "tests/test_factor_data.py", type: test }
