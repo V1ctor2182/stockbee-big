@@ -29,6 +29,8 @@ Alpha158 全部 158 个技术因子用表达式引擎动态计算（27 组 × 5 
 | NaN 比较语义 | 保持 pandas 默认（NaN 比较→False），与 qlib 行为一致，不改为 NaN 传播 | 2026-04-11 |
 | max_lookback 实现 | 直接用 AST.lookback()（嵌套相加），不需要 walk() | 2026-04-11 |
 | 因子定义源 | 全量 YAML（config/factors-alpha158.yaml），长表达式也写全，不混合 Python factory | 2026-04-11 |
+| 混合价格 schema | CLOSE→adj_close + raw OHLV 是已知约束（数据源仅提供 adj_close）；m6 LocalFactorProvider 可用 adj_close/close ratio 推导 adj OHLV 解决 | 2026-04-11 |
+| VWAP0 可选依赖 | VWAP0 属于 Alpha158 标准但 vwap 列在当前数据源中不保证存在；无 vwap 时该因子 raise，其余 157 因子正常 | 2026-04-11 |
 
 ## Contracts
 

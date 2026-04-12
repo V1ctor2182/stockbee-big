@@ -1567,3 +1567,43 @@ class TestAlpha158EvalSmoke:
         result = ev.evaluate(alpha.get_expression("WVMA60"))
         aaa = result.xs("AAA", level="ticker").sort_index()
         assert not aaa.iloc[-1:].isna().all()
+
+    def test_157_evaluate_without_vwap(self, alpha):
+        """无 vwap 列的 panel 上 157 因子（排除 VWAP0）全部正常。
+
+        真实数据源 OHLCV_FIELDS 不含 vwap，VWAP0 是可选因子。
+        此测试验证其余 157 个因子不依赖 vwap 列。
+        """
+        rows = []
+        for ticker, base_close in (("AAA", 50.0), ("BBB", 100.0)):
+            for i, date in enumerate(_EVAL_DATES):
+                c = base_close + i * 0.5
+                rows.append({
+                    "date": date, "ticker": ticker,
+                    "open": c - 0.3, "high": c + 0.8, "low": c - 0.6,
+                    "close": c, "adj_close": c * 1.5,
+                    "volume": 1000.0 + i * 10.0,
+                })
+        no_vwap_panel = pd.DataFrame(rows).set_index(["date", "ticker"]).sort_index()
+        ev = Evaluator(no_vwap_panel)
+        non_vwap_factors = [n for n in alpha.list_factor_names() if n != "VWAP0"]
+        assert len(non_vwap_factors) == 157
+        for name in non_vwap_factors:
+            ast = alpha.get_expression(name)
+            result = ev.evaluate(ast)
+            assert isinstance(result, pd.Series), f"{name} failed without vwap"
+
+    def test_vwap0_raises_without_vwap(self, alpha):
+        """无 vwap 列时 VWAP0 应 raise ExpressionError。"""
+        idx = pd.MultiIndex.from_arrays(
+            [pd.date_range("2024-01-01", periods=3, freq="D"), ["X"] * 3],
+            names=["date", "ticker"],
+        )
+        p = pd.DataFrame({
+            "open": [1.0, 2.0, 3.0], "high": [1.5, 2.5, 3.5],
+            "low": [0.5, 1.5, 2.5], "adj_close": [1.0, 2.0, 3.0],
+            "volume": [100.0, 200.0, 300.0],
+        }, index=idx)
+        ev = Evaluator(p)
+        with pytest.raises(ExpressionError, match="vwap"):
+            ev.evaluate(alpha.get_expression("VWAP0"))
