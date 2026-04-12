@@ -849,6 +849,40 @@ register_impl("IDXMAX", _impl_idxmax)
 register_impl("IDXMIN", _impl_idxmin)
 
 
+# ---------------------------------------------------------------------------
+# m2: CORR — per-ticker rolling 相关系数
+# ---------------------------------------------------------------------------
+#
+# 合约：CORR(x, y, n) 在每个 ticker 内部对两个 Series 做 rolling Pearson corr。
+# 当窗口内 x 或 y 恒定（方差=0）→ 除零 → NaN（传播到下游，不崩）。
+#
+# 实现细节：pandas 没有一步到位的 groupby+rolling+corr(other) 接口。
+# 手法：concat 成 DataFrame → groupby('ticker').apply → 每组内 rolling.corr。
+# groupby.apply 会残留 ticker 前缀 level（nlevels=3），用 droplevel(0) 清掉
+# 再 reindex 回 panel.index 做防御性对齐。
+# ---------------------------------------------------------------------------
+
+
+def _impl_corr(s1: pd.Series, s2: pd.Series, n: int) -> pd.Series:
+    df = pd.concat([s1.rename("a"), s2.rename("b")], axis=1)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        res = (
+            df.groupby(level="ticker", sort=False, group_keys=False)
+              .apply(
+                  lambda g: g["a"].rolling(n, min_periods=n).corr(g["b"]),
+                  include_groups=False,
+              )
+        )
+    # groupby.apply 可能残留 ticker 前缀 level（pandas 行为依版本而异），
+    # 一律 droplevel + reindex 做防御性对齐。
+    if res.index.nlevels > 2:
+        res = res.droplevel(0)
+    return res.reindex(s1.index)
+
+
+register_impl("CORR", _impl_corr)
+
+
 # --- 二元 / 一元运算 ---
 
 def _apply_binop(op: str, left: Any, right: Any) -> Any:

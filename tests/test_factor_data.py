@@ -1058,3 +1058,49 @@ class TestIdxMaxMin:
         result = evaluate(parse("IDXMAX($close, 1)"), panel)
         # 每个窗口只有一个元素 → argmax = 0
         assert _aaa(result).to_numpy() == pytest.approx([0.0] * 10)
+
+
+# ===========================================================================
+# m2 — CORR（per-ticker rolling 相关系数）
+# ===========================================================================
+
+class TestCorrelation:
+    def test_corr_identical_series(self, panel):
+        """CORR($close, $close, 5) ≈ 1.0（恒等相关）。"""
+        result = evaluate(parse("CORR($close, $close, 5)"), panel)
+        aaa = _aaa(result)
+        assert aaa.iloc[:4].isna().all()
+        assert aaa.iloc[4:].to_numpy() == pytest.approx([1.0] * 6, abs=1e-10)
+
+    def test_corr_anti_correlated(self, panel):
+        """CORR($close, -$close, 5) = -1.0（完美反相关）。"""
+        result = evaluate(parse("CORR($close, -$close, 5)"), panel)
+        aaa = _aaa(result)
+        assert aaa.iloc[4:].to_numpy() == pytest.approx([-1.0] * 6, abs=1e-10)
+
+    def test_corr_constant_series_nan(self, panel):
+        """恒定序列 → var=0 → 除零 → NaN，不应抛异常。"""
+        # 构造一个恒定为 1 的 Series：$close - $close + 1
+        result = evaluate(parse("CORR($close - $close + 1, $close, 5)"), panel)
+        aaa = _aaa(result)
+        # 窗口填满后所有位置应为 NaN（不是值也不是崩溃）
+        assert aaa.iloc[4:].isna().all()
+
+    def test_corr_ticker_isolation(self, panel):
+        """CORR 在每 ticker 内独立计算，不跨 ticker 串。
+        AAA close 与 volume 完全线性相关 → 1.0；BBB 两列也线性相关 → 1.0。"""
+        result = evaluate(parse("CORR($close, $volume, 5)"), panel)
+        aaa = _aaa(result).iloc[4:]
+        bbb = _bbb(result).iloc[4:]
+        # AAA close=1..10 递增，volume=100..1000 递增 → 线性相关
+        assert aaa.to_numpy() == pytest.approx([1.0] * 6, abs=1e-10)
+        # BBB close=20..11 递减，volume=200..2000 递增 → 反相关
+        assert bbb.to_numpy() == pytest.approx([-1.0] * 6, abs=1e-10)
+
+    def test_corr_output_index_matches_panel(self, panel):
+        """CORR 输出 index 必须与 panel.index 完全对齐（droplevel + reindex 防御）。"""
+        result = evaluate(parse("CORR($close, $open, 5)"), panel)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert result.index.nlevels == 2
+        # 必须能与 panel index 完全对齐（不多不少）
+        assert set(result.index) == set(panel.index)
