@@ -704,6 +704,105 @@ register_impl("SIGN",  _impl_sign)
 # overload 语义塞进 FunctionSpec.impl 签名。
 
 
+# ---------------------------------------------------------------------------
+# m2: 共享 rolling OLS kernel（SLOPE / RSQUARE / RESI 复用）
+# ---------------------------------------------------------------------------
+#
+# 约定 x 轴：窗口内位置 i ∈ [0, n-1]，0 = 窗口最早一行，n-1 = 当前行。
+# 这是 qlib Alpha158 的约定：y = β·x + α + ε，回归在"最近 n 天"上。
+#
+# 关键实现难点：Σxy 不能直接 rolling_sum(y * x_literal)，因为 x 是"窗口内位置"
+# 而不是 panel 上的列。解决方案：用 per-ticker 全局行号 k（ticker 内 0,1,2,...）
+# 做代数展开：
+#
+#   窗口 [t-n+1, t] 内，x_i = global_row_i - (t - n + 1)
+#   Σxy_t = Σ_{i ∈ window} (i - (t-n+1)) · y_i
+#         = Σ(i · y_i) − (t − n + 1) · Σy_i
+#         = rolling_sum(k · y, n) − (k_t − n + 1) · rolling_sum(y, n)
+#
+# 其中 k_t 是当前行的 per-ticker 全局行号。x 轴常数：
+#   Σx  = n(n−1)/2
+#   Σxx = n(n−1)(2n−1)/6
+#   n·Σxx − Σx² = n²(n²−1)/12  （分母 D）
+#
+# RSQUARE 闭式（避免二次 pass）：
+#   SSxx  = Σxx − (Σx)²/n = n(n²−1)/12
+#   SStot = Σyy − (Σy)²/n
+#   SSres = SStot − slope²·SSxx
+#   r²    = 1 − SSres/SStot = slope²·SSxx / SStot
+#
+# RESI（last-point 残差，与 qlib 对齐）：
+#   resi_t = y_t − (intercept + slope·(n−1))
+# ---------------------------------------------------------------------------
+
+
+def _rolling_ols(s: pd.Series, n: int) -> tuple[pd.Series, pd.Series, pd.Series]:
+    """Per-ticker rolling OLS 的闭式解。
+
+    Args:
+        s: (date, ticker) MultiIndex Series (y)
+        n: 窗口长度（≥2，由 _validate_function_args 保证）
+
+    Returns:
+        (slope, intercept, rsquare) — 三个与 s 同 index 的 Series。
+        前 n-1 行为 NaN（min_periods=n 的 rolling sum 传播）。
+    """
+    # per-ticker 全局行号 k（ticker 内 0,1,2,...），dtype=int64 → 上转 float 后参与算术
+    k = (
+        s.groupby(level="ticker", sort=False, group_keys=False)
+         .cumcount()
+         .astype(float)
+    )
+
+    sum_y  = _rolling_transform(s, n, "sum")
+    sum_ky = _rolling_transform(k * s, n, "sum")
+    sum_yy = _rolling_transform(s * s, n, "sum")
+
+    # 窗口最早一行的全局行号 k_start = k_t − n + 1
+    k_start = k - (n - 1)
+    # Σxy = Σ(k·y) − k_start · Σy
+    sum_xy = sum_ky - k_start * sum_y
+
+    # x 轴常数（Python 整数 → float 自动上转）
+    n_f = float(n)
+    sum_x  = n_f * (n_f - 1.0) / 2.0
+    sum_xx = n_f * (n_f - 1.0) * (2.0 * n_f - 1.0) / 6.0
+    denom  = n_f * sum_xx - sum_x * sum_x   # = n²(n²−1)/12，n≥2 时 > 0
+
+    slope     = (n_f * sum_xy - sum_x * sum_y) / denom
+    intercept = (sum_y - slope * sum_x) / n_f
+
+    # r² 闭式：SSxx = Σxx − (Σx)²/n，SStot = Σyy − (Σy)²/n
+    ssxx  = sum_xx - (sum_x * sum_x) / n_f
+    sstot = sum_yy - (sum_y * sum_y) / n_f
+    # 当 SStot=0（窗口内 y 恒定） → r² 无定义，NaN 传播符合 numpy 规则
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rsquare = (slope * slope) * ssxx / sstot
+
+    return slope, intercept, rsquare
+
+
+def _impl_slope(s: pd.Series, n: int) -> pd.Series:
+    slope, _, _ = _rolling_ols(s, n)
+    return slope
+
+
+def _impl_rsquare(s: pd.Series, n: int) -> pd.Series:
+    _, _, rsquare = _rolling_ols(s, n)
+    return rsquare
+
+
+def _impl_resi(s: pd.Series, n: int) -> pd.Series:
+    """Last-point residual: y_t − (intercept + slope·(n−1))."""
+    slope, intercept, _ = _rolling_ols(s, n)
+    return s - intercept - slope * (n - 1)
+
+
+register_impl("SLOPE",   _impl_slope)
+register_impl("RSQUARE", _impl_rsquare)
+register_impl("RESI",    _impl_resi)
+
+
 # --- 二元 / 一元运算 ---
 
 def _apply_binop(op: str, left: Any, right: Any) -> Any:

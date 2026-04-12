@@ -854,3 +854,112 @@ class TestMinWindowValidation:
         assert _REGISTRY["SLOPE"].min_window == 2
         assert _REGISTRY["MA"].min_window == 1
         assert _REGISTRY["CORR"].min_window == 2
+
+
+# ===========================================================================
+# m2 — 共享 rolling OLS kernel：SLOPE / RSQUARE / RESI
+# ===========================================================================
+#
+# Panel 复用 m1b _make_panel() 的线性 adj_close：
+#   AAA: adj_close = 2, 4, 6, ..., 20   （step = +2）
+#   BBB: adj_close = 40, 38, 36, ..., 22 （step = -2）
+# 完美线性 → 任意窗口 slope=±2.0，r²=1.0，resi=0.0。
+# ---------------------------------------------------------------------------
+
+
+def _make_panel_nonlinear() -> pd.DataFrame:
+    """单 ticker Fibonacci 序列 + 第二个 ticker 保持线性，用于验证 r² < 1。"""
+    rows = []
+    fib = [1, 1, 2, 3, 5, 8, 13, 21, 34, 55]
+    for i, date in enumerate(_DATES):
+        # AAA: Fibonacci (非线性)
+        rows.append({
+            "date": date, "ticker": "AAA",
+            "open": fib[i] - 0.5, "high": fib[i] + 0.5, "low": fib[i] - 1.0,
+            "close": fib[i], "adj_close": float(fib[i]), "volume": 100 * (i + 1),
+        })
+        # BBB: 线性（对照组）
+        close = 20 - i
+        rows.append({
+            "date": date, "ticker": "BBB",
+            "open": close - 0.5, "high": close + 0.5, "low": close - 1.0,
+            "close": close, "adj_close": float(close), "volume": 200 * (i + 1),
+        })
+    return pd.DataFrame(rows).set_index(["date", "ticker"]).sort_index()
+
+
+@pytest.fixture
+def panel_nonlinear() -> pd.DataFrame:
+    return _make_panel_nonlinear()
+
+
+class TestRollingOLS:
+    def test_slope_linear_aaa_window_5(self, panel):
+        """adj_close AAA = 2,4,...,20 (step=2) → 任意窗口 slope = 2.0。"""
+        result = evaluate(parse("SLOPE($close, 5)"), panel)
+        aaa = _aaa(result)
+        # 前 n-1=4 行 NaN
+        assert aaa.iloc[:4].isna().all()
+        # 其余全为 2.0
+        assert aaa.iloc[4:].to_numpy() == pytest.approx([2.0] * 6)
+
+    def test_slope_linear_bbb_negative(self, panel):
+        """BBB adj_close = 40,38,...,22 (step=-2) → slope = -2.0。"""
+        result = evaluate(parse("SLOPE($close, 5)"), panel)
+        bbb = _bbb(result)
+        assert bbb.iloc[4:].to_numpy() == pytest.approx([-2.0] * 6)
+
+    def test_slope_n_equals_2(self, panel):
+        """最小窗口 n=2，两点 OLS = 相邻差。
+        AAA step=2 → slope=2.0；BBB step=-2 → slope=-2.0。"""
+        result = evaluate(parse("SLOPE($close, 2)"), panel)
+        aaa = _aaa(result)
+        bbb = _bbb(result)
+        assert aaa.iloc[0] != aaa.iloc[0] or np.isnan(aaa.iloc[0])  # 第 0 行 NaN
+        assert aaa.iloc[1:].to_numpy() == pytest.approx([2.0] * 9)
+        assert bbb.iloc[1:].to_numpy() == pytest.approx([-2.0] * 9)
+
+    def test_rsquare_linear_is_one(self, panel):
+        """完美线性 → r² ≈ 1.0（两个 ticker 都一样）。"""
+        result = evaluate(parse("RSQUARE($close, 5)"), panel)
+        aaa = _aaa(result)
+        bbb = _bbb(result)
+        assert aaa.iloc[4:].to_numpy() == pytest.approx([1.0] * 6, abs=1e-12)
+        assert bbb.iloc[4:].to_numpy() == pytest.approx([1.0] * 6, abs=1e-12)
+
+    def test_rsquare_nonlinear_less_than_one(self, panel_nonlinear):
+        """Fibonacci 输入 → r² < 1（非线性）；线性对照组 r² = 1。"""
+        result = evaluate(parse("RSQUARE($close, 5)"), panel_nonlinear)
+        aaa_r2 = _aaa(result).iloc[4:]   # Fibonacci
+        bbb_r2 = _bbb(result).iloc[4:]   # 线性
+        # AAA 非线性：每一个 r² 都 < 1（但仍 > 0.9，因为指数增长近似线性）
+        assert (aaa_r2 < 1.0 - 1e-6).all()
+        # BBB 线性对照：r² = 1
+        assert bbb_r2.to_numpy() == pytest.approx([1.0] * 6, abs=1e-12)
+
+    def test_resi_linear_is_zero(self, panel):
+        """线性输入 → resi ≈ 0（两个 ticker 都一样）。"""
+        result = evaluate(parse("RESI($close, 5)"), panel)
+        aaa = _aaa(result)
+        bbb = _bbb(result)
+        assert aaa.iloc[4:].to_numpy() == pytest.approx([0.0] * 6, abs=1e-10)
+        assert bbb.iloc[4:].to_numpy() == pytest.approx([0.0] * 6, abs=1e-10)
+
+    def test_resi_last_point_formula(self, panel_nonlinear):
+        """RESI 必须返回最后一点的残差，不是整段残差序列。
+
+        手算 AAA Fibonacci 窗口 [i=3..5] = [3, 5, 8]，n=3：
+          Σy = 16, Σxy = Σ(i·y) − k_start·Σy where k_start = 3
+               = (3·3 + 4·5 + 5·8) − 3·16
+               = (9 + 20 + 40) − 48 = 21
+          Σx = n(n-1)/2 = 3, Σxx = n(n-1)(2n-1)/6 = 5
+          D  = n·Σxx − Σx² = 15 − 9 = 6
+          slope     = (n·Σxy − Σx·Σy) / D = (3·21 − 3·16) / 6 = (63 − 48)/6 = 2.5
+          intercept = (Σy − slope·Σx) / n = (16 − 7.5) / 3 = 8.5/3 ≈ 2.8333
+          resi_t = y_t − (intercept + slope·(n−1))
+                 = 8 − (2.8333 + 2.5·2) = 8 − 7.8333 = 0.1667
+        """
+        result = evaluate(parse("RESI($close, 3)"), panel_nonlinear)
+        # AAA 第 i=5 行（窗口 [3..5]） → 对应 iloc[5]
+        aaa_resi_5 = _aaa(result).iloc[5]
+        assert aaa_resi_5 == pytest.approx(1.0 / 6.0, abs=1e-10)
