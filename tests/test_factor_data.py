@@ -1343,3 +1343,113 @@ class TestTsQuantile:
             assert _REGISTRY[name].impl is not None, (
                 f"m3 函数 {name} 缺少 impl 注册"
             )
+
+
+# ===========================================================================
+# m3 — Alpha158 Loader / Registry / Lookback
+# ===========================================================================
+
+from stockbee.factor_data.alpha158 import Alpha158
+
+_WINDOWS = [5, 10, 20, 30, 60]
+
+_LOOKBACK_W = [
+    "ROC", "MA", "STD", "BETA", "RSQR", "RESI", "MAX", "MIN",
+    "QTLU", "QTLD", "RANK", "RSV", "IMAX", "IMIN", "IMXD",
+    "CORR", "VMA", "VSTD",
+]
+
+_LOOKBACK_W_PLUS_1 = [
+    "CORD", "CNTP", "CNTN", "CNTD", "SUMP", "SUMN", "SUMD",
+    "WVMA", "VSUMP", "VSUMN", "VSUMD",
+]
+
+
+class TestAlpha158Loader:
+    def test_factor_count_158(self):
+        assert len(Alpha158()) == 158
+
+    def test_factor_names_unique(self):
+        names = Alpha158().list_factor_names()
+        assert len(names) == len(set(names))
+
+    def test_kbar_9_factors_present(self):
+        a = Alpha158()
+        kbar = ["KMID", "KLEN", "KMID2", "KUP", "KUP2",
+                "KLOW", "KLOW2", "KSFT", "KSFT2"]
+        for name in kbar:
+            assert name in a, f"KBAR factor {name} missing"
+
+    def test_price_4_factors_present(self):
+        a = Alpha158()
+        for name in ["OPEN0", "HIGH0", "LOW0", "VWAP0"]:
+            assert name in a, f"price factor {name} missing"
+
+    def test_rolling_cartesian_expansion(self):
+        """每个 rolling 算子对 5 个窗口展开。"""
+        a = Alpha158()
+        for prefix in _LOOKBACK_W + _LOOKBACK_W_PLUS_1:
+            for w in _WINDOWS:
+                name = f"{prefix}{w}"
+                assert name in a, f"rolling factor {name} missing"
+
+    def test_exact_order_frozen(self):
+        """因子顺序是 contract，固定不变。"""
+        a = Alpha158()
+        names = a.list_factor_names()
+        assert names[:9] == [
+            "KMID", "KLEN", "KMID2", "KUP", "KUP2",
+            "KLOW", "KLOW2", "KSFT", "KSFT2",
+        ]
+        assert names[9:13] == ["OPEN0", "HIGH0", "LOW0", "VWAP0"]
+        assert names[13] == "ROC5"
+        assert names[-1] == "VSUMD60"
+
+    def test_unknown_name_raises(self):
+        a = Alpha158()
+        with pytest.raises(KeyError, match="未知因子"):
+            a.get_expression("BOGUS")
+        with pytest.raises(KeyError, match="未知因子"):
+            a.get_expression_str("BOGUS")
+
+    def test_all_158_parse_success(self):
+        """全部 158 个表达式 parse 无异常。"""
+        a = Alpha158()
+        for name in a.list_factor_names():
+            node = a.get_expression(name)
+            assert isinstance(node, Node), f"{name} parse 返回类型错误"
+
+
+class TestAlpha158Lookback:
+    """全部 158 因子 lookback 参数化断言。"""
+
+    def test_kbar_lookback_zero(self):
+        a = Alpha158()
+        for name in ["KMID", "KLEN", "KMID2", "KUP", "KUP2",
+                      "KLOW", "KLOW2", "KSFT", "KSFT2"]:
+            assert a.max_lookback(name) == 0, f"{name} expected lookback=0"
+
+    def test_price_lookback_zero(self):
+        a = Alpha158()
+        for name in ["OPEN0", "HIGH0", "LOW0", "VWAP0"]:
+            assert a.max_lookback(name) == 0, f"{name} expected lookback=0"
+
+    @pytest.mark.parametrize("w", _WINDOWS)
+    def test_simple_rolling_lookback_equals_window(self, w):
+        """18 个简单滚动算子 lookback = window。"""
+        a = Alpha158()
+        for prefix in _LOOKBACK_W:
+            name = f"{prefix}{w}"
+            assert a.max_lookback(name) == w, (
+                f"{name} expected lookback={w}, got {a.max_lookback(name)}"
+            )
+
+    @pytest.mark.parametrize("w", _WINDOWS)
+    def test_ref_nested_lookback_equals_window_plus_1(self, w):
+        """11 个 REF 嵌套算子 lookback = window + 1。"""
+        a = Alpha158()
+        for prefix in _LOOKBACK_W_PLUS_1:
+            name = f"{prefix}{w}"
+            assert a.max_lookback(name) == w + 1, (
+                f"{name} expected lookback={w+1}, got {a.max_lookback(name)}"
+            )

@@ -1,0 +1,57 @@
+# Alpha158 因子定义 — qlib 标准 158 因子集
+# 来源：qlib/contrib/data/handler.py Alpha158
+# 引擎对接：src/stockbee/factor_data/alpha158.py
+#
+# 分布：9 KBAR + 4 price + 29 rolling operators × 5 windows = 158
+# windows: [5, 10, 20, 30, 60]
+
+groups:
+  kbar:
+    - { name: KMID,  expr: "($close-$open)/$open" }
+    - { name: KLEN,  expr: "($high-$low)/$open" }
+    - { name: KMID2, expr: "($close-$open)/($high-$low+1e-12)" }
+    - { name: KUP,   expr: "($high-MAX($open,$close))/$open" }
+    - { name: KUP2,  expr: "($high-MAX($open,$close))/($high-$low+1e-12)" }
+    - { name: KLOW,  expr: "(MIN($open,$close)-$low)/$open" }
+    - { name: KLOW2, expr: "(MIN($open,$close)-$low)/($high-$low+1e-12)" }
+    - { name: KSFT,  expr: "(2*$close-$high-$low)/$open" }
+    - { name: KSFT2, expr: "(2*$close-$high-$low)/($high-$low+1e-12)" }
+
+  price:
+    - { name: OPEN0, expr: "$open/$close" }
+    - { name: HIGH0, expr: "$high/$close" }
+    - { name: LOW0,  expr: "$low/$close" }
+    - { name: VWAP0, expr: "$vwap/$close" }
+
+  rolling:
+    windows: [5, 10, 20, 30, 60]
+    operators:
+      - { name_template: "ROC{w}",  expr_template: "REF($close,{w})/$close" }
+      - { name_template: "MA{w}",   expr_template: "MEAN($close,{w})/$close" }
+      - { name_template: "STD{w}",  expr_template: "STD($close,{w})/$close" }
+      - { name_template: "BETA{w}", expr_template: "SLOPE($close,{w})/$close" }
+      - { name_template: "RSQR{w}", expr_template: "RSQUARE($close,{w})" }
+      - { name_template: "RESI{w}", expr_template: "RESI($close,{w})/$close" }
+      - { name_template: "MAX{w}",  expr_template: "MAX($high,{w})/$close" }
+      - { name_template: "MIN{w}",  expr_template: "MIN($low,{w})/$close" }
+      - { name_template: "QTLU{w}", expr_template: "TS_QUANTILE($close,{w},0.8)/$close" }
+      - { name_template: "QTLD{w}", expr_template: "TS_QUANTILE($close,{w},0.2)/$close" }
+      - { name_template: "RANK{w}", expr_template: "TS_RANK($close,{w})" }
+      - { name_template: "RSV{w}",  expr_template: "($close-MIN($low,{w}))/(MAX($high,{w})-MIN($low,{w})+1e-12)" }
+      - { name_template: "IMAX{w}", expr_template: "IDXMAX($high,{w})/{w}" }
+      - { name_template: "IMIN{w}", expr_template: "IDXMIN($low,{w})/{w}" }
+      - { name_template: "IMXD{w}", expr_template: "(IDXMAX($high,{w})-IDXMIN($low,{w}))/{w}" }
+      - { name_template: "CORR{w}", expr_template: "CORR($close,LOG($volume+1),{w})" }
+      - { name_template: "CORD{w}", expr_template: "CORR($close/REF($close,1),LOG($volume/REF($volume,1)+1),{w})" }
+      - { name_template: "CNTP{w}", expr_template: "MEAN($close>REF($close,1),{w})" }
+      - { name_template: "CNTN{w}", expr_template: "MEAN($close<REF($close,1),{w})" }
+      - { name_template: "CNTD{w}", expr_template: "MEAN($close>REF($close,1),{w})-MEAN($close<REF($close,1),{w})" }
+      - { name_template: "SUMP{w}", expr_template: "SUM(MAX($close-REF($close,1),0),{w})/(SUM(ABS($close-REF($close,1)),{w})+1e-12)" }
+      - { name_template: "SUMN{w}", expr_template: "SUM(MAX(REF($close,1)-$close,0),{w})/(SUM(ABS($close-REF($close,1)),{w})+1e-12)" }
+      - { name_template: "SUMD{w}", expr_template: "(SUM(MAX($close-REF($close,1),0),{w})-SUM(MAX(REF($close,1)-$close,0),{w}))/(SUM(ABS($close-REF($close,1)),{w})+1e-12)" }
+      - { name_template: "VMA{w}",  expr_template: "MEAN($volume,{w})/($volume+1e-12)" }
+      - { name_template: "VSTD{w}", expr_template: "STD($volume,{w})/($volume+1e-12)" }
+      - { name_template: "WVMA{w}", expr_template: "STD(ABS($close/REF($close,1)-1)*$volume,{w})/(MEAN(ABS($close/REF($close,1)-1)*$volume,{w})+1e-12)" }
+      - { name_template: "VSUMP{w}", expr_template: "SUM(MAX($volume-REF($volume,1),0),{w})/(SUM(ABS($volume-REF($volume,1)),{w})+1e-12)" }
+      - { name_template: "VSUMN{w}", expr_template: "SUM(MAX(REF($volume,1)-$volume,0),{w})/(SUM(ABS($volume-REF($volume,1)),{w})+1e-12)" }
+      - { name_template: "VSUMD{w}", expr_template: "(SUM(MAX($volume-REF($volume,1),0),{w})-SUM(MAX(REF($volume,1)-$volume,0),{w}))/(SUM(ABS($volume-REF($volume,1)),{w})+1e-12)" }
