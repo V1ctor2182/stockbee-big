@@ -82,10 +82,10 @@ timeline:
           target_start: "2026-04-07"
           target_end: "2026-04-16"
           estimated_days: 7
-          status: planning
-          completion: 0.0
+          status: completed
+          completion: 1.0
           depends_on: ["07-provider-arch"]
-          note: "研究完成，与 stock-data 并行"
+          note: "6/6 milestones completed — Room done"
 
         - room: "03-macro-data"
           parent: "02-data-architecture"
@@ -116,10 +116,10 @@ timeline:
           target_start: "2026-04-21"
           target_end: "2026-05-02"
           estimated_days: 9
-          status: planning
-          completion: 0.0
+          status: completed
+          completion: 1.0
           depends_on: ["02-news-data"]
-          note: "研究完成，多模型路由+降级链"
+          note: "已完成 2026-04-08, litellm + 降级链 + CostTracker"
 
         - room: "02-small-models"
           parent: "03-model-system"
@@ -508,8 +508,8 @@ timeline:
     phase_1_rooms: 26
     phase_2_rooms: 11
     phase_3_rooms: 3
-    completed: 4
+    completed: 5
     in_progress: 0
-    planning: 22
+    planning: 21
     backlog: 14
-    completion: 0.10
+    completion: 0.125

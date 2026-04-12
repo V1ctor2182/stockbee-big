@@ -1,0 +1,31 @@
+spec_id: "change-2026-04-07-m6-edge-cases"
+type: change
+state: active
+intent:
+  summary: "25 edge case tests — security, data integrity, boundary, timezone, pipeline risks"
+  detail: |
+    Plan A (module-by-module) + Plan B (risk-based) 合并的高价值 tests:
+    - Security (2): SQL injection 参数化查询验证, XSS 原样存储验证
+    - Data Integrity (5): g_levels monotonic, scores 跨级保留, daily count 一致性,
+      batch rollback, junction table cascade delete
+    - Boundary (7): G3 sentiment 0.9/0.1 精确边界 (> not >=),
+      G1 max_age 7天边界, G2 topic tie-break 确定性, dedup 标点差异
+    - Pipeline Risks (5): G2 batch 长度一致性, nonexistent update_g_level,
+      G3 失败不递增计数, 空 headline 去重丢弃, Perplexity citations 溢出
+    - Timezone (2): G3 日限额 UTC 日期边界, G1 混合时区 timestamp
+    - Robustness (4): None 输入, 错误类型, SyncResult 默认值, 动态添加 source
+constraints: []
+indexing:
+  type: change
+  priority: medium
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["test", "edge-case", "security", "data-integrity", "boundary", "timezone"]
+provenance:
+  source_type: commit
+  confidence: 1.0
+  source_ref: "commit on news_data branch, 2026-04-07"
+relations:
+  - { type: implements, target: "intent-02-news-data-001", reason: "m6 测试完成" }
+anchors:
+  - { file: "tests/test_news_data.py", type: test }

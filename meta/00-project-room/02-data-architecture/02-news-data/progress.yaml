@@ -1,20 +1,128 @@
 progress:
-  completion: 0.0
+  completion: 1.0
   milestones:
-    - id: "m1-news_events-表设计"
-      name: "news_events 表设计"
-      status: pending
-      completed_at: null
-    - id: "m2-G1-过滤入库"
-      name: "G1 过滤入库"
-      status: pending
-      completed_at: null
-    - id: "m3-分级字段存储"
-      name: "分级字段存储"
-      status: pending
-      completed_at: null
-    - id: "m4-测试"
+    - id: "m1-SqliteNewsProvider"
+      name: "SqliteNewsProvider — news_events 表 + 查询接口"
+      status: completed
+      completed_at: "2026-04-04"
+      estimated_files: ["src/stockbee/news_data/news_store.py"]
+      estimated_lines: 200
+      depends_on: []
+      description: |
+        SQLite WAL 模式，news_events 表完整 schema（id, timestamp, source, tickers,
+        headline, snippet, sentiment_score, importance_score, reliability_score,
+        g_level, analysis）。实现 NewsProvider.get_news() 支持按 ticker/时间范围/
+        重要度/g_level 多条件查询。insert_news() 写入 + 去重（同新闻不同源只保留一条）。
+        Edge cases: 空 tickers、超长 headline 截断、timestamp 时区归一化（UTC）、
+        并发写入安全（WAL）、SQL 注入防护（参数化查询）。
+    - id: "m2-G1-快速过滤"
+      name: "G1 快速过滤管道"
+      status: completed
+      completed_at: "2026-04-04"
+      estimated_files: ["src/stockbee/news_data/g1_filter.py"]
+      estimated_lines: 150
+      depends_on: ["m1-SqliteNewsProvider"]
+      description: |
+        来源合法性检查（可配置黑名单 domain 列表）。发布时间校验（拒绝超过 N 天的旧新闻，
+        处理时区差异）。去重（标题相似度 + URL 精确匹配，同新闻多源只保留最早一条）。
+        实体识别（从标题/摘要提取 ticker，支持公司全名→ticker 模糊匹配）。
+        Edge cases: 非英语新闻、标题为空/纯特殊字符、timestamp 缺失或格式异常、
+        相似但不同的新闻（如同一事件的更新报道）、ticker 误匹配（如 "Apple" 水果 vs AAPL）。
+    - id: "m3-G2-FinBERT-分类"
+      name: "G2 FinBERT 分类评分"
+      status: completed
+      completed_at: "2026-04-05"
+      estimated_files: ["src/stockbee/news_data/g2_classifier.py"]
+      estimated_lines: 180
+      depends_on: ["m2-G1-快速过滤"]
+      description: |
+        FinBERT 本地推理：情绪三分类 (positive/neutral/negative) + confidence 置信度。
+        主题分类：收益/合规/并购/诉讼/政策/产品/其他。重要度评分 (0-1)。
+        紧急度评分 (high/medium/low)。依赖 transformers + torch。
+        Edge cases: 模型首次加载耗时（lazy init + 缓存）、GPU 不可用时 CPU fallback、
+        输入超过 512 tokens 截断策略、空文本 / 纯数字文本、FinBERT 对非英语文本
+        置信度低时的降级处理、batch 推理优化（多条新闻一次处理）。
+    - id: "m4-G3-深度分析"
+      name: "G3 深度分析 (Claude Haiku)"
+      status: completed
+      completed_at: "2026-04-07"
+      estimated_files: ["src/stockbee/news_data/g3_analyzer.py"]
+      estimated_lines: 120
+      depends_on: ["m3-G2-FinBERT-分类"]
+      description: |
+        触发条件：importance > 0.7 且 urgency=high，或 sentiment 极端 (>0.9/<0.1)。
+        Claude Haiku 全文分析：影响评估 (±X%)、权重调整建议、新闻真伪评估。
+        日限 10 篇计数器（SQLite 存储当日已分析数）。依赖 anthropic SDK。
+        Edge cases: API 超时/限流重试（exponential backoff）、日限额用完后的排队策略
+        （按 importance 排序缓冲）、API key 缺失时优雅降级（跳过 G3）、
+        Haiku 返回格式异常时的 fallback 解析、极长新闻的 token 截断。
+    - id: "m5-数据源与同步"
+      name: "NewsAPI + Perigon + Perplexity + NewsDataSyncer"
+      status: completed
+      completed_at: "2026-04-07"
+      estimated_files: ["src/stockbee/news_data/newsapi_source.py", "src/stockbee/news_data/perplexity_source.py", "src/stockbee/news_data/sync.py"]
+      estimated_lines: 220
+      depends_on: ["m4-G3-深度分析"]
+      description: |
+        NewsAPI 集成（免费层 ~500条/天）：按关键词/来源/日期拉取。
+        Perplexity API 集成：与 NewsAPI 同级的新闻拉取源。
+        NewsDataSyncer 编排：fetch → G1 filter → store → G2 classify → G3 analyze（条件触发）。
+        实现 ingest_news(source)。
+        Edge cases: API rate limit 处理、网络中断断点续传、两个源返回相同新闻的跨源去重、
+        NewsAPI 免费层日限额耗尽的降级、Perplexity 返回非新闻内容的过滤、
+        增量同步时间窗口重叠（避免漏取）。
+    - id: "m6-测试"
       name: "测试"
-      status: pending
-      completed_at: null
-  commits: []
+      status: completed
+      completed_at: "2026-04-07"
+      estimated_files: ["tests/test_news_data.py"]
+      estimated_lines: 280
+      depends_on: ["m5-数据源与同步"]
+      description: |
+        SQLite CRUD、去重逻辑、多条件查询。G1 各过滤条件（黑名单、时间、去重、实体识别）。
+        G2 FinBERT mock（情绪输出格式、主题分类覆盖、batch 处理）。
+        G3 Haiku mock（触发条件、日限计数、降级）。同步管道 mock 端到端。
+        Edge cases 专项测试：空数据、异常输入、时区边界、并发写入。
+  commits:
+    - hash: "85114fe"
+      date: "2026-04-05"
+      message: "[02-news-data] test: add 52 G2 classifier tests — mock FinBERT, batch, rules, integration"
+      files_changed: 1
+      specs_affected:
+        - intent-02-news-data-001 (no change — 3/6 milestones done, draft kept)
+      milestones_affected:
+        - m2-G1-快速过滤 (→ completed, catch-up from f5152e2)
+        - m3-G2-FinBERT-分类 (→ completed, catch-up from a026aff)
+        - m6-测试 (→ in_progress)
+    - hash: "9b19464"
+      date: "2026-04-05"
+      message: "[02-news-data] refactor: word-boundary regex for G1 ticker + G2 keyword matching"
+      files_changed: 3
+      specs_affected:
+        - change-2026-04-05-word-boundary (created)
+      milestones_affected: []
+    - hash: "54cb445"
+      date: "2026-04-07"
+      message: "[02-news-data] feat: add G3 Analyzer — Claude Haiku deep analysis + 40 tests"
+      files_changed: 3
+      specs_affected:
+        - intent-02-news-data-001 (draft → active)
+        - change-2026-04-07-g3-analyzer (created)
+      milestones_affected:
+        - m4-G3-深度分析 (→ completed)
+    - hash: "8e904b6"
+      date: "2026-04-07"
+      message: "[02-news-data] feat: add 3 news sources + NewsDataSyncer pipeline + 39 tests"
+      files_changed: 7
+      specs_affected:
+        - change-2026-04-07-m5-sources-sync (created)
+      milestones_affected:
+        - m5-数据源与同步 (→ completed)
+    - hash: "fdbc33e"
+      date: "2026-04-07"
+      message: "[02-news-data] test: add 25 edge case tests — security, integrity, boundary, timezone"
+      files_changed: 1
+      specs_affected:
+        - change-2026-04-07-m6-edge-cases (created)
+      milestones_affected:
+        - m6-测试 (→ completed)

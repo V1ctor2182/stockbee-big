@@ -1,23 +1,49 @@
 spec_id: "intent-01-llm-routing-001"
 type: intent
-state: draft
+state: active
 intent:
-  summary: "按任务选模型，G1/G2/G3 分级路由，降级链"
+  summary: "litellm 多模型路由器 + 降级链 + 成本追踪 + 响应缓存"
   detail: |
-    G1 GPT-4.1 nano (<$1)，G2 Claude Sonnet 4 (<$2)，G3 GPT-4.1 (<$5)，SEC GPT-4.1 long (<$3)，宏观 Claude Sonnet 4 (<$4)。降级链：主模型→备选→缓存→禁用信号。
+    LLM Routing 模块提供统一的 LLM 调用接口，按任务类型选择最优模型。
 
-来源：Tech Design §3.2
-研究状态：研究完成 (research-llm-selection.md)
-constraints: []
+    1. LLMRouter（路由核心）
+       - route(task_type, prompt, system_prompt?, output_schema?) → LLMResponse
+       - 统一调用接口 via litellm（屏蔽 OpenAI/Anthropic SDK 差异）
+       - 降级链：主模型 → 备选模型 → RuntimeError（可配置重试次数）
+       - JSON 输出自动解析（含 markdown code block 处理）
+       - 简单 schema 验证（检查 required 字段）
+       - set_completion_fn() 替换底层调用（测试 mock 用）
+       - task-agnostic：不包含 G1/G2/G3 业务逻辑
+
+    2. TaskConfig（任务配置）
+       - 5 种 TaskType: G1_FILTER, G2_CLASSIFY, G3_ANALYSIS, SEC_PARSE, MACRO_ANALYSIS
+       - 每种配置：model, fallback_model, max_tokens, temperature, output_format, monthly_budget
+       - DEFAULT_TASK_CONFIGS 映射 Tech Design §3.2 的模型选择
+       - TOTAL_MONTHLY_BUDGET = $15
+
+    3. CostTracker（成本追踪 + 缓存）
+       - SQLite 两张表：llm_calls（调用历史）+ llm_cache（响应缓存）
+       - record_call：记录调用 + 自动更新缓存
+       - get_cached：SHA256 prompt hash 去重，返回上次成功响应
+       - is_over_budget / monthly_spent：月度预算检查
+       - monthly_report：按任务类型分组的成本报告
+constraints:
+  - "constraint-01-llm-routing-001"
+  - "constraint-01-llm-routing-002"
+  - "constraint-01-llm-routing-003"
 indexing:
   type: intent
   priority: high
-  layer: epic
+  layer: feature
   domain: "quantitative-trading"
-  tags: []
+  tags: ["llm", "routing", "litellm", "cost-tracking", "fallback"]
 provenance:
-  source_type: prd_extraction
-  confidence: 0.8
-  source_ref: "PRD + Feature Hierarchy + Tech Design"
-relations: []
-anchors: []
+  source_type: implementation_verified
+  confidence: 1.0
+  source_ref: "src/stockbee/llm_routing/, Tech Design §3.2"
+relations:
+  - { type: depends_on, target: "intent-07-provider-arch-001", reason: "复用 Provider 设计模式" }
+anchors:
+  - { file: "src/stockbee/llm_routing/router.py", type: implementation }
+  - { file: "src/stockbee/llm_routing/task_config.py", type: implementation }
+  - { file: "src/stockbee/llm_routing/cost_tracker.py", type: implementation }

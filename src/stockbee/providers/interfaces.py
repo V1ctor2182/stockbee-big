@@ -228,6 +228,7 @@ class NewsProvider(BaseProvider):
         end: datetime | None = None,
         min_importance: float = 0.0,
         g_level: int | None = None,
+        limit: int = 1000,
     ) -> pd.DataFrame:
         """查询新闻事件。
 

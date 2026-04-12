@@ -1,19 +1,32 @@
 spec_id: "constraint-01-llm-routing-001"
 type: constraint
-state: draft
+state: active
 intent:
-  summary: "月度合计 < $15"
-  detail: ""
-constraints: []
+  summary: "月度 LLM 成本 < $15，按任务类型分配预算"
+  detail: |
+    5 种任务类型的月度预算分配：
+    - G1_FILTER: $1（GPT-4.1 nano，标题+摘要 100-300 tokens）
+    - G2_CLASSIFY: $2（Claude Sonnet 4，摘要+正文 500-1k tokens）
+    - G3_ANALYSIS: $5（GPT-4.1，完整新闻+持仓 2-5k tokens）
+    - SEC_PARSE: $3（GPT-4.1 long context，60k tokens）
+    - MACRO_ANALYSIS: $4（Claude Sonnet 4，FRED 指标 2k tokens）
+
+    CostTracker 实时累计，is_over_budget() 超限时调用方应降级到缓存。
+constraints:
+  - "TOTAL_MONTHLY_BUDGET = $15"
+  - "CostTracker 按月累计，跨月自动归零"
+  - "超预算时 is_over_budget() 返回 True，由调用方决定降级策略"
 indexing:
   type: constraint
   priority: high
-  layer: epic
+  layer: feature
   domain: "quantitative-trading"
-  tags: []
+  tags: ["cost", "budget", "llm"]
 provenance:
-  source_type: prd_extraction
-  confidence: 0.9
-  source_ref: "Tech Design §3.2"
+  source_type: implementation_verified
+  confidence: 1.0
+  source_ref: "Tech Design §3.2, src/stockbee/llm_routing/cost_tracker.py"
 relations: []
-anchors: []
+anchors:
+  - { file: "src/stockbee/llm_routing/cost_tracker.py", type: implementation }
+  - { file: "src/stockbee/llm_routing/task_config.py", type: implementation }
