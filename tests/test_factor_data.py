@@ -804,3 +804,53 @@ class TestMaxMinScalarConstants:
         result = evaluate(parse("MAX($close, 3)"), panel)
         # 之前已经验证过的数值，必须依然正确
         assert _aaa(result).iloc[2] == pytest.approx(6.0)
+
+
+# ===========================================================================
+# m2 — 最小窗口校验（FunctionSpec.min_window）
+# ===========================================================================
+#
+# SLOPE/RSQUARE/RESI/CORR/EMA 的 n=1 数学上退化（OLS 分母为 0，EMA α=1 不平滑），
+# _validate_function_args 必须在 parse 阶段就 raise，不能让 n=1 流到 Evaluator。
+# m1b 的 REF/MA/STD/SUM/DELTA/IDXMAX/IDXMIN 仍保持 min_window=1。
+# ---------------------------------------------------------------------------
+
+class TestMinWindowValidation:
+    def test_slope_n1_rejected(self):
+        """SLOPE 要求 min_window=2，n=1 → ParseError。"""
+        with pytest.raises(ParseError, match="≥2"):
+            parse("SLOPE($close, 1)")
+
+    def test_ema_n1_rejected(self):
+        """EMA 要求 min_window=2。"""
+        with pytest.raises(ParseError, match="≥2"):
+            parse("EMA($close, 1)")
+
+    def test_corr_n1_rejected(self):
+        """CORR 要求 min_window=2。"""
+        with pytest.raises(ParseError, match="≥2"):
+            parse("CORR($close, $open, 1)")
+
+    def test_rsquare_n1_rejected(self):
+        with pytest.raises(ParseError, match="≥2"):
+            parse("RSQUARE($close, 1)")
+
+    def test_resi_n1_rejected(self):
+        with pytest.raises(ParseError, match="≥2"):
+            parse("RESI($close, 1)")
+
+    def test_ma_n1_still_allowed(self):
+        """m1b 函数 min_window=1 保持不变，不应被本次改动破坏。"""
+        # 不抛异常即通过
+        parse("MA($close, 1)")
+        parse("REF($close, 1)")
+
+    def test_idxmax_n1_allowed(self):
+        """IDXMAX 保持 min_window=1（单元素窗口 argmax=0 合法）。"""
+        parse("IDXMAX($close, 1)")
+
+    def test_min_window_field_exists_on_spec(self):
+        """契约测试：FunctionSpec 必须暴露 min_window 字段。"""
+        assert _REGISTRY["SLOPE"].min_window == 2
+        assert _REGISTRY["MA"].min_window == 1
+        assert _REGISTRY["CORR"].min_window == 2

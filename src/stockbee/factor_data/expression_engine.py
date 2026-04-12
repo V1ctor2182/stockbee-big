@@ -292,6 +292,8 @@ class FunctionSpec:
         rolling_arg_index:  窗口参数的下标（None 表示无滚动窗口）
         overloaded_max_min: True 表示 MAX/MIN 重载（看 arg[rolling_arg_index] 类型决定）
         cross_section:      True 表示横截面语义（QUANTILE），lookback 不加窗口
+        min_window:         滚动窗口的最小合法值（parse 阶段校验）。默认 1。
+                            SLOPE/RSQUARE/RESI/CORR/EMA 需 ≥2（n=1 时数学上退化）。
         impl:               函数实现（m1b/m2 通过 register_impl 填入）
     """
     name: str
@@ -300,6 +302,7 @@ class FunctionSpec:
     rolling_arg_index: int | None = None
     overloaded_max_min: bool = False
     cross_section: bool = False
+    min_window: int = 1
     impl: Callable[..., Any] | None = field(default=None, compare=False)
 
 
@@ -314,6 +317,7 @@ def _reg(
     rolling_arg_index: int | None = None,
     overloaded_max_min: bool = False,
     cross_section: bool = False,
+    min_window: int = 1,
 ) -> None:
     _REGISTRY[name] = FunctionSpec(
         name=name,
@@ -322,16 +326,20 @@ def _reg(
         rolling_arg_index=rolling_arg_index,
         overloaded_max_min=overloaded_max_min,
         cross_section=cross_section,
+        min_window=min_window,
     )
 
 
-# --- 滚动函数：rolling_arg_index=1（arg0=data, arg1=window） ---
-for _n in ("REF", "DELAY", "MA", "MEAN", "STD", "SUM", "DELTA",
-           "EMA", "SLOPE", "RSQUARE", "RESI", "IDXMAX", "IDXMIN"):
+# --- 滚动函数（min_window=1）：窗口位置已用 ≥1 校验即可 ---
+for _n in ("REF", "DELAY", "MA", "MEAN", "STD", "SUM", "DELTA", "IDXMAX", "IDXMIN"):
     _reg(_n, min_arity=2, max_arity=2, rolling_arg_index=1)
 
-# --- CORR：arg0=data1, arg1=data2, arg2=window ---
-_reg("CORR", min_arity=3, max_arity=3, rolling_arg_index=2)
+# --- OLS/EMA 系列（min_window=2）：n=1 时数学退化或除零 ---
+for _n in ("EMA", "SLOPE", "RSQUARE", "RESI"):
+    _reg(_n, min_arity=2, max_arity=2, rolling_arg_index=1, min_window=2)
+
+# --- CORR：arg0=data1, arg1=data2, arg2=window，n=1 时样本相关系数无定义 ---
+_reg("CORR", min_arity=3, max_arity=3, rolling_arg_index=2, min_window=2)
 
 # --- element-wise 函数 ---
 _reg("ABS",  min_arity=1, max_arity=1)
@@ -375,17 +383,17 @@ def _validate_function_args(call: "FunctionCall", pos: int) -> None:
     """
     spec = _REGISTRY[call.name]
 
-    # --- 1. 严格滚动函数：窗口必须是正整数常量 ---
+    # --- 1. 严格滚动函数：窗口必须是整数常量且 ≥ spec.min_window ---
     if spec.rolling_arg_index is not None and not spec.overloaded_max_min:
         win_node = call.args[spec.rolling_arg_index]
         if not (
             isinstance(win_node, Constant)
             and isinstance(win_node.value, int)
-            and win_node.value >= 1
+            and win_node.value >= spec.min_window
         ):
             raise ParseError(
                 f"函数 {call.name} 的窗口参数（位置 {spec.rolling_arg_index}）"
-                f"必须是 ≥1 的整数常量，实际为 {win_node!r}",
+                f"必须是 ≥{spec.min_window} 的整数常量，实际为 {win_node!r}",
                 pos,
             )
 
