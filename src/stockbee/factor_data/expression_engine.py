@@ -883,6 +883,63 @@ def _impl_corr(s1: pd.Series, s2: pd.Series, n: int) -> pd.Series:
 register_impl("CORR", _impl_corr)
 
 
+# ---------------------------------------------------------------------------
+# m2: 横截面函数（RANK / QUANTILE）+ element-wise IF
+# ---------------------------------------------------------------------------
+#
+# RANK/QUANTILE 约定为横截面语义（spec.md 2026-04-11 决策），
+# 在每个 date 内对所有 ticker 做排序 / 分位数，不是时序 rolling。
+# lookback = 0（m1a 已在 FunctionSpec.cross_section=True 分支里处理）。
+#
+# IF 是纯 element-wise，三个参数都可能是 Series 或 scalar。
+# 支持 6 种合法组合（cond ∈ {Series, bool, int/float}, a/b ∈ {Series, scalar}）。
+# scalar cond 来自于两个常量比较（如 IF(1>0, $close, $open)），此时 _apply_binop
+# 返回 Python bool 或 numpy bool_，需要特判走标量路径。
+# ---------------------------------------------------------------------------
+
+
+def _impl_rank(s: pd.Series) -> pd.Series:
+    """横截面 rank (pct=True)。单 ticker 的日期返回 1.0，不 NaN。
+    NaN 输入保持 NaN（na_option='keep' 是 pandas 默认）。"""
+    return (
+        s.groupby(level="date", sort=False, group_keys=False)
+         .rank(pct=True)
+    )
+
+
+def _impl_quantile(s: pd.Series, q: float) -> pd.Series:
+    """横截面 q 分位数，broadcast 回 (date, ticker)。
+    使得 IF($close > QUANTILE($close, 0.5), ...) 这类表达式可用。"""
+    return (
+        s.groupby(level="date", sort=False, group_keys=False)
+         .transform(lambda g: g.quantile(q))
+    )
+
+
+def _impl_if(cond: Any, a: Any, b: Any) -> Any:
+    """三元 IF：cond 为真 → a，否则 → b。
+
+    类型矩阵：
+      - scalar cond (Python bool / np.bool_)：直接返回 a 或 b
+      - Series cond：用 np.where 组合 a/b（可能是 Series 或 scalar），
+        输出 Series 对齐 cond.index
+    """
+    # 标量 cond 路径（_apply_binop 对两个常量比较会返回 bool / np.bool_）
+    if not isinstance(cond, pd.Series):
+        return a if bool(cond) else b
+
+    # Series cond 路径
+    a_arr = a.to_numpy() if isinstance(a, pd.Series) else a
+    b_arr = b.to_numpy() if isinstance(b, pd.Series) else b
+    result = np.where(cond.to_numpy(), a_arr, b_arr)
+    return pd.Series(result, index=cond.index)
+
+
+register_impl("RANK",     _impl_rank)
+register_impl("QUANTILE", _impl_quantile)
+register_impl("IF",       _impl_if)
+
+
 # --- 二元 / 一元运算 ---
 
 def _apply_binop(op: str, left: Any, right: Any) -> Any:

@@ -1,5 +1,5 @@
 progress:
-  completion: 0.25   # 2/8 milestones done
+  completion: 0.375   # 3/8 milestones done
   milestones:
     - id: "m1a-tokenizer-parser"
       name: "Tokenizer + Parser + AST"
@@ -43,17 +43,28 @@ progress:
 
     - id: "m2-advanced-functions"
       name: "高级表达式函数"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-11"
+      actual_files:
+        - "src/stockbee/factor_data/expression_engine.py"
+        - "tests/test_factor_data.py"
+        - "meta/00-project-room/02-data-architecture/04-factor-storage/spec.md"
+      actual_lines: 687   # engine +244 / tests +443
       estimated_files: ["src/stockbee/factor_data/expression_engine.py", "tests/test_factor_data.py"]
       estimated_lines: 300
       depends_on: [m1b-evaluator-basic-funcs]
       complexity_flags: [first_of_kind]
       description: |
         追加 10 个函数：EMA, SLOPE, RSQUARE, RESI, CORR, RANK, IF, QUANTILE, IDXMAX, IDXMIN。
-        SLOPE/RSQUARE/RESI 共享 rolling OLS（用 rolling sum 代数展开，非 apply(lstsq)）。
-        RANK/QUANTILE 默认横截面（cross-section at each date），非时序。
-        测试：≥2 tickers 验证横截面 RANK；rolling OLS 用 numpy 线性数据验证斜率精度。
+        SLOPE/RSQUARE/RESI 共享 _rolling_ols kernel：per-ticker cumcount() 做全局行号 k，
+        Σxy = Σ(k·y) − (k_t−n+1)·Σy 代数展开，避免 rolling.apply(lstsq) 慢路径。
+        RSQUARE 闭式 r² = slope²·SSxx/SStot。RESI = last-point residual（qlib 约定）。
+        RANK/QUANTILE 横截面（groupby level='date'），QUANTILE 广播回 (date,ticker)。
+        IF 支持 6 种 (cond, a, b) 标量/Series 组合。CORR via concat + apply + droplevel。
+        FunctionSpec 加 min_window 字段，EMA/SLOPE/RSQUARE/RESI/CORR 设为 2（n=1 数学退化）。
+        EMA 决策：pandas ewm(adjust=False) IIR 递推，与 qlib FIR 在前 ~2n 行有差异（见 spec.md）。
+        Evaluator dispatch 零改动——m1a 预留的 cross_section/rolling_arg_index 元数据完全够用。
+        43 个 m2 test case，全量 122 pass。5 commit 按函数分组落盘。
 
     - id: "m3-alpha158-full"
       name: "Alpha158 全量因子定义"

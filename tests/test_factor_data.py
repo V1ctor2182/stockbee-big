@@ -1104,3 +1104,146 @@ class TestCorrelation:
         assert result.index.nlevels == 2
         # 必须能与 panel index 完全对齐（不多不少）
         assert set(result.index) == set(panel.index)
+
+
+# ===========================================================================
+# m2 — 横截面函数（RANK / QUANTILE）+ element-wise IF
+# ===========================================================================
+#
+# Panel 设计确保两 ticker 每日可比：
+#   AAA adj_close = 2, 4, ..., 20 （递增）
+#   BBB adj_close = 40, 38, ..., 22（递减）
+# Day 0: AAA=2  BBB=40 → AAA rank=0.5, BBB rank=1.0（BBB 大）
+# Day 9: AAA=20 BBB=22 → AAA rank=0.5, BBB rank=1.0（BBB 仍大）
+# BBB adj_close 始终 > AAA → BBB rank=1.0, AAA rank=0.5，每日恒定。
+# ---------------------------------------------------------------------------
+
+
+class TestCrossSectionRank:
+    def test_rank_cross_section_two_tickers(self, panel):
+        """BBB adj_close 每日都大于 AAA → BBB rank=1.0, AAA rank=0.5。"""
+        result = evaluate(parse("RANK($close)"), panel)
+        aaa = _aaa(result)
+        bbb = _bbb(result)
+        # pct=True + 2 个 ticker → 小的=0.5, 大的=1.0
+        assert aaa.to_numpy() == pytest.approx([0.5] * 10)
+        assert bbb.to_numpy() == pytest.approx([1.0] * 10)
+
+    def test_rank_single_ticker_date(self):
+        """单 ticker 退化：每日只有一个值 → rank=1.0（不 NaN 不崩）。"""
+        df = pd.DataFrame(
+            {"open": [1.0, 2.0], "high": [1.5, 2.5], "low": [0.5, 1.5],
+             "close": [1.0, 2.0], "adj_close": [1.0, 2.0], "volume": [100, 200]},
+            index=pd.MultiIndex.from_tuples(
+                [(pd.Timestamp("2024-01-01"), "AAA"),
+                 (pd.Timestamp("2024-01-02"), "AAA")],
+                names=["date", "ticker"],
+            ),
+        )
+        result = evaluate(parse("RANK($close)"), df)
+        assert result.to_numpy() == pytest.approx([1.0, 1.0])
+
+    def test_rank_nan_input(self, panel):
+        """NaN 输入保留 NaN（pandas rank 默认 na_option='keep'）。
+        构造：LOG(0) = -inf（numpy 警告忽略），LOG(-1) = NaN。这里用 REF 制造前缀 NaN。"""
+        result = evaluate(parse("RANK(REF($close, 3))"), panel)
+        # 前 3 行 REF 是 NaN，因此 RANK 也应是 NaN
+        aaa = _aaa(result)
+        assert aaa.iloc[:3].isna().all()
+        # 第 3 行起有值（两 ticker 都能参与排序）
+        assert not aaa.iloc[3:].isna().any()
+
+
+class TestCrossSectionQuantile:
+    def test_quantile_median_broadcast(self, panel):
+        """q=0.5 两 ticker → 每日返回两值中位数，AAA/BBB 同值。
+        Day 0: median(2, 40) = 21.0  （adj_close 空间）
+        Day 9: median(20, 22) = 21.0
+        """
+        result = evaluate(parse("QUANTILE($close, 0.5)"), panel)
+        # 两 ticker 同一日期应得到相同值（广播）
+        for date in _DATES:
+            aaa_val = result.loc[(date, "AAA")]
+            bbb_val = result.loc[(date, "BBB")]
+            assert aaa_val == pytest.approx(bbb_val)
+        # 第 0 天中位数
+        assert result.loc[(_DATES[0], "AAA")] == pytest.approx(21.0)
+
+    def test_quantile_multiindex_shape(self, panel):
+        """QUANTILE 输出 index 与 panel.index 完全一致（shape preservation via transform）。"""
+        result = evaluate(parse("QUANTILE($close, 0.5)"), panel)
+        assert isinstance(result.index, pd.MultiIndex)
+        assert set(result.index) == set(panel.index)
+        assert len(result) == len(panel)
+
+    def test_quantile_usable_in_if_predicate(self, panel):
+        """QUANTILE 广播语义的意义：允许 IF($close > QUANTILE($close, 0.5), ...)。"""
+        result = evaluate(
+            parse("IF($close > QUANTILE($close, 0.5), 1, 0)"),
+            panel,
+        )
+        # BBB 每日都高于中位数 → 1，AAA 每日都低于中位数 → 0
+        assert _bbb(result).to_numpy() == pytest.approx([1] * 10)
+        assert _aaa(result).to_numpy() == pytest.approx([0] * 10)
+
+
+class TestIfFunction:
+    def test_if_series_cond_series_branches(self, panel):
+        """IF(Series, Series, Series) → 按 cond 逐点挑选。
+        $close > $open 恒为 True（open=close-0.5）→ 全部取 $close。"""
+        result = evaluate(parse("IF($close > $open, $close, $open)"), panel)
+        pd.testing.assert_series_equal(
+            result.sort_index(),
+            panel["adj_close"].sort_index(),
+            check_names=False,
+        )
+
+    def test_if_series_cond_scalar_branches(self, panel):
+        """IF(Series, scalar, scalar) → 全 1（cond 恒 True）。"""
+        result = evaluate(parse("IF($close > $open, 1, -1)"), panel)
+        assert result.to_numpy() == pytest.approx([1] * 20)
+
+    def test_if_scalar_cond_scalar_branches(self, panel):
+        """IF(scalar, scalar, scalar) → 纯标量路径，返回原生数字。"""
+        result = evaluate(parse("IF(1 > 0, 42, -1)"), panel)
+        assert result == 42
+        result2 = evaluate(parse("IF(0 > 1, 42, -1)"), panel)
+        assert result2 == -1
+
+    def test_if_scalar_cond_series_branches(self, panel):
+        """IF(scalar, Series, Series) → 标量 cond 直接选分支（返回整条 Series）。"""
+        result = evaluate(parse("IF(1 > 0, $close, $open)"), panel)
+        # cond 为 True → 返回 $close = adj_close
+        pd.testing.assert_series_equal(
+            result.sort_index(),
+            panel["adj_close"].sort_index(),
+            check_names=False,
+        )
+
+
+class TestAdvancedIntegration:
+    def test_nested_ma_slope(self, panel):
+        """MA(SLOPE($close, 5), 3) — 验证 SLOPE 输出可嵌入另一个 rolling。
+        线性 panel 下 SLOPE=2.0（AAA）/ -2.0（BBB），再 MA(.,3) 仍 = ±2.0。"""
+        result = evaluate(parse("MA(SLOPE($close, 5), 3)"), panel)
+        aaa = _aaa(result)
+        bbb = _bbb(result)
+        # SLOPE 前 4 行 NaN，再 MA 需要 3 行有效 → 前 4+2=6 行 NaN
+        assert aaa.iloc[:6].isna().all()
+        assert aaa.iloc[6:].to_numpy() == pytest.approx([2.0] * 4)
+        assert bbb.iloc[6:].to_numpy() == pytest.approx([-2.0] * 4)
+
+    def test_nested_ma_slope_lookback(self):
+        """nested lookback：MA(SLOPE($close,5),3) = 5+3 = 8（嵌套相加）。"""
+        assert parse("MA(SLOPE($close, 5), 3)").lookback() == 8
+
+    def test_m2_impls_all_registered(self):
+        """契约冒烟：m2 的 10 个函数必须全部有 impl 注册。"""
+        m2_funcs = (
+            "EMA", "SLOPE", "RSQUARE", "RESI", "CORR",
+            "RANK", "QUANTILE", "IF", "IDXMAX", "IDXMIN",
+        )
+        for name in m2_funcs:
+            assert _REGISTRY[name].impl is not None, (
+                f"m2 函数 {name} 缺少 impl 注册"
+            )
