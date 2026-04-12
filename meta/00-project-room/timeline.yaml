@@ -79,10 +79,10 @@ timeline:
           target_start: "2026-04-21"
           target_end: "2026-05-02"
           estimated_days: 9
-          status: planning
-          completion: 0.0
+          status: completed
+          completion: 1.0
           depends_on: ["02-news-data"]
-          note: "研究完成，多模型路由+降级链"
+          note: "已完成 2026-04-08, litellm + 降级链 + CostTracker"
 
         - room: "02-small-models"
           parent: "03-model-system"
@@ -471,8 +471,8 @@ timeline:
     phase_1_rooms: 26
     phase_2_rooms: 11
     phase_3_rooms: 3
-    completed: 3
+    completed: 5
     in_progress: 0
-    planning: 23
+    planning: 21
     backlog: 14
-    completion: 0.075
+    completion: 0.125

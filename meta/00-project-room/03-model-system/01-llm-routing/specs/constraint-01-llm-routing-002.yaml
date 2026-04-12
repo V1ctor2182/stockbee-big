@@ -1,0 +1,27 @@
+spec_id: "constraint-01-llm-routing-002"
+type: constraint
+state: active
+intent:
+  summary: "litellm 为可选依赖，Router task-agnostic"
+  detail: |
+    - litellm 未安装时 _default_completion 抛出 ImportError 并给出安装提示
+    - 通过 set_completion_fn() 可替换底层调用，测试时不需要 litellm
+    - Router 不包含 G1/G2/G3 的 prompt 模板或处理逻辑
+    - 调用方（news-data、macro-analysis 等）负责构建 prompt 并选择 TaskType
+constraints:
+  - "litellm 未安装时给出明确 ImportError 提示"
+  - "Router 接口只有 route(task_type, prompt) — 不做业务判断"
+  - "28 个测试全部使用 mock，不依赖外部 API"
+indexing:
+  type: constraint
+  priority: medium
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["litellm", "dependency", "agnostic"]
+provenance:
+  source_type: implementation_verified
+  confidence: 1.0
+  source_ref: "src/stockbee/llm_routing/router.py"
+relations: []
+anchors:
+  - { file: "src/stockbee/llm_routing/router.py", type: implementation }

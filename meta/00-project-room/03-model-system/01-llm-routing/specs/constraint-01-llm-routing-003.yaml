@@ -1,0 +1,31 @@
+spec_id: "constraint-01-llm-routing-003"
+type: constraint
+state: active
+intent:
+  summary: "降级链：主模型 → 备选 → RuntimeError，可配置重试次数"
+  detail: |
+    降级流程：
+    1. 主模型重试 max_retries 次（默认 2）
+    2. 全部失败 → 备选模型重试 max_retries 次
+    3. 全部失败 → raise RuntimeError
+
+    最后一次重试的异常会被 log（exc_info=True），之前的只 log warning。
+    调用方可在 RuntimeError 外层实现缓存回退（通过 CostTracker.get_cached）。
+constraints:
+  - "主模型失败自动降级到 fallback_model"
+  - "fallback_model=None 时跳过降级步骤"
+  - "全部失败 raise RuntimeError（不静默吞错）"
+  - "exc_info 只在最后一次重试时打印（避免日志爆炸）"
+indexing:
+  type: constraint
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["fallback", "retry", "error-handling"]
+provenance:
+  source_type: implementation_verified
+  confidence: 1.0
+  source_ref: "src/stockbee/llm_routing/router.py:128-162"
+relations: []
+anchors:
+  - { file: "src/stockbee/llm_routing/router.py", type: implementation }

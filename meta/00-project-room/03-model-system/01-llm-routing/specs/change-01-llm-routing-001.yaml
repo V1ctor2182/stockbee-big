@@ -1,0 +1,36 @@
+spec_id: "change-01-llm-routing-001"
+type: change
+state: active
+intent:
+  summary: "01-llm-routing 模块完整实现 (2026-04-07 ~ 2026-04-08)"
+  detail: |
+    新增文件：
+    - src/stockbee/llm_routing/__init__.py
+    - src/stockbee/llm_routing/router.py — LLMRouter + LLMResponse
+    - src/stockbee/llm_routing/task_config.py — TaskType + TaskConfig + DEFAULT_TASK_CONFIGS
+    - src/stockbee/llm_routing/cost_tracker.py — CostTracker (SQLite)
+    - tests/test_llm_routing.py — 28 个测试
+
+    Git commits：
+    - d72471e plan: 3 milestones
+    - e5e4396 feat: LLMRouter + TaskConfig
+    - 8a11056 feat: CostTracker
+    - 39740a4 feat+docs: 28 tests + Room completed
+
+    验证：
+    - 28/28 测试通过（mock，不调真实 API）
+    - 169/169 全项目测试通过
+    - 路由 + 降级 + JSON 解析 + 缓存全部验证
+constraints: []
+indexing:
+  type: change
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["changelog", "implementation"]
+provenance:
+  source_type: git_history
+  confidence: 1.0
+  source_ref: "git log d72471e..39740a4"
+relations: []
+anchors: []
