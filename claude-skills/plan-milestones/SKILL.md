@@ -131,7 +131,8 @@ Feature Room 的 milestones 最初由 room-init 从 PRD 机械生成，粒度不
 
 ### Phase 2.5: 多方案对比（关键 milestone）
 
-对于带有 `complexity_flags` 的 milestone，必须生成 **至少 2 个实施方案** 供开发者选择。
+对于带有 `complexity_flags` 的 milestone，必须生成 **至少 2 个实施方案** 供开发者选择并 **思考是否应该拆成更多milestone**。
+
 
 方案对比维度：
 
