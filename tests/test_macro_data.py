@@ -19,6 +19,7 @@ from stockbee.macro_data.indicators import (
 from stockbee.macro_data.parquet_macro import (
     ParquetMacroProvider, Z_SCORE_CLIP, Z_SCORE_WINDOW,
 )
+from stockbee.macro_data.fred_macro import FredMacroProvider
 
 
 # =========================================================================
@@ -211,6 +212,48 @@ class TestParquetMacroProvider:
         result = macro_provider.get_macro_indicators(["DFF"])
         assert len(result) > 300  # 原始 300 + 新增 10
 
+    def test_incremental_partial_column_preserves_other_columns(self, macro_provider, macro_data):
+        """增量写入只带部分列时，历史行的其它列必须保留，不能被写成 NaN。
+
+        Regression: earlier refactor used `pd.concat + drop_duplicates(keep="last")`
+        which silently overwrote whole rows, nullifying columns absent from
+        the increment. Must use column-level merge (combine_first + update).
+        """
+        macro_provider.write_indicators(macro_data)
+
+        # Read the parquet directly — bypass the PIT alignment in
+        # get_macro_indicators() so we can inspect an exact row.
+        parquet_path = macro_provider._parquet_path
+        original = pd.read_parquet(parquet_path)
+        original.index = pd.to_datetime(original.index)
+
+        overlap_date = macro_data.index[50]
+        original_row = original.loc[overlap_date]
+        assert not pd.isna(original_row["VIXCLS"]), \
+            "test fixture precondition: VIXCLS must have a value at overlap_date"
+        original_vix = float(original_row["VIXCLS"])
+        original_t10y2y = float(original_row["T10Y2Y"])
+
+        # Write an increment touching *only* DFF for that overlap date.
+        partial = pd.DataFrame(
+            {"DFF": [9.99]},
+            index=pd.DatetimeIndex([overlap_date], name="date"),
+        )
+        macro_provider.write_indicators(partial)
+
+        after = pd.read_parquet(parquet_path)
+        after.index = pd.to_datetime(after.index)
+        after_row = after.loc[overlap_date]
+
+        # DFF takes the new value.
+        assert float(after_row["DFF"]) == pytest.approx(9.99)
+
+        # Non-touched columns must not be nullified.
+        assert not pd.isna(after_row["VIXCLS"]), \
+            "VIXCLS got nullified — partial-column increment corrupted history"
+        assert float(after_row["VIXCLS"]) == pytest.approx(original_vix)
+        assert float(after_row["T10Y2Y"]) == pytest.approx(original_t10y2y)
+
     def test_indicator_date_range(self, macro_provider, macro_data):
         macro_provider.write_indicators(macro_data)
 
@@ -241,6 +284,64 @@ class TestParquetMacroProvider:
         macro_provider.initialize()
         result = macro_provider.get_macro_indicators(["DFF"])
         assert not result.empty
+
+
+# =========================================================================
+# FredMacroProvider.get_latest_z_scores — window multiplier regression
+# =========================================================================
+
+class TestFredZScoreWindow:
+    """Lock in the 2.0x calendar-day multiplier for the Z-score lookback.
+
+    The earlier 1.5x multiplier computed on insufficient calendar-day
+    history; 252 trading days need ~504 calendar days of coverage.
+    """
+
+    def test_z_score_lookback_uses_2x_calendar_days(self):
+        from unittest.mock import MagicMock
+
+        provider = FredMacroProvider(
+            ProviderConfig(implementation="FredMacroProvider", params={"api_key": ""})
+        )
+        # Bypass the Fred() instantiation — we only exercise the pure
+        # arithmetic of window-size → calendar-day delta.
+        provider._fred = MagicMock()
+
+        captured: dict = {}
+
+        def fake_get_macro(indicators=None, start=None, end=None):
+            captured["start"] = start
+            captured["end"] = end
+            return pd.DataFrame()  # short-circuit: returns {} from z_scores
+
+        provider.get_macro_indicators = fake_get_macro  # type: ignore[method-assign]
+
+        provider.get_latest_z_scores(["DFF"], window=252)
+
+        span_days = (captured["end"] - captured["start"]).days
+        # 252 trading days × 2.0 = 504 calendar days.
+        assert span_days == 504, \
+            f"expected 504-day lookback for window=252, got {span_days}"
+
+    def test_z_score_lookback_scales_with_window(self):
+        from unittest.mock import MagicMock
+
+        provider = FredMacroProvider(
+            ProviderConfig(implementation="FredMacroProvider", params={"api_key": ""})
+        )
+        provider._fred = MagicMock()
+
+        captured: dict = {}
+
+        def fake_get_macro(indicators=None, start=None, end=None):
+            captured["start"] = start
+            captured["end"] = end
+            return pd.DataFrame()
+
+        provider.get_macro_indicators = fake_get_macro  # type: ignore[method-assign]
+
+        provider.get_latest_z_scores(["DFF"], window=63)
+        assert (captured["end"] - captured["start"]).days == 126
 
 
 # =========================================================================

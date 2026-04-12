@@ -1,0 +1,30 @@
+spec_id: "decision-01-macro-sources-001"
+type: decision
+state: active
+intent:
+  summary: "Room 重新定义：原 FRED/BLS/RSS → Polymarket + 经济日历"
+  detail: |
+    原定义（FRED API + BLS + 美联储 RSS）已被 03-macro-data 完全覆盖：
+    - FRED API: FredMacroProvider 17 指标已连通
+    - BLS: NFP/UNRATE/CPI/PPI 通过 FRED 镜像获取
+    - 美联储 RSS: Tech Design 未明确要求
+
+    重新定义为两个补充数据源：
+    1. Polymarket 事件概率（Tech Design §4.3）
+    2. FRED release calendar 经济日历
+
+    决策：Polymarket REST API > 爬虫（公开 API 更稳定）
+    决策：FRED release calendar API > 静态维护（自动同步）
+constraints: []
+indexing:
+  type: decision
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["redesign", "polymarket", "adr"]
+provenance:
+  source_type: implementation
+  confidence: 1.0
+  source_ref: "plan-milestones 分析 2026-04-05"
+relations: []
+anchors: []

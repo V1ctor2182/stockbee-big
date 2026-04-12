@@ -90,7 +90,7 @@ class FredMacroProvider(MacroProvider):
 
         # 拉取足够的历史数据计算 Z-score
         end = date.today()
-        start = end - timedelta(days=int(window * 1.5))  # 多取一些以覆盖非交易日
+        start = end - timedelta(days=int(window * 2.0))  # 252 交易日 ≈ 504 日历天
         df = self.get_macro_indicators(indicators, start=start, end=end)
 
         if df.empty:

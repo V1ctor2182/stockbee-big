@@ -80,7 +80,19 @@ class SqliteUniverseProvider(UniverseProvider):
             self._conn = None
 
     @contextmanager
-    def _cursor(self) -> Generator[sqlite3.Cursor, None, None]:
+    def _read_cursor(self) -> Generator[sqlite3.Cursor, None, None]:
+        """读操作用，不 commit。"""
+        if not self._conn:
+            raise RuntimeError("Provider not initialized")
+        cur = self._conn.cursor()
+        try:
+            yield cur
+        finally:
+            cur.close()
+
+    @contextmanager
+    def _write_cursor(self) -> Generator[sqlite3.Cursor, None, None]:
+        """写操作用，成功 commit，失败 rollback。"""
         if not self._conn:
             raise RuntimeError("Provider not initialized")
         cur = self._conn.cursor()
@@ -110,7 +122,7 @@ class SqliteUniverseProvider(UniverseProvider):
             WHERE level = ? AND removed_at IS NULL
             ORDER BY ticker
         """
-        with self._cursor() as cur:
+        with self._read_cursor() as cur:
             cur.execute(query, (level,))
             rows = cur.fetchall()
 
@@ -138,7 +150,7 @@ class SqliteUniverseProvider(UniverseProvider):
             ORDER BY ticker
         """
         as_of_str = as_of.isoformat()
-        with self._cursor() as cur:
+        with self._read_cursor() as cur:
             cur.execute(query, (level, as_of_str, as_of_str))
             rows = cur.fetchall()
 
@@ -185,9 +197,11 @@ class SqliteUniverseProvider(UniverseProvider):
         snapshot_date = snapshot_date or date.today()
         date_str = snapshot_date.isoformat()
 
+        import json
+
         new_tickers = set(members["ticker"].str.upper())
 
-        with self._cursor() as cur:
+        with self._write_cursor() as cur:
             # 标记已移除的成员
             cur.execute(
                 "SELECT ticker FROM universe_members WHERE level = ? AND removed_at IS NULL",
@@ -202,44 +216,49 @@ class SqliteUniverseProvider(UniverseProvider):
                     [(date_str, t, level) for t in removed],
                 )
 
-            # Upsert 新成员
+            # Batch upsert — prepare insert and update lists
             added = new_tickers - existing_tickers
-            for _, row in members.iterrows():
-                ticker = row["ticker"].upper()
+            insert_rows = []
+            update_rows = []
+
+            for ticker, sector, mcap, avgv, avgdv, shortable in zip(
+                members["ticker"].str.upper(),
+                members.get("sector", [None] * len(members)),
+                members.get("market_cap", [None] * len(members)),
+                members.get("avg_volume", [None] * len(members)),
+                members.get("avg_dollar_volume", [None] * len(members)),
+                members.get("short_able", [True] * len(members)),
+            ):
                 if ticker in added:
-                    cur.execute(
-                        """INSERT INTO universe_members
-                           (ticker, level, sector, market_cap, avg_volume, avg_dollar_volume, short_able, added_at)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (
-                            ticker, level,
-                            row.get("sector"),
-                            row.get("market_cap"),
-                            row.get("avg_volume"),
-                            row.get("avg_dollar_volume"),
-                            int(row.get("short_able", True)),
-                            date_str,
-                        ),
-                    )
+                    insert_rows.append((
+                        ticker, level, sector, mcap, avgv, avgdv,
+                        int(shortable) if shortable is not None else 1, date_str,
+                    ))
                 else:
-                    # 更新现有成员的指标
-                    cur.execute(
-                        """UPDATE universe_members
-                           SET sector = ?, market_cap = ?, avg_volume = ?,
-                               avg_dollar_volume = ?, short_able = ?
-                           WHERE ticker = ? AND level = ? AND removed_at IS NULL""",
-                        (
-                            row.get("sector"),
-                            row.get("market_cap"),
-                            row.get("avg_volume"),
-                            row.get("avg_dollar_volume"),
-                            int(row.get("short_able", True)),
-                            ticker, level,
-                        ),
-                    )
+                    update_rows.append((
+                        sector, mcap, avgv, avgdv,
+                        int(shortable) if shortable is not None else 1,
+                        ticker, level,
+                    ))
+
+            if insert_rows:
+                cur.executemany(
+                    """INSERT INTO universe_members
+                       (ticker, level, sector, market_cap, avg_volume, avg_dollar_volume, short_able, added_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    insert_rows,
+                )
+
+            if update_rows:
+                cur.executemany(
+                    """UPDATE universe_members
+                       SET sector = ?, market_cap = ?, avg_volume = ?,
+                           avg_dollar_volume = ?, short_able = ?
+                       WHERE ticker = ? AND level = ? AND removed_at IS NULL""",
+                    update_rows,
+                )
 
             # 保存快照
-            import json
             cur.execute(
                 """INSERT OR REPLACE INTO universe_snapshots
                    (snapshot_date, level, ticker_count, tickers_json)
@@ -255,7 +274,7 @@ class SqliteUniverseProvider(UniverseProvider):
 
     def get_member_count(self, level: str) -> int:
         """返回某层级的当前活跃成员数。"""
-        with self._cursor() as cur:
+        with self._read_cursor() as cur:
             cur.execute(
                 "SELECT COUNT(*) FROM universe_members WHERE level = ? AND removed_at IS NULL",
                 (level,),

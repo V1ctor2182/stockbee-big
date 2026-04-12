@@ -1,0 +1,71 @@
+spec_id: "contract-01-macro-sources-001"
+type: contract
+state: active
+intent:
+  summary: "PolymarketFetcher + EconomicCalendar 完整接口约定"
+  detail: |
+    @dataclass
+    class MarketEvent:
+        event_id, question, slug: str
+        probability, volume, liquidity: float
+        previous_probability: float | None
+        is_cliff: bool
+        fetched_at: str  # ISO 8601 UTC
+
+    class PolymarketFetcher:
+        def __init__(db_path="data/macro_sources.db", cliff_threshold=0.15)
+        def initialize() / shutdown()
+
+        # 抓取（两步过滤）
+        def fetch_macro_events(limit=30, fetch_size=200) → list[MarketEvent]
+            # Step 1: GET /markets?limit=fetch_size&active=true&order=volume desc
+            # Step 2: 本地 MACRO_KEYWORDS 关键词过滤
+            # 返回前 limit 个
+
+        def save_events(events) → int
+        def detect_cliffs(events?) → list[MarketEvent]
+        def get_latest_events(limit=30) → list[dict]
+
+        # Internal
+        @staticmethod
+        def _is_macro_related(market: dict) → bool
+            # 检查 question + description 是否包含任一 MACRO_KEYWORDS
+
+    # 模块级常量
+    GAMMA_API_BASE = "https://gamma-api.polymarket.com"
+    DEFAULT_CLIFF_THRESHOLD = 0.15
+    MACRO_KEYWORDS: list[str]  # 20 个关键词
+    HTTP headers: {"Accept": "application/json", "User-Agent": "StockBEE/1.0"}
+
+    @dataclass
+    class ReleaseEvent:
+        release_id: int
+        release_name: str
+        release_date: date
+        high_volatility: bool
+
+    class EconomicCalendar:
+        def __init__(api_key="", db_path="data/macro_sources.db")
+        def initialize() / shutdown()
+        def sync(days_ahead=90) → int  # API key 为空时返回 0
+        def get_events(start?, end?, high_volatility_only=False) → list[ReleaseEvent]
+        def is_high_volatility_day(d) → bool
+        def get_next_high_volatility(after?) → ReleaseEvent | None
+
+    # 模块级常量
+    HIGH_VOLATILITY_RELEASES: dict[int, str]  # 8 个 release IDs
+constraints: []
+indexing:
+  type: contract
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["api", "interface"]
+provenance:
+  source_type: implementation
+  confidence: 1.0
+  source_ref: "src/stockbee/macro_sources/"
+relations: []
+anchors:
+  - { file: "src/stockbee/macro_sources/polymarket.py", type: implementation }
+  - { file: "src/stockbee/macro_sources/calendar.py", type: implementation }

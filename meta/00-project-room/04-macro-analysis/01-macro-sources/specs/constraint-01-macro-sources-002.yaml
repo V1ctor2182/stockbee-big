@@ -1,0 +1,35 @@
+spec_id: "constraint-01-macro-sources-002"
+type: constraint
+state: active
+intent:
+  summary: "经济日历 8 类高波动事件，FRED API key 可选"
+  detail: |
+    8 个高波动 FRED release IDs：
+    - 10: CPI
+    - 50: Employment Situation (NFP)
+    - 53: GDP
+    - 21: PPI
+    - 46: Federal Funds Rate (FOMC)
+    - 268: Treasury Yield Curve Rates
+    - 11: Industrial Production
+    - 22: M2 Money Stock
+
+    FRED API key 为空时 sync() 返回 0（graceful skip）。
+    API key 暴露在 URL 中的风险已缓解（logger.warning 不含 URL）。
+constraints:
+  - "8 类高波动事件 release IDs 硬编码"
+  - "无 API key 时 sync() 静默跳过"
+  - "错误日志不暴露 API key"
+indexing:
+  type: constraint
+  priority: medium
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["economic-calendar", "fred", "high-volatility"]
+provenance:
+  source_type: implementation_verified
+  confidence: 1.0
+  source_ref: "src/stockbee/macro_sources/calendar.py"
+relations: []
+anchors:
+  - { file: "src/stockbee/macro_sources/calendar.py", type: implementation }

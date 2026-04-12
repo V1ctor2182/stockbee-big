@@ -1,0 +1,44 @@
+spec_id: "constraint-01-macro-sources-004"
+type: constraint
+state: active
+intent:
+  summary: "MACRO_KEYWORDS — 20 个关键词覆盖货币政策、经济周期、贸易、财政"
+  detail: |
+    完整关键词列表（src/stockbee/macro_sources/polymarket.py:30）：
+
+    美联储/利率（6）：
+      "fed ", "federal reserve", "fomc",
+      "interest rate", "rate cut", "rate hike"
+
+    经济周期（5）：
+      "recession", "inflation", "cpi", "gdp", "unemployment"
+
+    贸易（2）：
+      "tariff", "trade war"
+
+    财政（4）：
+      "treasury", "debt ceiling", "deficit", "stimulus"
+
+    央行/政策（3）：
+      "central bank", "monetary policy", "fiscal"
+
+    未覆盖的领域（待扩展）：
+    - 地缘冲突: russia, ukraine, iran, china taiwan
+    - 大宗商品: oil price, opec, dxy, dollar index
+    - 大选: election, primary
+constraints:
+  - "关键词数量 = 20"
+  - "新增/修改关键词需要更新此 spec"
+indexing:
+  type: constraint
+  priority: medium
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["polymarket", "keywords", "macro"]
+provenance:
+  source_type: implementation_verified
+  confidence: 1.0
+  source_ref: "src/stockbee/macro_sources/polymarket.py:30"
+relations: []
+anchors:
+  - { file: "src/stockbee/macro_sources/polymarket.py", type: implementation }

@@ -1,0 +1,41 @@
+spec_id: "constraint-01-macro-sources-003"
+type: constraint
+state: active
+intent:
+  summary: "Polymarket 两步搜索：volume 排序拉取 + 本地关键词过滤"
+  detail: |
+    Gamma API 不支持文本搜索或 tag 分类过滤（实测 tag, slug_contains 都无效），
+    所以采用两步策略：
+
+    Step 1: API 服务端拉取
+      GET /markets?limit={fetch_size}&active=true&order=volume&ascending=false
+      - 默认 fetch_size=200（最热门的 200 个市场）
+      - active=true 排除已结算
+      - 按 volume 降序（流动性高 = 信号可信度高）
+
+    Step 2: 本地关键词过滤
+      - 检查 question + description 字段（lowercase）
+      - 任一 MACRO_KEYWORDS 命中即视为宏观相关
+      - 返回前 limit 个（默认 30）
+
+    必要性：API 不提供文本搜索/分类标签过滤功能。
+
+    需要 User-Agent header（"StockBEE/1.0"），否则返回 403 Forbidden。
+constraints:
+  - "API 请求必须带 User-Agent header（避免 403）"
+  - "fetch_size 控制 API 拉取量，limit 控制返回数量"
+  - "关键词匹配子字符串，大小写不敏感"
+  - "question + description 都参与匹配"
+indexing:
+  type: constraint
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["polymarket", "search", "filtering", "api"]
+provenance:
+  source_type: implementation_verified
+  confidence: 1.0
+  source_ref: "实测 2026-04-09, commit 4b46421"
+relations: []
+anchors:
+  - { file: "src/stockbee/macro_sources/polymarket.py", type: implementation }
