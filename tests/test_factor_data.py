@@ -1247,3 +1247,99 @@ class TestAdvancedIntegration:
             assert _REGISTRY[name].impl is not None, (
                 f"m2 函数 {name} 缺少 impl 注册"
             )
+
+
+# ===========================================================================
+# m3 — 时序滚动 TS_RANK / TS_QUANTILE
+# ===========================================================================
+
+class TestTsRank:
+    def test_monotonic_increasing_rank_1(self, panel):
+        """AAA close 递增 → 最后一行 rolling rank 应为 1.0 (最高百分位)。"""
+        result = evaluate(parse("TS_RANK($close, 5)"), panel)
+        aaa = _aaa(result)
+        assert np.isnan(aaa.iloc[3])
+        assert aaa.iloc[9] == pytest.approx(1.0)
+
+    def test_monotonic_decreasing_rank(self, panel):
+        """BBB close 递减 → 当前值总是窗口最小，rolling rank 应为最低百分位。"""
+        result = evaluate(parse("TS_RANK($close, 5)"), panel)
+        bbb = _bbb(result)
+        for i in range(4, 10):
+            assert bbb.iloc[i] == pytest.approx(1.0 / 5.0), f"row {i}"
+
+    def test_min_periods_respected(self, panel):
+        """窗口不满 → NaN (min_periods=window)。"""
+        result = evaluate(parse("TS_RANK($close, 5)"), panel)
+        aaa = _aaa(result)
+        for i in range(4):
+            assert np.isnan(aaa.iloc[i])
+
+    def test_ties_average(self, panel):
+        """Ties 用 average 策略（pandas 默认）。构造全等值窗口。"""
+        idx = pd.MultiIndex.from_arrays(
+            [pd.date_range("2024-01-01", periods=5, freq="D"), ["X"] * 5],
+            names=["date", "ticker"],
+        )
+        p = pd.DataFrame({"adj_close": [1.0, 1.0, 1.0, 1.0, 1.0]}, index=idx)
+        result = evaluate(parse("TS_RANK($close, 3)"), p)
+        assert result.iloc[4] == pytest.approx(2.0 / 3.0, abs=0.01)
+
+    def test_ticker_isolation(self, panel):
+        """TS_RANK 不跨 ticker 串数据。"""
+        result = evaluate(parse("TS_RANK($close, 5)"), panel)
+        assert result.index.equals(panel.sort_index().index)
+
+    def test_lookback(self):
+        ast = parse("TS_RANK($close, 10)")
+        assert ast.lookback() == 10
+
+    def test_min_window_validation(self):
+        with pytest.raises(ParseError):
+            parse("TS_RANK($close, 1)")
+
+
+class TestTsQuantile:
+    def test_q08_monotonic(self, panel):
+        """AAA close 递增 → TS_QUANTILE($close, 5, 0.8) 应接近窗口第4大值。"""
+        result = evaluate(parse("TS_QUANTILE($close, 5, 0.8)"), panel)
+        aaa = _aaa(result)
+        assert np.isnan(aaa.iloc[3])
+        assert aaa.iloc[4] == pytest.approx(
+            pd.Series([2.0, 4.0, 6.0, 8.0, 10.0]).quantile(0.8), abs=0.01
+        )
+
+    def test_q0_returns_min(self, panel):
+        result = evaluate(parse("TS_QUANTILE($close, 5, 0)"), panel)
+        aaa = _aaa(result)
+        assert aaa.iloc[4] == pytest.approx(2.0)
+
+    def test_q1_returns_max(self, panel):
+        result = evaluate(parse("TS_QUANTILE($close, 5, 1)"), panel)
+        aaa = _aaa(result)
+        assert aaa.iloc[4] == pytest.approx(10.0)
+
+    def test_q_validation_range(self):
+        with pytest.raises(ParseError):
+            parse("TS_QUANTILE($close, 5, 1.5)")
+        with pytest.raises(ParseError):
+            parse("TS_QUANTILE($close, 5, -0.1)")
+
+    def test_min_window_validation(self):
+        with pytest.raises(ParseError):
+            parse("TS_QUANTILE($close, 1, 0.5)")
+
+    def test_lookback(self):
+        ast = parse("TS_QUANTILE($close, 20, 0.8)")
+        assert ast.lookback() == 20
+
+    def test_nested_lookback(self):
+        ast = parse("TS_QUANTILE(REF($close, 3), 10, 0.5)")
+        assert ast.lookback() == 13
+
+    def test_m3_ts_impls_registered(self):
+        """契约冒烟：m3 的 TS_RANK / TS_QUANTILE 必须有 impl 注册。"""
+        for name in ("TS_RANK", "TS_QUANTILE"):
+            assert _REGISTRY[name].impl is not None, (
+                f"m3 函数 {name} 缺少 impl 注册"
+            )

@@ -357,6 +357,12 @@ _reg("MIN", min_arity=2, max_arity=2, rolling_arg_index=1, overloaded_max_min=Tr
 # --- QUANTILE 横截面：(data, q)，q 是分位数 0~1 的浮点，非窗口 ---
 _reg("QUANTILE", min_arity=2, max_arity=2, cross_section=True)
 
+# --- m3: 时序滚动 RANK / QUANTILE（与横截面 RANK/QUANTILE 共存）---
+# TS_RANK(data, window)：per-ticker rolling rank percentile
+_reg("TS_RANK", min_arity=2, max_arity=2, rolling_arg_index=1, min_window=2)
+# TS_QUANTILE(data, window, q)：per-ticker rolling quantile，q 是第 3 参数
+_reg("TS_QUANTILE", min_arity=3, max_arity=3, rolling_arg_index=1, min_window=2)
+
 
 def _get_spec(name: str) -> FunctionSpec:
     """获取函数规格，未知函数抛 ExpressionError。"""
@@ -397,7 +403,7 @@ def _validate_function_args(call: "FunctionCall", pos: int) -> None:
                 pos,
             )
 
-    # --- 2. QUANTILE q 参数：必须是 [0,1] 范围内的数字常量 ---
+    # --- 2. QUANTILE / TS_QUANTILE q 参数：必须是 [0,1] 范围内的数字常量 ---
     if call.name == "QUANTILE":
         q_node = call.args[1]
         if not isinstance(q_node, Constant) or not isinstance(q_node.value, (int, float)):
@@ -408,6 +414,19 @@ def _validate_function_args(call: "FunctionCall", pos: int) -> None:
         if not (0 <= q_node.value <= 1):
             raise ParseError(
                 f"QUANTILE 的分位数 q 必须在 [0,1] 范围内，实际为 {q_node.value}",
+                pos,
+            )
+
+    if call.name == "TS_QUANTILE":
+        q_node = call.args[2]
+        if not isinstance(q_node, Constant) or not isinstance(q_node.value, (int, float)):
+            raise ParseError(
+                f"TS_QUANTILE 的第三参数 q 必须是数字常量，实际为 {q_node!r}",
+                pos,
+            )
+        if not (0 <= q_node.value <= 1):
+            raise ParseError(
+                f"TS_QUANTILE 的分位数 q 必须在 [0,1] 范围内，实际为 {q_node.value}",
                 pos,
             )
 
@@ -881,6 +900,38 @@ def _impl_corr(s1: pd.Series, s2: pd.Series, n: int) -> pd.Series:
 
 
 register_impl("CORR", _impl_corr)
+
+
+# ---------------------------------------------------------------------------
+# m3: 时序滚动 TS_RANK / TS_QUANTILE
+# ---------------------------------------------------------------------------
+#
+# 与横截面 RANK/QUANTILE 共存。Alpha158 的 RANK%d / QTLU%d / QTLD%d 使用时序
+# 滚动语义（qlib: Rank($close, d) = past d days rolling rank percentile）。
+#
+# TS_RANK ties 处理：pandas 默认 average（spec.md 2026-04-11 决策）。
+# TS_QUANTILE 插值：pandas 默认 linear（spec.md 2026-04-11 决策）。
+# ---------------------------------------------------------------------------
+
+
+def _impl_ts_rank(s: pd.Series, n: int) -> pd.Series:
+    """Per-ticker rolling rank percentile over window n."""
+    return (
+        s.groupby(level="ticker", sort=False, group_keys=False)
+         .transform(lambda x: x.rolling(n, min_periods=n).rank(pct=True))
+    )
+
+
+def _impl_ts_quantile(s: pd.Series, n: int, q: float) -> pd.Series:
+    """Per-ticker rolling quantile over window n."""
+    return (
+        s.groupby(level="ticker", sort=False, group_keys=False)
+         .transform(lambda x: x.rolling(n, min_periods=n).quantile(q))
+    )
+
+
+register_impl("TS_RANK", _impl_ts_rank)
+register_impl("TS_QUANTILE", _impl_ts_quantile)
 
 
 # ---------------------------------------------------------------------------
