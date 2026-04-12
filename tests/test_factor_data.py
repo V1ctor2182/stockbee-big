@@ -945,6 +945,15 @@ class TestRollingOLS:
         assert aaa.iloc[4:].to_numpy() == pytest.approx([0.0] * 6, abs=1e-10)
         assert bbb.iloc[4:].to_numpy() == pytest.approx([0.0] * 6, abs=1e-10)
 
+    def test_ols_nan_propagation_prefix(self, panel):
+        """rolling 前 n-1 行 NaN 必须传播到 OLS 的所有输出（slope/rsquare/resi）。"""
+        slope = evaluate(parse("SLOPE($close, 5)"), panel)
+        rsq   = evaluate(parse("RSQUARE($close, 5)"), panel)
+        resi  = evaluate(parse("RESI($close, 5)"), panel)
+        assert _aaa(slope).iloc[:4].isna().all()
+        assert _aaa(rsq).iloc[:4].isna().all()
+        assert _aaa(resi).iloc[:4].isna().all()
+
     def test_resi_last_point_formula(self, panel_nonlinear):
         """RESI 必须返回最后一点的残差，不是整段残差序列。
 
@@ -963,3 +972,89 @@ class TestRollingOLS:
         # AAA 第 i=5 行（窗口 [3..5]） → 对应 iloc[5]
         aaa_resi_5 = _aaa(result).iloc[5]
         assert aaa_resi_5 == pytest.approx(1.0 / 6.0, abs=1e-10)
+
+
+# ===========================================================================
+# m2 — EMA / IDXMAX / IDXMIN
+# ===========================================================================
+
+class TestEMA:
+    def test_ema_hand_computed(self, panel):
+        """n=3, alpha=2/4=0.5，IIR 递推 y_t = α·x_t + (1−α)·y_{t−1}。
+        AAA adj_close = 2,4,6,... 前 2 行 NaN（min_periods=3），第 3 行起：
+          y2 = 0.5·6 + 0.5·(0.5·4 + 0.5·2) = 3 + 0.5·3 = 4.5
+          Wait: adjust=False 的 ewm 初始化用第一个观测值 y_0 = x_0 = 2，
+                递推：y1 = 0.5·4 + 0.5·2 = 3
+                      y2 = 0.5·6 + 0.5·3 = 4.5
+                      y3 = 0.5·8 + 0.5·4.5 = 6.25
+          min_periods=3 → 前 2 行输出 NaN，iloc[2]=4.5，iloc[3]=6.25
+        """
+        result = evaluate(parse("EMA($close, 3)"), panel)
+        aaa = _aaa(result)
+        assert aaa.iloc[0:2].isna().all()
+        assert aaa.iloc[2] == pytest.approx(4.5)
+        assert aaa.iloc[3] == pytest.approx(6.25)
+
+    def test_ema_min_periods(self, panel):
+        """min_periods=n → 前 n-1 行 NaN。"""
+        result = evaluate(parse("EMA($close, 5)"), panel)
+        aaa = _aaa(result)
+        assert aaa.iloc[:4].isna().all()
+        # iloc[4] 起有值
+        assert not np.isnan(aaa.iloc[4])
+
+    def test_ema_ticker_isolation(self, panel):
+        """AAA/BBB EMA 不跨 ticker 串：两条 ticker 各自独立递推。"""
+        result = evaluate(parse("EMA($close, 3)"), panel)
+        aaa = _aaa(result)
+        bbb = _bbb(result)
+        # BBB adj_close = 40, 38, 36, ... 递减；前 2 行 NaN
+        # y0=40, y1=0.5·38 + 0.5·40 = 39, y2=0.5·36 + 0.5·39 = 37.5
+        assert bbb.iloc[2] == pytest.approx(37.5)
+        # AAA 的 iloc[2] 应 = 4.5（与 BBB 独立）
+        assert aaa.iloc[2] == pytest.approx(4.5)
+
+
+class TestIdxMaxMin:
+    def test_idxmax_rolling_3(self, panel):
+        """AAA adj_close=2,4,...,20 递增，窗口 3 每行的 argmax 位置都是 2（最新 = 最大）。"""
+        result = evaluate(parse("IDXMAX($close, 3)"), panel)
+        aaa = _aaa(result)
+        assert aaa.iloc[:2].isna().all()  # min_periods=3
+        assert aaa.iloc[2:].to_numpy() == pytest.approx([2.0] * 8)
+
+    def test_idxmin_rolling_3(self, panel):
+        """AAA 递增序列 → 窗口 3 的 argmin 位置都是 0（最早 = 最小）。"""
+        result = evaluate(parse("IDXMIN($close, 3)"), panel)
+        aaa = _aaa(result)
+        assert aaa.iloc[:2].isna().all()
+        assert aaa.iloc[2:].to_numpy() == pytest.approx([0.0] * 8)
+
+    def test_idxmax_bbb_decreasing(self, panel):
+        """BBB 递减序列 → 窗口 3 argmax = 0（最早 = 最大）。"""
+        result = evaluate(parse("IDXMAX($close, 3)"), panel)
+        bbb = _bbb(result)
+        assert bbb.iloc[2:].to_numpy() == pytest.approx([0.0] * 8)
+
+    def test_idxmax_ties_first_position(self, panel):
+        """平局（恒定序列）→ np.argmax 返回首个位置 0。
+        造一个 AAA 与 BBB 都一致的常数 close，通过 SIGN($close - $close) + 1 构造常数 1。"""
+        # 用表达式构造一个常数 Series：$close - $close + 1 → 全 1
+        result = evaluate(parse("IDXMAX($close - $close + 1, 3)"), panel)
+        aaa = _aaa(result)
+        # 常数序列 [1,1,1] 的 argmax = 0
+        assert aaa.iloc[2:].to_numpy() == pytest.approx([0.0] * 8)
+
+    def test_idxmax_ticker_isolation(self, panel):
+        """AAA 递增 / BBB 递减 在同一次调用中应各自独立 argmax。"""
+        result = evaluate(parse("IDXMAX($close, 5)"), panel)
+        # AAA 递增 → argmax = 4 (n-1)
+        assert _aaa(result).iloc[4:].to_numpy() == pytest.approx([4.0] * 6)
+        # BBB 递减 → argmax = 0
+        assert _bbb(result).iloc[4:].to_numpy() == pytest.approx([0.0] * 6)
+
+    def test_idxmax_n1_allowed(self, panel):
+        """IDXMAX/IDXMIN 保持 min_window=1（单元素窗口 argmax=0 合法）。"""
+        result = evaluate(parse("IDXMAX($close, 1)"), panel)
+        # 每个窗口只有一个元素 → argmax = 0
+        assert _aaa(result).to_numpy() == pytest.approx([0.0] * 10)

@@ -23,6 +23,7 @@ Alpha158 全部 158 个技术因子用表达式引擎动态计算（27 组 × 5 
 | max_lookback 算法 | AST.walk() 沿嵌套链相加（MA(REF(c,5),20)→25），非取 max | 2026-04-11 |
 | Parquet group 粒度 | 按数据来源（fundamental/sentiment/ml_score），每组一文件 | 2026-04-11 |
 | 未知 factor 处理 | get_factors 收到未知 factor name → raise，不静默跳过 | 2026-04-11 |
+| EMA 实现 | pandas ewm(adjust=False, α=2/(n+1))，IIR 递推；与 qlib FIR 截断加权在前 ~2n 行有差异 | 2026-04-11 |
 
 ## Contracts
 

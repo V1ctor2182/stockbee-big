@@ -803,6 +803,52 @@ register_impl("RSQUARE", _impl_rsquare)
 register_impl("RESI",    _impl_resi)
 
 
+# ---------------------------------------------------------------------------
+# m2: EMA / IDXMAX / IDXMIN
+# ---------------------------------------------------------------------------
+#
+# EMA 决策（spec.md 2026-04-11）：采用 pandas ewm(adjust=False) 的 IIR 递推，
+# alpha = 2/(n+1)。与 qlib FIR 截断加权均值在前 ~2n 行存在差异，不对齐 qlib。
+#
+# IDXMAX/IDXMIN 返回窗口内位置偏移 0..n-1（0 = 最早，n-1 = 当前）。
+# rolling.apply(np.argmax, raw=True) 是慢路径（~100x vs 原生 rolling agg），
+# 后续可用 sliding_window_view 优化，m2 范围内保持可读性。
+# ---------------------------------------------------------------------------
+
+
+def _impl_ema(s: pd.Series, n: int) -> pd.Series:
+    """Per-ticker EMA via pandas ewm (IIR, adjust=False)."""
+    alpha = 2.0 / (n + 1.0)
+    return (
+        s.groupby(level="ticker", sort=False, group_keys=False)
+         .transform(lambda x: x.ewm(alpha=alpha, adjust=False, min_periods=n).mean())
+    )
+
+
+def _impl_idxmax(s: pd.Series, n: int) -> pd.Series:
+    """窗口内 argmax 位置偏移 [0, n-1]。ties: numpy argmax 返回最早出现。"""
+    return (
+        s.groupby(level="ticker", sort=False, group_keys=False)
+         .transform(
+             lambda x: x.rolling(n, min_periods=n).apply(np.argmax, raw=True)
+         )
+    )
+
+
+def _impl_idxmin(s: pd.Series, n: int) -> pd.Series:
+    return (
+        s.groupby(level="ticker", sort=False, group_keys=False)
+         .transform(
+             lambda x: x.rolling(n, min_periods=n).apply(np.argmin, raw=True)
+         )
+    )
+
+
+register_impl("EMA",    _impl_ema)
+register_impl("IDXMAX", _impl_idxmax)
+register_impl("IDXMIN", _impl_idxmin)
+
+
 # --- 二元 / 一元运算 ---
 
 def _apply_binop(op: str, left: Any, right: Any) -> Any:
