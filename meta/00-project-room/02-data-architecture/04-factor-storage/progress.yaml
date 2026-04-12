@@ -1,5 +1,5 @@
 progress:
-  completion: 0.375   # 3/8 milestones done
+  completion: 0.500   # 4/8 milestones done
   milestones:
     - id: "m1a-tokenizer-parser"
       name: "Tokenizer + Parser + AST"
@@ -68,8 +68,16 @@ progress:
 
     - id: "m3-alpha158-full"
       name: "Alpha158 全量因子定义"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-11"
+      actual_files:
+        - "src/stockbee/factor_data/expression_engine.py"
+        - "src/stockbee/factor_data/alpha158.py"
+        - "src/stockbee/factor_data/__init__.py"
+        - "config/factors-alpha158.yaml"
+        - "tests/test_factor_data.py"
+        - "meta/00-project-room/02-data-architecture/04-factor-storage/spec.md"
+      actual_lines: 516   # engine +51 / alpha158 85 / yaml 57 / __init__ +3 / tests +320
       estimated_files: ["src/stockbee/factor_data/alpha158.py", "src/stockbee/factor_data/expression_engine.py", "config/factors-alpha158.yaml", "tests/test_factor_data.py"]
       estimated_lines: 940
       depends_on: [m1a-tokenizer-parser, m2-advanced-functions]
