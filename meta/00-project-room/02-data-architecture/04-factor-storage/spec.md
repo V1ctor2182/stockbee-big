@@ -86,12 +86,12 @@ Alpha158 全部 158 个技术因子用表达式引擎动态计算（27 组 × 5 
 
 ## 当前进度
 
-8 milestones, ~2080 行, 9 files — 全部 pending
+8 milestones — 4/8 完成 (m1a, m1b, m2, m3)
 
-1. **m1a-tokenizer-parser** — Tokenizer + Parser + AST（含 walk/lookback 接口）(~200行)
-2. **m1b-evaluator-basic-funcs** — Evaluator + 16 基础函数 + MAX/MIN 重载 (~250行)
-3. **m2-advanced-functions** — 10 高级函数（rolling OLS / cross-section RANK 等）(~300行)
-4. **m3-alpha158-full** — Alpha158 全量 158 因子定义 (9 KBAR + 4 price + 5 VMA + 28算子×5窗口) + TS_RANK/TS_QUANTILE + max_lookback (~940行)
+1. **m1a-tokenizer-parser** — ✅ Tokenizer + Parser + AST（740行）
+2. **m1b-evaluator-basic-funcs** — ✅ Evaluator + 12 基础函数（866行）
+3. **m2-advanced-functions** — ✅ 10 高级函数（687行）
+4. **m3-alpha158-full** — ✅ Alpha158 全量 158 因子 + TS_RANK/TS_QUANTILE（516行, 167 tests）
 5. **m4-parquet-factor-store** — 预计算因子 Parquet 存储（可与 m1-m3 并行）(~250行)
 6. **m5-ic-evaluator** — IC/ICIR 纯数值计算（可与 m1-m4 并行）(~200行)
 7. **m6-local-provider** — LocalFactorProvider 路由 + 模块导出 (~280行)
@@ -101,5 +101,5 @@ Alpha158 全部 158 个技术因子用表达式引擎动态计算（27 组 × 5 
 
 ---
 _spec 状态: intent (draft), change (active)_
-_spec.md 最后更新: 2026-04-11 (8-milestone 重规划 + contract 扩充)_
-_specs 目录: 1 intent + 1 change = 2 个 spec 文件_
+_spec.md 最后更新: 2026-04-11 (m3 完成 + codex review findings)_
+_specs 目录: 1 intent + 3 change = 4 个 spec 文件_
