@@ -1,6 +1,6 @@
 spec_id: "intent-04-factor-storage-001"
 type: intent
-state: draft
+state: active
 intent:
   summary: "表达式引擎（技术因子）+ Parquet 预计算（融合因子）"
   detail: |
@@ -20,4 +20,9 @@ provenance:
   confidence: 0.8
   source_ref: "PRD + Feature Hierarchy + Tech Design"
 relations: []
-anchors: []
+anchors:
+  - { file: "src/stockbee/factor_data/expression_engine.py", type: source }
+  - { file: "src/stockbee/factor_data/alpha158.py", type: source }
+  - { file: "src/stockbee/factor_data/parquet_factor.py", type: source }
+  - { file: "config/factors-alpha158.yaml", type: config }
+  - { file: "tests/test_factor_data.py", type: test }

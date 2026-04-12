@@ -1,5 +1,5 @@
 progress:
-  completion: 0.57
+  completion: 0.65
   milestones:
     - id: "m1-Provider-架构"
       name: "Provider 架构"
@@ -11,7 +11,7 @@ progress:
       completed_at: null
     - id: "m3-因子存储"
       name: "因子存储"
-      status: pending
+      status: in_progress
       completed_at: null
     - id: "m4-知识图谱"
       name: "知识图谱"

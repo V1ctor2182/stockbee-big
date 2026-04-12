@@ -1607,3 +1607,214 @@ class TestAlpha158EvalSmoke:
         ev = Evaluator(p)
         with pytest.raises(ExpressionError, match="vwap"):
             ev.evaluate(alpha.get_expression("VWAP0"))
+
+
+# ---------------------------------------------------------------------------
+# m4: ParquetFactorStore
+# ---------------------------------------------------------------------------
+
+from stockbee.factor_data.parquet_factor import ParquetFactorStore
+from datetime import date as _date
+
+
+def _make_factor_df(
+    tickers: list[str],
+    dates: list[str],
+    columns: dict[str, list[float]] | None = None,
+) -> pd.DataFrame:
+    """构造 MultiIndex (date, ticker) 因子 DataFrame 的测试辅助函数。"""
+    idx_tuples = [
+        (pd.Timestamp(d), t)
+        for d in dates
+        for t in tickers
+    ]
+    idx = pd.MultiIndex.from_tuples(idx_tuples, names=["date", "ticker"])
+    n = len(idx_tuples)
+    if columns is None:
+        columns = {"factor_a": list(range(n))}
+    data = {k: v for k, v in columns.items()}
+    return pd.DataFrame(data, index=idx, dtype=float)
+
+
+class TestParquetFactorStore:
+    """m4: 预计算因子 Parquet 存储。"""
+
+    def test_write_and_read_roundtrip(self, tmp_path):
+        """write → read，shape 和值完全一致。"""
+        store = ParquetFactorStore(tmp_path)
+        df = _make_factor_df(["AAPL", "TSLA"], ["2024-01-01", "2024-01-02"])
+        store.write_factors("fundamental", df)
+        result = store.read_factors("fundamental")
+        pd.testing.assert_frame_equal(result.sort_index(), df.sort_index())
+
+    def test_read_filter_tickers(self, tmp_path):
+        """write 2 tickers，read 只请求 1，返回只含该 ticker。"""
+        store = ParquetFactorStore(tmp_path)
+        df = _make_factor_df(["AAPL", "TSLA"], ["2024-01-01"])
+        store.write_factors("fundamental", df)
+        result = store.read_factors("fundamental", tickers=["AAPL"])
+        assert list(result.index.get_level_values("ticker").unique()) == ["AAPL"]
+        assert len(result) == 1
+
+    def test_read_filter_date_range(self, tmp_path):
+        """write 10 天，read [3,7]，返回 5 行（每天 1 ticker）。"""
+        store = ParquetFactorStore(tmp_path)
+        dates = [f"2024-01-{d:02d}" for d in range(1, 11)]
+        df = _make_factor_df(["AAPL"], dates)
+        store.write_factors("fundamental", df)
+        result = store.read_factors(
+            "fundamental",
+            start=_date(2024, 1, 3),
+            end=_date(2024, 1, 7),
+        )
+        assert len(result) == 5
+        dates_out = result.index.get_level_values("date")
+        assert dates_out.min() == pd.Timestamp("2024-01-03")
+        assert dates_out.max() == pd.Timestamp("2024-01-07")
+
+    def test_merge_write_dedup_new_wins(self, tmp_path):
+        """同 (date, ticker) 写两次，第二次值覆盖第一次。"""
+        store = ParquetFactorStore(tmp_path)
+        df1 = _make_factor_df(["AAPL"], ["2024-01-01"], {"factor_a": [1.0]})
+        df2 = _make_factor_df(["AAPL"], ["2024-01-01"], {"factor_a": [99.0]})
+        store.write_factors("fundamental", df1)
+        store.write_factors("fundamental", df2)
+        result = store.read_factors("fundamental")
+        assert result.loc[(pd.Timestamp("2024-01-01"), "AAPL"), "factor_a"] == 99.0
+        assert len(result) == 1
+
+    def test_merge_write_new_columns_preserves_old(self, tmp_path):
+        """第二次 write 加新列；旧列值也保留（不被丢弃）。"""
+        store = ParquetFactorStore(tmp_path)
+        df1 = _make_factor_df(["AAPL"], ["2024-01-01"], {"factor_a": [1.0]})
+        df2 = _make_factor_df(["AAPL"], ["2024-01-01"], {"factor_b": [2.0]})
+        store.write_factors("fundamental", df1)
+        store.write_factors("fundamental", df2)
+        result = store.read_factors("fundamental")
+        # 两列都应存在
+        assert "factor_a" in result.columns
+        assert "factor_b" in result.columns
+        # 旧值也保留
+        assert result.loc[(pd.Timestamp("2024-01-01"), "AAPL"), "factor_a"] == 1.0
+        assert result.loc[(pd.Timestamp("2024-01-01"), "AAPL"), "factor_b"] == 2.0
+
+    def test_read_missing_group_returns_empty(self, tmp_path):
+        """请求不存在的 group → 空 MultiIndex DataFrame，names 正确。"""
+        store = ParquetFactorStore(tmp_path)
+        result = store.read_factors("nonexistent")
+        assert isinstance(result.index, pd.MultiIndex)
+        assert list(result.index.names) == ["date", "ticker"]
+        assert len(result) == 0
+
+    def test_list_precomputed_factors_sorted(self, tmp_path):
+        """write 多个 groups → list 返回 sorted stems，顺序确定。"""
+        store = ParquetFactorStore(tmp_path)
+        df = _make_factor_df(["AAPL"], ["2024-01-01"])
+        store.write_factors("sentiment", df)
+        store.write_factors("fundamental", df)
+        store.write_factors("ml_score", df)
+        result = store.list_precomputed_factors()
+        assert result == sorted(result)
+        assert set(result) == {"fundamental", "ml_score", "sentiment"}
+
+    def test_read_none_tickers_returns_all(self, tmp_path):
+        """tickers=None → 返回全部 tickers（不过滤）。"""
+        store = ParquetFactorStore(tmp_path)
+        df = _make_factor_df(["AAPL", "TSLA", "GOOG"], ["2024-01-01"])
+        store.write_factors("fundamental", df)
+        result = store.read_factors("fundamental", tickers=None)
+        assert len(result) == 3
+
+    def test_read_empty_tickers_list_returns_all(self, tmp_path):
+        """tickers=[] → 与 tickers=None 行为相同，返回全部。"""
+        store = ParquetFactorStore(tmp_path)
+        df = _make_factor_df(["AAPL", "TSLA"], ["2024-01-01"])
+        store.write_factors("fundamental", df)
+        result = store.read_factors("fundamental", tickers=[])
+        assert len(result) == 2
+
+    def test_read_none_start_end_returns_all_dates(self, tmp_path):
+        """start=None, end=None → 返回全量日期，不截断。"""
+        store = ParquetFactorStore(tmp_path)
+        dates = ["2024-01-01", "2024-06-15", "2024-12-31"]
+        df = _make_factor_df(["AAPL"], dates)
+        store.write_factors("fundamental", df)
+        result = store.read_factors("fundamental", start=None, end=None)
+        assert len(result) == 3
+
+    def test_write_invalid_index_raises(self, tmp_path):
+        """非 MultiIndex df → ValueError。"""
+        store = ParquetFactorStore(tmp_path)
+        df = pd.DataFrame({"factor_a": [1.0, 2.0]}, index=pd.date_range("2024-01-01", periods=2))
+        with pytest.raises(ValueError, match="MultiIndex"):
+            store.write_factors("fundamental", df)
+
+    def test_write_wrong_index_names_raises(self, tmp_path):
+        """MultiIndex 但 names 不是 ['date', 'ticker'] → ValueError。"""
+        store = ParquetFactorStore(tmp_path)
+        idx = pd.MultiIndex.from_tuples(
+            [(pd.Timestamp("2024-01-01"), "AAPL")],
+            names=["timestamp", "symbol"],  # 错误的 names
+        )
+        df = pd.DataFrame({"factor_a": [1.0]}, index=idx)
+        with pytest.raises(ValueError, match="names must be"):
+            store.write_factors("fundamental", df)
+
+    def test_invalid_group_name_raises(self, tmp_path):
+        """包含路径穿越字符的 group 名 → ValueError。"""
+        store = ParquetFactorStore(tmp_path)
+        df = _make_factor_df(["AAPL"], ["2024-01-01"])
+        with pytest.raises(ValueError, match="Invalid group name"):
+            store.write_factors("../evil", df)
+        with pytest.raises(ValueError, match="Invalid group name"):
+            store.read_factors("../evil")
+        with pytest.raises(ValueError, match="Invalid group name"):
+            store.write_factors("", df)
+        # backslash（Windows 路径穿越）
+        with pytest.raises(ValueError, match="Invalid group name"):
+            store.write_factors("..\\evil", df)
+
+    # --- v3 新增：review 发现的 corner case ---
+
+    def test_merge_write_nan_overwrites_existing(self, tmp_path):
+        """新写入的 NaN 必须覆盖旧的非 NaN 值（新数据无条件胜出）。"""
+        store = ParquetFactorStore(tmp_path)
+        df1 = _make_factor_df(["AAPL"], ["2024-01-01"], {"factor_a": [1.0]})
+        df2 = _make_factor_df(["AAPL"], ["2024-01-01"], {"factor_a": [float("nan")]})
+        store.write_factors("fundamental", df1)
+        store.write_factors("fundamental", df2)
+        result = store.read_factors("fundamental")
+        assert pd.isna(result.loc[(pd.Timestamp("2024-01-01"), "AAPL"), "factor_a"])
+
+    def test_read_unknown_ticker_returns_empty(self, tmp_path):
+        """请求存在的 group 但不存在的 ticker → 空 DataFrame。"""
+        store = ParquetFactorStore(tmp_path)
+        df = _make_factor_df(["AAPL"], ["2024-01-01"])
+        store.write_factors("fundamental", df)
+        result = store.read_factors("fundamental", tickers=["UNKNOWN"])
+        assert len(result) == 0
+        assert isinstance(result.index, pd.MultiIndex)
+
+    def test_read_start_equals_end_single_day(self, tmp_path):
+        """start == end → 只返回该日的数据。"""
+        store = ParquetFactorStore(tmp_path)
+        dates = ["2024-01-01", "2024-01-02", "2024-01-03"]
+        df = _make_factor_df(["AAPL"], dates)
+        store.write_factors("fundamental", df)
+        result = store.read_factors(
+            "fundamental",
+            start=_date(2024, 1, 2),
+            end=_date(2024, 1, 2),
+        )
+        assert len(result) == 1
+        assert result.index.get_level_values("date")[0] == pd.Timestamp("2024-01-02")
+
+    def test_write_empty_df_skipped(self, tmp_path):
+        """写入空 DataFrame（0行）不创建文件。"""
+        store = ParquetFactorStore(tmp_path)
+        idx = pd.MultiIndex.from_tuples([], names=["date", "ticker"])
+        df = pd.DataFrame({"factor_a": pd.Series(dtype=float)}, index=idx)
+        store.write_factors("fundamental", df)
+        # 文件不应被创建
+        assert not (tmp_path / "fundamental.parquet").exists()
+        assert store.list_precomputed_factors() == []

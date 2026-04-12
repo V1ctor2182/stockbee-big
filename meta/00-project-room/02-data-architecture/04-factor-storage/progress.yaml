@@ -1,5 +1,5 @@
 progress:
-  completion: 0.500   # 4/8 milestones done
+  completion: 0.625   # 5/8 milestones done
   milestones:
     - id: "m1a-tokenizer-parser"
       name: "Tokenizer + Parser + AST"
@@ -93,8 +93,13 @@ progress:
 
     - id: "m4-parquet-factor-store"
       name: "预计算因子 Parquet 存储"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-11"
+      actual_files:
+        - "src/stockbee/factor_data/parquet_factor.py"
+        - "src/stockbee/factor_data/__init__.py"
+        - "tests/test_factor_data.py"
+      actual_lines: 315   # parquet_factor ~150 + __init__ +3 + tests +130 (13 cases)
       estimated_files: ["src/stockbee/factor_data/parquet_factor.py", "tests/test_factor_data.py"]
       estimated_lines: 250
       depends_on: []
@@ -104,7 +109,10 @@ progress:
         group 粒度：按数据来源分组（e.g. fundamental, sentiment, ml_score），每组一文件。
         接口：read_factors(group, tickers, start, end)，write_factors(group, df)（merge-write
         按 (date, ticker) 主键去重），list_precomputed_factors() → list[str]。
-        测试：tmp Parquet 路径，写入后读取对比，merge 去重验证。
+        merge-write 用 combine_first+update（非 concat+duplicated），保留旧列值。
+        新增输入校验：MultiIndex (date, ticker) 验证 + group 名路径穿越防护。
+        tickers=None/[] 均返回全部 tickers；start/end=None 不过滤。
+        测试：13 个 case，180 全量 pass。
 
     - id: "m5-ic-evaluator"
       name: "IC / ICIR 离线评估"
@@ -162,4 +170,13 @@ progress:
         10. test_column_order_preserved：factor_names=["B","A"] 返回 [B,A] 列顺序
         11. test_open_zero_div_nan：$open=0 → inf → 因子值 NaN 不崩
         12. test_empty_date_range：无数据日期 → 返回空 MultiIndex DataFrame，不 crash
-  commits: []
+  commits:
+    - hash: "46c5636"
+      date: "2026-04-12"
+      message: "[04-factor-storage] feat: m4 ParquetFactorStore — 预计算因子存储 + 17 tests"
+      files_changed: 5
+      specs_affected:
+        - "intent-04-factor-storage-001 (draft → active)"
+        - "change-2026-04-12-m4-parquet-store (created)"
+      milestones_affected:
+        - "m4-parquet-factor-store (→ completed)"

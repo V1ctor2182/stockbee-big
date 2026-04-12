@@ -86,13 +86,13 @@ Alpha158 全部 158 个技术因子用表达式引擎动态计算（27 组 × 5 
 
 ## 当前进度
 
-8 milestones — 4/8 完成 (m1a, m1b, m2, m3)
+8 milestones — 5/8 完成 (m1a, m1b, m2, m3, m4)
 
 1. **m1a-tokenizer-parser** — ✅ Tokenizer + Parser + AST（740行）
 2. **m1b-evaluator-basic-funcs** — ✅ Evaluator + 12 基础函数（866行）
 3. **m2-advanced-functions** — ✅ 10 高级函数（687行）
 4. **m3-alpha158-full** — ✅ Alpha158 全量 158 因子 + TS_RANK/TS_QUANTILE（516行, 167 tests）
-5. **m4-parquet-factor-store** — 预计算因子 Parquet 存储（可与 m1-m3 并行）(~250行)
+5. **m4-parquet-factor-store** — ✅ 预计算因子 Parquet 存储（315行, 13 tests, 180 全量 pass）
 6. **m5-ic-evaluator** — IC/ICIR 纯数值计算（可与 m1-m4 并行）(~200行)
 7. **m6-local-provider** — LocalFactorProvider 路由 + 模块导出 (~280行)
 8. **m7-integration-tests** — 集成层 edge case 测试（12 个场景）(~250行)

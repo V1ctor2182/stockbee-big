@@ -1,0 +1,43 @@
+spec_id: "change-2026-04-12-m4-parquet-store"
+type: change
+state: active
+intent:
+  summary: "m4 完成：ParquetFactorStore 预计算因子 Parquet 存储"
+  detail: |
+    实现 ParquetFactorStore 类，为预计算因子（fundamental/sentiment/ml_score）
+    提供按 group 分文件的 Parquet 持久化层。
+
+    实现内容：
+    - read_factors(group, tickers, start, end) → MultiIndex (date, ticker) DataFrame
+    - write_factors(group, df) — reindex + .loc 赋值（NaN 也覆盖，新数据无条件胜出）
+    - list_precomputed_factors() → sorted list[str]
+    - 输入校验：MultiIndex 验证 + group 名路径穿越防护
+    - 原子写入：write-then-rename 防止 crash 导致文件损坏
+    - date 级别归一化：pyarrow round-trip 后 object dtype → datetime64
+
+    经 2 轮 review（Codex + subagent 独立 review）修正的关键问题：
+    1. combine_first+update → reindex+.loc（修复 NaN 不传播 bug）
+    2. date 级别 dtype 归一化（修复 datetime.date object 比较 TypeError）
+    3. 空 DataFrame 写入跳过（避免空 parquet 文件污染）
+    4. 反斜杠路径穿越防护
+
+    17 个测试 case，184 全量 pass。
+
+constraints: []
+indexing:
+  type: change
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["factor-storage", "parquet", "m4", "precomputed-factors"]
+provenance:
+  source_type: implementation
+  confidence: 1.0
+  source_ref: "m4-parquet-factor-store milestone implementation"
+relations:
+  - { type: implements, target: "intent-04-factor-storage-001", reason: "实现预计算因子 Parquet 存储部分" }
+  - { type: refines, target: "change-2026-04-11-milestone-replan", reason: "完成 m4 milestone" }
+anchors:
+  - { file: "src/stockbee/factor_data/parquet_factor.py", type: source }
+  - { file: "src/stockbee/factor_data/__init__.py", type: source }
+  - { file: "tests/test_factor_data.py", type: test }
