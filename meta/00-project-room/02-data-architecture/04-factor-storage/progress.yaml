@@ -70,15 +70,18 @@ progress:
       name: "Alpha158 全量因子定义"
       status: pending
       completed_at: null
-      estimated_files: ["src/stockbee/factor_data/alpha158.py", "config/factors-alpha158.yaml", "tests/test_factor_data.py"]
-      estimated_lines: 350
+      estimated_files: ["src/stockbee/factor_data/alpha158.py", "src/stockbee/factor_data/expression_engine.py", "config/factors-alpha158.yaml", "tests/test_factor_data.py"]
+      estimated_lines: 940
       depends_on: [m1a-tokenizer-parser, m2-advanced-functions]
       complexity_flags: []
       description: |
-        alpha158.py：YAML 加载，factor registry，max_lookback()。
-        max_lookback()：调用 AST.walk() 沿嵌套链相加（MA(REF(c,5),20) → 25 非 20）。
-        config/factors-alpha158.yaml：全部 158 因子（9 KBAR + 27组×5窗口）。
-        测试：最小 YAML 片段测 loader；嵌套表达式验证 max_lookback 相加语义。
+        expression_engine.py：新增 TS_RANK/TS_QUANTILE 时序滚动函数（与横截面 RANK/QUANTILE 共存）。
+        alpha158.py：YAML 加载，factor registry，AST cache，max_lookback()。
+        max_lookback()：直接调用 AST.lookback()（嵌套相加，MA(REF(c,5),20) → 25）。
+        config/factors-alpha158.yaml：全部 158 因子（9 KBAR + 4 price + 5 VMA + 28算子×5窗口）。
+        全量 YAML 定义（含长表达式），不混合 Python factory。
+        测试：全部 158 parse + lookback 参数化断言 + 全量 evaluate smoke + 数值金标。
+        新增 decisions：NaN 比较语义（保持 pandas 默认=qlib 兼容）、TS ties/interpolation、因子别名表。
 
     - id: "m4-parquet-factor-store"
       name: "预计算因子 Parquet 存储"

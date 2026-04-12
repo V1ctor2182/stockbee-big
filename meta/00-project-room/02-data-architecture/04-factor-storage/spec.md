@@ -24,6 +24,11 @@ Alpha158 全部 158 个技术因子用表达式引擎动态计算（27 组 × 5 
 | Parquet group 粒度 | 按数据来源（fundamental/sentiment/ml_score），每组一文件 | 2026-04-11 |
 | 未知 factor 处理 | get_factors 收到未知 factor name → raise，不静默跳过 | 2026-04-11 |
 | EMA 实现 | pandas ewm(adjust=False, α=2/(n+1))，IIR 递推；与 qlib FIR 截断加权在前 ~2n 行有差异 | 2026-04-11 |
+| Alpha158 因子分布 | 9 KBAR + 4 price + 5 VMA + 28算子×5窗口 = 158（修正 PRD "27组×5"） | 2026-04-11 |
+| TS_RANK/TS_QUANTILE | 新增时序滚动函数（与横截面 RANK/QUANTILE 共存），TS_RANK ties=average，TS_QUANTILE interpolation=linear | 2026-04-11 |
+| NaN 比较语义 | 保持 pandas 默认（NaN 比较→False），与 qlib 行为一致，不改为 NaN 传播 | 2026-04-11 |
+| max_lookback 实现 | 直接用 AST.lookback()（嵌套相加），不需要 walk() | 2026-04-11 |
+| 因子定义源 | 全量 YAML（config/factors-alpha158.yaml），长表达式也写全，不混合 Python factory | 2026-04-11 |
 
 ## Contracts
 
@@ -35,13 +40,43 @@ Alpha158 全部 158 个技术因子用表达式引擎动态计算（27 组 × 5 
 - `list_factors() → list[dict]` (含 type: expression / precomputed)
 - `get_ic_report(factor_name, window=252) → dict` (ic_mean, ic_std, icir)
 
-**表达式引擎函数** (26 个):
+**表达式引擎函数** (28 个):
 - 基础 (m1b): REF/DELAY, MA/MEAN, STD, SUM, MAX, MIN, DELTA, ABS, LOG, SIGN
 - 高级 (m2): EMA, SLOPE, RSQUARE, RESI, CORR, RANK, IF, QUANTILE, IDXMAX, IDXMIN
+- 时序滚动 (m3): TS_RANK, TS_QUANTILE
+
+**Alpha158 因子名→表达式函数 Alias**:
+| Factor 前缀 | 表达式函数 | 参数 |
+|-------------|-----------|------|
+| ROC | REF | `REF($close,w)/$close` |
+| MA | MEAN | `MEAN($close,w)/$close` |
+| STD | STD | `STD($close,w)/$close` |
+| BETA | SLOPE | `SLOPE($close,w)/$close` |
+| RSQR | RSQUARE | `RSQUARE($close,w)` |
+| RESI | RESI | `RESI($close,w)/$close` |
+| MAX | MAX(rolling) | `MAX($high,w)/$close` |
+| MIN | MIN(rolling) | `MIN($low,w)/$close` |
+| QTLU | TS_QUANTILE | q=0.8 `TS_QUANTILE($close,w,0.8)/$close` |
+| QTLD | TS_QUANTILE | q=0.2 `TS_QUANTILE($close,w,0.2)/$close` |
+| RANK | TS_RANK | `TS_RANK($close,w)` |
+| RSV | MAX/MIN | `($close-MIN($low,w))/(MAX($high,w)-MIN($low,w)+1e-12)` |
+| IMAX | IDXMAX | `IDXMAX($high,w)/w` |
+| IMIN | IDXMIN | `IDXMIN($low,w)/w` |
+| IMXD | IDXMAX-IDXMIN | `(IDXMAX($high,w)-IDXMIN($low,w))/w` |
+| CORR | CORR | `CORR($close,LOG($volume+1),w)` |
+| CORD | CORR(returns) | `CORR($close/REF($close,1),LOG($volume/REF($volume,1)+1),w)` |
+| CNTP | MEAN(bool) | `MEAN($close>REF($close,1),w)` |
+| CNTN | MEAN(bool) | `MEAN($close<REF($close,1),w)` |
+| CNTD | CNTP-CNTN | 差值 |
+| SUMP/SUMN/SUMD | SUM+MAX | 比率 |
+| VMA | MEAN(volume) | `MEAN($volume,w)/($volume+1e-12)` |
+| VSTD | STD(volume) | `STD($volume,w)/($volume+1e-12)` |
+| WVMA | STD/MEAN | 嵌套加权波动率 |
+| VSUMP/VSUMN/VSUMD | SUM+MAX(volume) | 同 SUMP 但用 $volume |
 
 **AST 接口** (m1a 锁定):
-- `AST.walk() → Iterator[Node]` — 遍历全树，供 max_lookback 和集成测试
-- `AST.lookback() → int` — 沿嵌套链相加，返回该子树所需的最大 lookback 窗口
+- `AST.walk() → Iterator[Node]` — 遍历全树，供集成测试
+- `AST.lookback() → int` — 沿嵌套链相加，返回该子树所需的最大 lookback 窗口（m3 max_lookback 直接调用此接口）
 
 **IC Evaluator 接口**:
 - `compute(factor_df, prices_df, shift=1) → dict(ic_mean, ic_std, icir)`
@@ -54,7 +89,7 @@ Alpha158 全部 158 个技术因子用表达式引擎动态计算（27 组 × 5 
 1. **m1a-tokenizer-parser** — Tokenizer + Parser + AST（含 walk/lookback 接口）(~200行)
 2. **m1b-evaluator-basic-funcs** — Evaluator + 16 基础函数 + MAX/MIN 重载 (~250行)
 3. **m2-advanced-functions** — 10 高级函数（rolling OLS / cross-section RANK 等）(~300行)
-4. **m3-alpha158-full** — Alpha158 全量 158 因子定义 + max_lookback (~350行)
+4. **m3-alpha158-full** — Alpha158 全量 158 因子定义 (9 KBAR + 4 price + 5 VMA + 28算子×5窗口) + TS_RANK/TS_QUANTILE + max_lookback (~940行)
 5. **m4-parquet-factor-store** — 预计算因子 Parquet 存储（可与 m1-m3 并行）(~250行)
 6. **m5-ic-evaluator** — IC/ICIR 纯数值计算（可与 m1-m4 并行）(~200行)
 7. **m6-local-provider** — LocalFactorProvider 路由 + 模块导出 (~280行)
