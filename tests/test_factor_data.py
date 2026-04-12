@@ -2039,11 +2039,450 @@ class TestICEvaluator:
         result = compute(factor_df, prices_df, shift=1)
         assert math.isnan(result["ic_mean"])
 
-    def test_duplicate_index_raises(self):
+    def test_duplicate_prices_index_raises(self):
         """prices_df 有重复 (date, ticker) 行 → ValueError。"""
         prices_df, fwd_ret = _make_ic_data(n_tickers=3, n_dates=30)
-        # 人为制造重复行
         dup_prices = pd.concat([prices_df, prices_df.iloc[:3]])
         factor_df = pd.DataFrame({"f": fwd_ret}, index=fwd_ret.index).dropna()
         with pytest.raises(ValueError, match="duplicate"):
             compute(factor_df, dup_prices)
+
+    def test_duplicate_factor_index_raises(self):
+        """factor_df 有重复 (date, ticker) 行 → ValueError。"""
+        prices_df, fwd_ret = _make_ic_data(n_tickers=3, n_dates=30)
+        factor_df = pd.DataFrame({"f": fwd_ret}, index=fwd_ret.index).dropna()
+        dup_factor = pd.concat([factor_df, factor_df.iloc[:3]])
+        with pytest.raises(ValueError, match="duplicate"):
+            compute(dup_factor, prices_df)
+
+
+# ===========================================================================
+# m6: LocalFactorProvider + Module Exports
+# ===========================================================================
+from datetime import timedelta
+from unittest.mock import MagicMock
+
+from stockbee.factor_data import ICUniverse, LocalFactorProvider
+from stockbee.factor_data.local_provider import _normalize_date_index
+from stockbee.factor_data.parquet_factor import ParquetFactorStore
+from stockbee.providers.base import ProviderConfig
+
+
+def _make_ohlcv(
+    tickers: list[str],
+    start: str,
+    n_days: int = 60,
+) -> pd.DataFrame:
+    """合成 OHLCV MultiIndex (date, ticker) DataFrame。含 adj_close。"""
+    rng = np.random.default_rng(42)
+    dates = pd.bdate_range(start, periods=n_days)
+    rows = []
+    for t in tickers:
+        price = 100.0
+        for d in dates:
+            rows.append({
+                "date": d,
+                "ticker": t,
+                "open": price - 0.5,
+                "high": price + 0.5,
+                "low": price - 1.0,
+                "close": price,
+                "adj_close": price,
+                "volume": rng.integers(1000, 10000),
+            })
+            price *= 1 + rng.normal(0, 0.02)
+    df = pd.DataFrame(rows).set_index(["date", "ticker"]).sort_index()
+    return df
+
+
+def _mock_market_data(ohlcv: pd.DataFrame) -> MagicMock:
+    """创建一个返回固定 ohlcv 数据的 mock MarketDataProvider。"""
+    mock = MagicMock()
+    mock.get_daily_bars.return_value = ohlcv
+    return mock
+
+
+def _write_precomputed(
+    tmp_path,
+    group: str,
+    tickers: list[str],
+    dates: list[str],
+    columns: dict[str, list[float]] | None = None,
+) -> None:
+    """往 tmp_path 写一个 precomputed parquet group。"""
+    store = ParquetFactorStore(tmp_path)
+    idx_tuples = [
+        (pd.Timestamp(d), t)
+        for d in dates
+        for t in tickers
+    ]
+    idx = pd.MultiIndex.from_tuples(idx_tuples, names=["date", "ticker"])
+    n = len(idx_tuples)
+    if columns is None:
+        columns = {"pe_ratio": [float(i) for i in range(n)]}
+    df = pd.DataFrame(columns, index=idx, dtype=float)
+    store.write_factors(group, df)
+
+
+class TestLocalFactorProvider:
+    """m6: LocalFactorProvider — 路由、合并、IC 报告。"""
+
+    # --- Happy path ---
+
+    def test_expression_factors_happy_path(self, tmp_path):
+        """2 tickers, 2 expression factors → 正确 shape 和 MultiIndex。"""
+        ohlcv = _make_ohlcv(["AAPL", "TSLA"], "2024-01-01", n_days=60)
+        provider = LocalFactorProvider(
+            ProviderConfig(
+                implementation="LocalFactorProvider",
+                params={"precomputed_path": str(tmp_path)},
+            ),
+        )
+        provider.market_data = _mock_market_data(ohlcv)
+
+        result = provider.get_factors(
+            ["AAPL", "TSLA"],
+            ["KMID", "MA5"],
+            _date(2024, 2, 1),
+            _date(2024, 3, 1),
+        )
+        assert isinstance(result.index, pd.MultiIndex)
+        assert list(result.index.names) == ["date", "ticker"]
+        assert list(result.columns) == ["KMID", "MA5"]
+        assert len(result) > 0
+
+    def test_precomputed_factors_happy_path(self, tmp_path):
+        """1 precomputed factor → 读取 Parquet，无需 MarketDataProvider。"""
+        _write_precomputed(
+            tmp_path, "fundamental",
+            ["AAPL", "TSLA"],
+            ["2024-01-15", "2024-01-16", "2024-01-17"],
+        )
+        provider = LocalFactorProvider(
+            ProviderConfig(
+                implementation="LocalFactorProvider",
+                params={"precomputed_path": str(tmp_path)},
+            ),
+        )
+        result = provider.get_factors(
+            ["AAPL", "TSLA"],
+            ["pe_ratio"],
+            _date(2024, 1, 15),
+            _date(2024, 1, 17),
+        )
+        assert list(result.columns) == ["pe_ratio"]
+        assert len(result) == 6  # 3 dates × 2 tickers
+
+    def test_mixed_expression_and_precomputed(self, tmp_path):
+        """2 expression + 1 precomputed → merged DataFrame, 列顺序一致。"""
+        ohlcv = _make_ohlcv(["AAPL", "TSLA"], "2024-01-01", n_days=60)
+        _write_precomputed(
+            tmp_path, "fundamental",
+            ["AAPL", "TSLA"],
+            [str(d.date()) for d in pd.bdate_range("2024-01-01", periods=60)],
+        )
+        provider = LocalFactorProvider(
+            ProviderConfig(
+                implementation="LocalFactorProvider",
+                params={"precomputed_path": str(tmp_path)},
+            ),
+        )
+        provider.market_data = _mock_market_data(ohlcv)
+
+        factor_names = ["pe_ratio", "KMID", "MA5"]
+        result = provider.get_factors(
+            ["AAPL", "TSLA"],
+            factor_names,
+            _date(2024, 2, 1),
+            _date(2024, 3, 1),
+        )
+        assert list(result.columns) == factor_names
+
+    # --- Column order ---
+
+    def test_column_order_preserved(self, tmp_path):
+        """请求 ["B", "A"] 顺序 → 输出列顺序也是 ["B", "A"]。"""
+        ohlcv = _make_ohlcv(["AAPL"], "2024-01-01", n_days=60)
+        provider = LocalFactorProvider(
+            ProviderConfig(
+                implementation="LocalFactorProvider",
+                params={"precomputed_path": str(tmp_path)},
+            ),
+        )
+        provider.market_data = _mock_market_data(ohlcv)
+
+        result = provider.get_factors(
+            ["AAPL"],
+            ["MA5", "KMID"],
+            _date(2024, 2, 1),
+            _date(2024, 3, 1),
+        )
+        assert list(result.columns) == ["MA5", "KMID"]
+
+    # --- Error handling ---
+
+    def test_unknown_factor_raises(self, tmp_path):
+        """未知 factor name → ValueError。"""
+        provider = LocalFactorProvider(
+            ProviderConfig(
+                implementation="LocalFactorProvider",
+                params={"precomputed_path": str(tmp_path)},
+            ),
+        )
+        with pytest.raises(ValueError, match="Unknown factor"):
+            provider.get_factors(
+                ["AAPL"], ["NONEXISTENT"], _date(2024, 1, 1), _date(2024, 1, 2),
+            )
+
+    def test_expression_without_market_data_raises(self, tmp_path):
+        """请求 expression factor 但未设置 MarketDataProvider → RuntimeError。"""
+        provider = LocalFactorProvider(
+            ProviderConfig(
+                implementation="LocalFactorProvider",
+                params={"precomputed_path": str(tmp_path)},
+            ),
+        )
+        with pytest.raises(RuntimeError, match="MarketDataProvider not set"):
+            provider.get_factors(
+                ["AAPL"], ["KMID"], _date(2024, 1, 1), _date(2024, 1, 2),
+            )
+
+    def test_precomputed_without_market_data_ok(self, tmp_path):
+        """只请求 precomputed factor，不设 market_data → 应正常返回。"""
+        _write_precomputed(
+            tmp_path, "fundamental",
+            ["AAPL"],
+            ["2024-01-15", "2024-01-16"],
+        )
+        provider = LocalFactorProvider(
+            ProviderConfig(
+                implementation="LocalFactorProvider",
+                params={"precomputed_path": str(tmp_path)},
+            ),
+        )
+        # 不设 market_data
+        result = provider.get_factors(
+            ["AAPL"], ["pe_ratio"], _date(2024, 1, 15), _date(2024, 1, 16),
+        )
+        assert len(result) == 2
+
+    # --- Empty inputs ---
+
+    def test_empty_factor_names(self, tmp_path):
+        """factor_names=[] → 返回空 DataFrame。"""
+        provider = LocalFactorProvider(
+            ProviderConfig(
+                implementation="LocalFactorProvider",
+                params={"precomputed_path": str(tmp_path)},
+            ),
+        )
+        result = provider.get_factors(
+            ["AAPL"], [], _date(2024, 1, 1), _date(2024, 1, 2),
+        )
+        assert result.empty
+        assert list(result.index.names) == ["date", "ticker"]
+
+    def test_empty_ohlcv_returns_empty(self, tmp_path):
+        """market_data 返回空 → 不 crash，返回空 DataFrame。"""
+        empty_ohlcv = pd.DataFrame(
+            columns=["open", "high", "low", "close", "adj_close", "volume"],
+            index=pd.MultiIndex.from_tuples([], names=["date", "ticker"]),
+        )
+        provider = LocalFactorProvider(
+            ProviderConfig(
+                implementation="LocalFactorProvider",
+                params={"precomputed_path": str(tmp_path)},
+            ),
+        )
+        provider.market_data = _mock_market_data(empty_ohlcv)
+        result = provider.get_factors(
+            ["AAPL"], ["KMID"], _date(2024, 1, 1), _date(2024, 1, 2),
+        )
+        assert result.empty
+
+    # --- list_factors ---
+
+    def test_list_factors_expression_and_precomputed(self, tmp_path):
+        """list_factors 返回 expression + precomputed 条目。"""
+        _write_precomputed(
+            tmp_path, "sentiment",
+            ["AAPL"], ["2024-01-01"],
+            {"mood_score": [0.5]},
+        )
+        provider = LocalFactorProvider(
+            ProviderConfig(
+                implementation="LocalFactorProvider",
+                params={"precomputed_path": str(tmp_path)},
+            ),
+        )
+        factors = provider.list_factors()
+        names = {f["name"] for f in factors}
+        types = {f["type"] for f in factors}
+
+        assert "KMID" in names  # expression
+        assert "mood_score" in names  # precomputed
+        assert types == {"expression", "precomputed"}
+
+    def test_list_factors_expression_shadows_precomputed(self, tmp_path):
+        """precomputed 列名和 expression 因子同名 → expression 优先，precomputed 不出现。"""
+        # KMID is an Alpha158 expression factor
+        _write_precomputed(
+            tmp_path, "test_group",
+            ["AAPL"], ["2024-01-01"],
+            {"KMID": [42.0]},
+        )
+        provider = LocalFactorProvider(
+            ProviderConfig(
+                implementation="LocalFactorProvider",
+                params={"precomputed_path": str(tmp_path)},
+            ),
+        )
+        factors = provider.list_factors()
+        kmid_entries = [f for f in factors if f["name"] == "KMID"]
+        assert len(kmid_entries) == 1
+        assert kmid_entries[0]["type"] == "expression"
+
+    # --- get_ic_report ---
+
+    def test_ic_report_no_market_data_raises(self, tmp_path):
+        """get_ic_report 未设 market_data → RuntimeError。"""
+        provider = LocalFactorProvider(
+            ProviderConfig(
+                implementation="LocalFactorProvider",
+                params={"precomputed_path": str(tmp_path)},
+            ),
+        )
+        with pytest.raises(RuntimeError, match="MarketDataProvider not set"):
+            provider.get_ic_report("KMID")
+
+    def test_ic_report_no_universe_raises(self, tmp_path):
+        """get_ic_report 设了 market_data 但没设 ic_universe → RuntimeError。"""
+        provider = LocalFactorProvider(
+            ProviderConfig(
+                implementation="LocalFactorProvider",
+                params={"precomputed_path": str(tmp_path)},
+            ),
+        )
+        provider.market_data = MagicMock()
+        with pytest.raises(RuntimeError, match="IC universe not configured"):
+            provider.get_ic_report("KMID")
+
+    def test_ic_report_expression_factor(self, tmp_path):
+        """expression factor IC 报告返回正确 keys。"""
+        ohlcv = _make_ohlcv(["AAPL", "TSLA"], "2023-01-01", n_days=300)
+        provider = LocalFactorProvider(
+            ProviderConfig(
+                implementation="LocalFactorProvider",
+                params={"precomputed_path": str(tmp_path)},
+            ),
+        )
+        provider.market_data = _mock_market_data(ohlcv)
+        provider.ic_universe = ICUniverse(
+            tickers=["AAPL", "TSLA"],
+            start=_date(2023, 6, 1),
+            end=_date(2024, 1, 1),
+        )
+        result = provider.get_ic_report("KMID")
+        assert set(result.keys()) == {"ic_mean", "ic_std", "icir"}
+
+    def test_ic_report_unknown_factor_raises(self, tmp_path):
+        """get_ic_report 传入未知 factor → ValueError。"""
+        provider = LocalFactorProvider(
+            ProviderConfig(
+                implementation="LocalFactorProvider",
+                params={"precomputed_path": str(tmp_path)},
+            ),
+        )
+        provider.market_data = MagicMock()
+        provider.ic_universe = ICUniverse(
+            tickers=["AAPL"], start=_date(2024, 1, 1), end=_date(2024, 6, 1),
+        )
+        with pytest.raises(ValueError, match="Unknown factor"):
+            provider.get_ic_report("NONEXISTENT")
+
+    # --- Precomputed index ---
+
+    def test_precomputed_index_lazy_build(self, tmp_path):
+        """首次 get_factors 触发 lazy build，不需要手动 initialize。"""
+        _write_precomputed(
+            tmp_path, "fundamental",
+            ["AAPL"], ["2024-01-15"],
+        )
+        provider = LocalFactorProvider(
+            ProviderConfig(
+                implementation="LocalFactorProvider",
+                params={"precomputed_path": str(tmp_path)},
+            ),
+        )
+        # 不调 initialize()，直接 get_factors
+        result = provider.get_factors(
+            ["AAPL"], ["pe_ratio"], _date(2024, 1, 15), _date(2024, 1, 15),
+        )
+        assert len(result) == 1
+
+    def test_precomputed_index_via_initialize(self, tmp_path):
+        """initialize() 也触发 index build。"""
+        _write_precomputed(
+            tmp_path, "fundamental",
+            ["AAPL"], ["2024-01-15"],
+        )
+        provider = LocalFactorProvider(
+            ProviderConfig(
+                implementation="LocalFactorProvider",
+                params={"precomputed_path": str(tmp_path)},
+            ),
+        )
+        provider.initialize()
+        assert provider._precomputed_index_built
+        assert "pe_ratio" in provider._precomputed_index
+
+    # --- Name collision ---
+
+    def test_expression_wins_over_precomputed_collision(self, tmp_path):
+        """同名因子：expression 优先 routing，不读 precomputed 的 999.0。"""
+        ohlcv = _make_ohlcv(["AAPL"], "2024-01-01", n_days=60)
+        # 写一个和 KMID 同名的 precomputed factor（全 999）
+        _write_precomputed(
+            tmp_path, "test_group",
+            ["AAPL"],
+            [str(d.date()) for d in pd.bdate_range("2024-01-01", periods=60)],
+            {"KMID": [999.0] * 60},
+        )
+        provider = LocalFactorProvider(
+            ProviderConfig(
+                implementation="LocalFactorProvider",
+                params={"precomputed_path": str(tmp_path)},
+            ),
+        )
+        provider.market_data = _mock_market_data(ohlcv)
+
+        result = provider.get_factors(
+            ["AAPL"], ["KMID"], _date(2024, 2, 1), _date(2024, 3, 1),
+        )
+        # Expression KMID = ($close - $open) / $open
+        # 不应该全是 999.0
+        assert not (result["KMID"] == 999.0).all()
+
+    # --- Date normalization ---
+
+    def test_normalize_date_index_converts_date_objects(self):
+        """datetime.date index → datetime64 index。"""
+        from datetime import date as dt_date
+        idx = pd.MultiIndex.from_tuples(
+            [(dt_date(2024, 1, 1), "AAPL"), (dt_date(2024, 1, 2), "AAPL")],
+            names=["date", "ticker"],
+        )
+        df = pd.DataFrame({"x": [1.0, 2.0]}, index=idx)
+        result = _normalize_date_index(df)
+        assert pd.api.types.is_datetime64_any_dtype(
+            result.index.get_level_values("date"),
+        )
+
+    # --- Default config ---
+
+    def test_default_config_no_params(self, tmp_path):
+        """无 config 参数 → 使用默认值（Alpha158 default yaml, data/factors）。"""
+        provider = LocalFactorProvider()
+        assert len(provider._alpha158) == 158  # 默认 Alpha158 registry
+        assert provider.market_data is None
+        assert provider.ic_universe is None

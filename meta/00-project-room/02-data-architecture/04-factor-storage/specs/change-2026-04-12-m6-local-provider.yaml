@@ -1,0 +1,42 @@
+id: change-2026-04-12-m6-local-provider
+type: change
+state: active
+room: 04-factor-storage
+date: "2026-04-12"
+summary: "m6 LocalFactorProvider — ���子路由 + 合并 + IC 报告 + 20 tests"
+
+description: |
+  实现 LocalFactorProvider，整合 Alpha158 表达式引擎和 ParquetFactorStore。
+
+  核心功能：
+  - get_factors(): expression/precomputed 路由，batched Evaluator 复用，
+    outer join 合并，列顺序保持，未知 factor raise
+  - list_factors(): expression + precomputed 合并列表，同名 expression 优先
+  - get_ic_report(): wire 到 ic_evaluator.compute()，需要 ICUniverse 配置
+  - MarketDataProvider setter 注入
+  - ICUniverse dataclass（ticker universe + 日期范围）
+  - Precomputed reverse index：pyarrow schema 元数据读取，lazy build
+  - 日期��一化：_normalize_date_index 防止 date vs Timestamp TypeError
+
+  Review 驱动的改进：
+  - 空 OHLCV 短路（不构造 Evaluator）
+  - IC 价格数据多取 shift 天（前向收益不截断）
+  - 跨 group 同名 precomputed 列 warning
+  - Scalar broadcast guard（constant-only expression���
+
+  测试：20 个 case 覆盖 happy path���错误处理、空输入、
+  列顺序、名字冲突、IC 报告、lazy index、日期归一化。
+
+files_changed:
+  - src/stockbee/factor_data/local_provider.py (created, ~230 lines)
+  - src/stockbee/factor_data/__init__.py (updated, +3 lines)
+  - tests/test_factor_data.py (updated, +237 lines, 20 new tests)
+
+anchors:
+  file:
+    - src/stockbee/factor_data/local_provider.py
+    - src/stockbee/factor_data/__init__.py
+  symbols:
+    - LocalFactorProvider
+    - ICUniverse
+    - _normalize_date_index

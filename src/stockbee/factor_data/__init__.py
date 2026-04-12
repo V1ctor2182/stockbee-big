@@ -18,12 +18,15 @@ from .expression_engine import (
     tokenize,
 )
 from .ic_evaluator import compute as compute_ic
+from .local_provider import ICUniverse, LocalFactorProvider
 from .parquet_factor import ParquetFactorStore
 
 __all__ = [
     "Alpha158",
     "Evaluator",
     "ExpressionError",
+    "ICUniverse",
+    "LocalFactorProvider",
     "Node",
     "ParquetFactorStore",
     "compute_ic",

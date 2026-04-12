@@ -138,8 +138,9 @@ progress:
 
     - id: "m6-local-provider"
       name: "LocalFactorProvider + 模块导出"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-12"
+      actual_lines: 470  # local_provider ~230 + __init__ +3 + tests ~237 (20 cases)
       estimated_files: ["src/stockbee/factor_data/local_provider.py", "src/stockbee/factor_data/__init__.py", "tests/test_factor_data.py"]
       estimated_lines: 280
       depends_on: [m1b-evaluator-basic-funcs, m2-advanced-functions, m3-alpha158-full, m4-parquet-factor-store, m5-ic-evaluator]
@@ -196,3 +197,12 @@ progress:
         - "change-2026-04-12-m5-ic-evaluator (created)"
       milestones_affected:
         - "m5-ic-evaluator (→ completed)"
+    - hash: "15af978"
+      date: "2026-04-12"
+      message: "[04-factor-storage] feat: m6 LocalFactorProvider — 因子路由 + IC 报告 + 20 tests"
+      files_changed: 6
+      specs_affected:
+        - "intent-04-factor-storage-001 (anchor updated)"
+        - "change-2026-04-12-m6-local-provider (created)"
+      milestones_affected:
+        - "m6-local-provider (→ completed)"
