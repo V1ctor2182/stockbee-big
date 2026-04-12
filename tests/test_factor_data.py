@@ -1,21 +1,31 @@
 # tests/test_factor_data.py
-"""m1a — Tokenizer / Parser / AST 单元测试。
+"""m1a — Tokenizer / Parser / AST 单元测试
+m1b — Evaluator + 12 基础函数数值测试。
 
-不跑 OHLCV 数据，只验证：
+m1a 不跑 OHLCV 数据，只验证：
   - Token 流正确性
   - AST 结构形状
   - lookback() 数值
   - walk() DFS 顺序
 
+m1b 造 2 tickers 合成 OHLCV，验证：
+  - 变量映射（CLOSE→adj_close，OPEN 非复权等）
+  - 每个基础函数数值正确
+  - ticker 隔离（rolling/shift 不跨 ticker 串数据）
+  - MAX/MIN overload 两条分支
+
 运行方式（仓库根目录）：
     pytest tests/test_factor_data.py -v
 """
 
+import numpy as np
+import pandas as pd
 import pytest
 
 from stockbee.factor_data.expression_engine import (
     BinaryOp,
     Constant,
+    Evaluator,
     ExpressionError,
     FunctionCall,
     Node,
@@ -26,6 +36,7 @@ from stockbee.factor_data.expression_engine import (
     UnaryOp,
     Variable,
     _REGISTRY,
+    evaluate,
     parse,
     tokenize,
 )
@@ -321,3 +332,475 @@ class TestFunctionSpecContract:
             assert _REGISTRY[name].cross_section is False, (
                 f"{name} 不应被标记为 cross_section"
             )
+
+
+# ===========================================================================
+# m1b — Evaluator + 基础函数（含合成 OHLCV 数值验证）
+# ===========================================================================
+#
+# Panel 设计（2 tickers × 10 天，日期对齐）：
+#   AAA: close = 1..10 递增
+#   BBB: close = 20..11 递减
+#   adj_close ≠ close（验证 CLOSE→adj_close 映射）：adj_close = close * 2
+#   open = close - 0.5（用于 MAX/MIN element-wise 和非复权验证）
+#   volume = 100..1000（AAA），200..2000（BBB）
+# ---------------------------------------------------------------------------
+
+_DATES = pd.date_range("2024-01-01", periods=10, freq="D")
+
+
+def _make_panel(include_vwap: bool = False) -> pd.DataFrame:
+    """造 2 tickers × 10 天合成 OHLCV。索引 (date, ticker)。"""
+    rows = []
+    for ticker, close_series in (
+        ("AAA", list(range(1, 11))),              # 1..10
+        ("BBB", list(range(20, 10, -1))),         # 20..11
+    ):
+        for i, date in enumerate(_DATES):
+            close = close_series[i]
+            row = {
+                "date":      date,
+                "ticker":    ticker,
+                "open":      close - 0.5,          # 非复权，MAX elem 测试用
+                "high":      close + 0.5,
+                "low":       close - 1.0,
+                "close":     close,                # 非复权原价
+                "adj_close": close * 2.0,          # 复权价 = 2 × close
+                "volume":    (100 if ticker == "AAA" else 200) * (i + 1),
+            }
+            if include_vwap:
+                row["vwap"] = close + 0.1
+            rows.append(row)
+
+    df = pd.DataFrame(rows).set_index(["date", "ticker"]).sort_index()
+    return df
+
+
+@pytest.fixture
+def panel() -> pd.DataFrame:
+    return _make_panel()
+
+
+@pytest.fixture
+def panel_with_vwap() -> pd.DataFrame:
+    return _make_panel(include_vwap=True)
+
+
+def _aaa(s: pd.Series) -> pd.Series:
+    """从 (date, ticker) 索引 Series 中取 AAA 子序列，按日期排序。"""
+    return s.xs("AAA", level="ticker").sort_index()
+
+
+def _bbb(s: pd.Series) -> pd.Series:
+    return s.xs("BBB", level="ticker").sort_index()
+
+
+# ---------------------------------------------------------------------------
+# TestEvaluator — 基础求值 + 变量映射
+# ---------------------------------------------------------------------------
+
+class TestEvaluator:
+    def test_constant_only_returns_scalar(self, panel):
+        """Constant root → 返回原生 Python 标量。"""
+        assert evaluate(parse("42"), panel) == 42
+        assert evaluate(parse("3.14"), panel) == pytest.approx(3.14)
+
+    def test_close_maps_to_adj_close(self, panel):
+        """$close → panel['adj_close'] 而非 panel['close']。"""
+        result = evaluate(parse("$close"), panel)
+        expected = panel["adj_close"]
+        pd.testing.assert_series_equal(
+            result.sort_index(), expected.sort_index(), check_names=False
+        )
+        # 显式验证 AAA 第一行是 2.0（= 1 * 2），不是 1.0
+        assert _aaa(result).iloc[0] == 2.0
+
+    def test_open_is_not_adjusted(self, panel):
+        """$open → panel['open']，不被当作 adj_open。"""
+        result = evaluate(parse("$open"), panel)
+        pd.testing.assert_series_equal(
+            result.sort_index(), panel["open"].sort_index(), check_names=False
+        )
+
+    def test_high_low_volume_direct(self, panel):
+        """HIGH/LOW/VOLUME 直连对应列。"""
+        pd.testing.assert_series_equal(
+            evaluate(parse("$high"), panel).sort_index(),
+            panel["high"].sort_index(),
+            check_names=False,
+        )
+        pd.testing.assert_series_equal(
+            evaluate(parse("$low"), panel).sort_index(),
+            panel["low"].sort_index(),
+            check_names=False,
+        )
+        pd.testing.assert_series_equal(
+            evaluate(parse("$volume"), panel).sort_index(),
+            panel["volume"].sort_index(),
+            check_names=False,
+        )
+
+    def test_vwap_when_present(self, panel_with_vwap):
+        """带 vwap 列的 panel 可以引用 $vwap。"""
+        result = evaluate(parse("$vwap"), panel_with_vwap)
+        pd.testing.assert_series_equal(
+            result.sort_index(),
+            panel_with_vwap["vwap"].sort_index(),
+            check_names=False,
+        )
+
+    def test_vwap_missing_raises(self, panel):
+        """panel 无 vwap 列时引用 $vwap → ExpressionError。"""
+        with pytest.raises(ExpressionError, match="vwap"):
+            evaluate(parse("$vwap"), panel)
+
+    def test_binop_arithmetic(self, panel):
+        """$close + $open：基于复权 close + 非复权 open。"""
+        result = evaluate(parse("$close + $open"), panel)
+        expected = panel["adj_close"] + panel["open"]
+        pd.testing.assert_series_equal(
+            result.sort_index(), expected.sort_index(), check_names=False
+        )
+
+    def test_binop_with_constant(self, panel):
+        """$close * 2 → adj_close * 2。"""
+        result = evaluate(parse("$close * 2"), panel)
+        expected = panel["adj_close"] * 2
+        pd.testing.assert_series_equal(
+            result.sort_index(), expected.sort_index(), check_names=False
+        )
+
+    def test_unary_negation(self, panel):
+        """-$close → -adj_close。"""
+        result = evaluate(parse("-$close"), panel)
+        expected = -panel["adj_close"]
+        pd.testing.assert_series_equal(
+            result.sort_index(), expected.sort_index(), check_names=False
+        )
+
+    def test_evaluator_reuse_across_asts(self, panel):
+        """同一 Evaluator 实例可连续求值多个 AST。"""
+        ev = Evaluator(panel)
+        r1 = ev.evaluate(parse("$close"))
+        r2 = ev.evaluate(parse("MA($close, 3)"))
+        assert isinstance(r1, pd.Series)
+        assert isinstance(r2, pd.Series)
+        # 第二次 evaluate 不影响第一次结果
+        pd.testing.assert_series_equal(
+            r1.sort_index(), panel["adj_close"].sort_index(), check_names=False
+        )
+
+
+# ---------------------------------------------------------------------------
+# TestBasicFunctions — 12 个函数的数值正确性
+# ---------------------------------------------------------------------------
+
+class TestBasicFunctions:
+    def test_ref_shift_positive_n(self, panel):
+        """REF($close, 1)：每个 ticker 内沿时间 shift(1)，首行 NaN。"""
+        result = evaluate(parse("REF($close, 1)"), panel)
+        aaa = _aaa(result)
+        assert pd.isna(aaa.iloc[0])
+        # AAA: adj_close = 2,4,6,...；REF(1) 第 2 行 = 2（第 1 行 adj_close）
+        assert aaa.iloc[1] == 2.0
+        assert aaa.iloc[9] == 18.0   # 第 10 行 = 第 9 行 adj_close = 9*2
+
+    def test_delay_equals_ref(self, panel):
+        """DELAY 和 REF 是别名，结果必须完全相等。"""
+        r_ref = evaluate(parse("REF($close, 3)"), panel)
+        r_delay = evaluate(parse("DELAY($close, 3)"), panel)
+        pd.testing.assert_series_equal(r_ref, r_delay)
+
+    def test_ma_rolling_3(self, panel):
+        """MA($close, 3) 每个 ticker 手算 + 前 2 行 NaN。"""
+        result = evaluate(parse("MA($close, 3)"), panel)
+        aaa = _aaa(result)
+        # adj_close AAA = 2,4,6,8,10,12,14,16,18,20
+        # MA(3) 第 3 行 = (2+4+6)/3 = 4
+        assert pd.isna(aaa.iloc[0])
+        assert pd.isna(aaa.iloc[1])
+        assert aaa.iloc[2] == pytest.approx(4.0)
+        assert aaa.iloc[3] == pytest.approx(6.0)
+        assert aaa.iloc[9] == pytest.approx(18.0)  # (16+18+20)/3
+
+        bbb = _bbb(result)
+        # adj_close BBB = 40,38,36,34,32,30,28,26,24,22
+        # MA(3) 第 3 行 = (40+38+36)/3 = 38
+        assert bbb.iloc[2] == pytest.approx(38.0)
+        assert bbb.iloc[9] == pytest.approx(24.0)  # (26+24+22)/3
+
+    def test_mean_equals_ma(self, panel):
+        """MEAN 是 MA 的别名。"""
+        r_ma = evaluate(parse("MA($close, 5)"), panel)
+        r_mean = evaluate(parse("MEAN($close, 5)"), panel)
+        pd.testing.assert_series_equal(r_ma, r_mean)
+
+    def test_std_ddof1(self, panel):
+        """STD($close, 3) 用 ddof=1 样本方差。"""
+        result = evaluate(parse("STD($close, 3)"), panel)
+        aaa = _aaa(result)
+        # adj_close AAA 第 1-3 行 = 2,4,6；样本 std = 2.0
+        assert pd.isna(aaa.iloc[0])
+        assert pd.isna(aaa.iloc[1])
+        assert aaa.iloc[2] == pytest.approx(2.0)
+        # numpy std ddof=1 验证
+        expected = float(np.std([2.0, 4.0, 6.0], ddof=1))
+        assert aaa.iloc[2] == pytest.approx(expected)
+
+    def test_sum_rolling(self, panel):
+        """SUM($volume, 2)：滚动 2 日和。"""
+        result = evaluate(parse("SUM($volume, 2)"), panel)
+        aaa = _aaa(result)
+        # volume AAA = 100,200,300,400,...,1000
+        assert pd.isna(aaa.iloc[0])
+        assert aaa.iloc[1] == 300.0  # 100+200
+        assert aaa.iloc[9] == 1900.0  # 900+1000
+
+    def test_delta_equals_minus_ref(self, panel):
+        """DELTA(x, n) = x - REF(x, n)。"""
+        r_delta = evaluate(parse("DELTA($close, 2)"), panel)
+        r_manual = evaluate(parse("$close - REF($close, 2)"), panel)
+        pd.testing.assert_series_equal(r_delta, r_manual)
+        # 具体数值：AAA adj_close 差 2 行 = 每个 4.0（等差 2×2）
+        aaa = _aaa(r_delta)
+        assert pd.isna(aaa.iloc[0])
+        assert pd.isna(aaa.iloc[1])
+        assert aaa.iloc[2] == pytest.approx(4.0)
+
+    def test_abs_of_negative(self, panel):
+        """ABS(-$close) == $close。"""
+        r_abs = evaluate(parse("ABS(-$close)"), panel)
+        r_close = evaluate(parse("$close"), panel)
+        pd.testing.assert_series_equal(r_abs, r_close, check_names=False)
+        assert (r_abs >= 0).all()
+
+    def test_log_positive(self, panel):
+        """LOG($close) vs np.log(adj_close)。"""
+        result = evaluate(parse("LOG($close)"), panel)
+        expected = pd.Series(
+            np.log(panel["adj_close"].to_numpy()),
+            index=panel.index,
+        )
+        pd.testing.assert_series_equal(
+            result.sort_index(), expected.sort_index(), check_names=False
+        )
+
+    def test_sign_delta(self, panel):
+        """SIGN($close - REF($close, 1)) 对递增 AAA 应全为 +1（除首行 NaN）。"""
+        result = evaluate(parse("SIGN($close - REF($close, 1))"), panel)
+        aaa = _aaa(result)
+        assert pd.isna(aaa.iloc[0])
+        # AAA adj_close 递增 2→4→6...，diff 恒正 → sign = 1
+        assert (aaa.iloc[1:] == 1.0).all()
+
+        bbb = _bbb(result)
+        # BBB adj_close 递减 40→38→36...，diff 恒负 → sign = -1
+        assert pd.isna(bbb.iloc[0])
+        assert (bbb.iloc[1:] == -1.0).all()
+
+    def test_max_rolling_branch(self, panel):
+        """MAX($close, 3)：arg[1]=int≥2 → rolling max。"""
+        result = evaluate(parse("MAX($close, 3)"), panel)
+        aaa = _aaa(result)
+        # AAA 递增 → rolling max 就是窗口末端
+        assert pd.isna(aaa.iloc[0])
+        assert pd.isna(aaa.iloc[1])
+        assert aaa.iloc[2] == pytest.approx(6.0)    # max(2,4,6)
+        assert aaa.iloc[9] == pytest.approx(20.0)   # max(16,18,20)
+
+        bbb = _bbb(result)
+        # BBB 递减 → rolling max 就是窗口起点
+        assert bbb.iloc[2] == pytest.approx(40.0)   # max(40,38,36)
+        assert bbb.iloc[9] == pytest.approx(26.0)   # max(26,24,22)
+
+    def test_max_elementwise_branch_two_series(self, panel):
+        """MAX($close, $open)：arg[1] 是 Variable → element-wise max。
+
+        adj_close 始终 > open（AAA: 2..20 vs 0.5..9.5），结果等于 $close。
+        """
+        result = evaluate(parse("MAX($close, $open)"), panel)
+        expected = panel["adj_close"]   # 因为 adj_close > open
+        pd.testing.assert_series_equal(
+            result.sort_index(), expected.sort_index(), check_names=False,
+            check_dtype=False,
+        )
+
+    def test_max_elementwise_branch_with_float_constant(self, panel):
+        """MAX($close, 5.0)：float 常量 → element-wise，不触发 rolling。"""
+        result = evaluate(parse("MAX($close, 5.0)"), panel)
+        aaa = _aaa(result)
+        # AAA adj_close = 2..20，clip 下界到 5
+        # iloc[0] = max(2, 5) = 5, iloc[1] = max(4, 5) = 5, iloc[2] = max(6, 5) = 6
+        assert aaa.iloc[0] == 5.0
+        assert aaa.iloc[1] == 5.0
+        assert aaa.iloc[2] == 6.0
+        assert aaa.iloc[9] == 20.0
+
+    def test_min_rolling_branch(self, panel):
+        """MIN($close, 3) rolling 分支。"""
+        result = evaluate(parse("MIN($close, 3)"), panel)
+        aaa = _aaa(result)
+        assert aaa.iloc[2] == pytest.approx(2.0)   # min(2,4,6)
+        assert aaa.iloc[9] == pytest.approx(16.0)  # min(16,18,20)
+
+    def test_min_elementwise_with_integer_one(self, panel):
+        """MIN($close, 1)：arg[1]=1 < 2 → element-wise（clip 上限到 1）。"""
+        result = evaluate(parse("MIN($close, 1)"), panel)
+        aaa = _aaa(result)
+        # 所有 adj_close 都 ≥ 2，取 min 与 1 → 全部 1
+        assert (aaa == 1.0).all()
+
+
+# ---------------------------------------------------------------------------
+# TestTickerIsolation — rolling / shift 不跨 ticker 串数据
+# ---------------------------------------------------------------------------
+
+class TestTickerIsolation:
+    def test_ma_does_not_leak_across_tickers(self, panel):
+        """AAA 第 3 行的 MA(3) 必须只用 AAA 的前 3 日，不掺 BBB。"""
+        result = evaluate(parse("MA($close, 3)"), panel)
+
+        # AAA 前 3 行 adj_close = 2,4,6 → mean = 4
+        # 如果跨 ticker 串数据，BBB 的 40 会污染结果
+        aaa_row3 = _aaa(result).iloc[2]
+        assert aaa_row3 == pytest.approx(4.0)
+        assert aaa_row3 != pytest.approx(
+            (2 + 4 + 40) / 3, abs=1e-3
+        ), "rolling 串了 BBB 的数据"
+
+    def test_ref_shift_is_ticker_scoped(self, panel):
+        """REF($close, 1) 对 BBB 首行 NaN，不把 AAA 的末值接过去。"""
+        result = evaluate(parse("REF($close, 1)"), panel)
+        bbb = _bbb(result)
+        assert pd.isna(bbb.iloc[0])
+        # BBB 第 2 行 = 40（BBB 首行 adj_close），不是 AAA 末行 20
+        assert bbb.iloc[1] == 40.0
+
+
+# ---------------------------------------------------------------------------
+# TestEndToEnd — parse → evaluate 整链路
+# ---------------------------------------------------------------------------
+
+class TestEndToEnd:
+    def test_ma_diff(self, panel):
+        """MA($close, 3) - MA($close, 5)：组合表达式跑通。"""
+        result = evaluate(parse("MA($close, 3) - MA($close, 5)"), panel)
+        # AAA adj_close = 2,4,6,8,10,12,14,16,18,20
+        # 第 5 行（iloc=4）：MA3=(6+8+10)/3=8, MA5=(2+4+6+8+10)/5=6, diff=2
+        aaa = _aaa(result)
+        assert pd.isna(aaa.iloc[3])   # MA5 还没到位
+        assert aaa.iloc[4] == pytest.approx(2.0)
+
+    def test_nested_ma_ref(self, panel):
+        """MA(REF($close, 1), 3)：嵌套函数调用。
+
+        等价于：先对 close 做 shift(1)，再对结果做 MA(3)。
+        AAA adj_close = 2,4,6,8,...；shift(1) = NaN,2,4,6,...
+        MA(3) 需要窗口满 → iloc[3] = (2+4+6)/3 = 4
+        """
+        result = evaluate(parse("MA(REF($close, 1), 3)"), panel)
+        aaa = _aaa(result)
+        # 前 3 行 NaN（shift 吃 1 + 窗口前 2）
+        assert pd.isna(aaa.iloc[0])
+        assert pd.isna(aaa.iloc[1])
+        assert pd.isna(aaa.iloc[2])
+        assert aaa.iloc[3] == pytest.approx(4.0)
+
+
+# ---------------------------------------------------------------------------
+# TestEvaluatorErrors — 错误路径
+# ---------------------------------------------------------------------------
+
+class TestEvaluatorErrors:
+    def test_non_multiindex_raises(self):
+        """单层索引 panel → raise。"""
+        df = pd.DataFrame({"adj_close": [1, 2, 3]})
+        with pytest.raises(ExpressionError, match="MultiIndex"):
+            Evaluator(df)
+
+    def test_missing_ticker_level_raises(self):
+        """MultiIndex 但无 ticker 一级 → raise。"""
+        idx = pd.MultiIndex.from_product(
+            [pd.date_range("2024-01-01", periods=3), ["X"]],
+            names=["date", "symbol"],   # 故意不叫 ticker
+        )
+        df = pd.DataFrame({"adj_close": [1, 2, 3]}, index=idx)
+        with pytest.raises(ExpressionError, match="ticker"):
+            Evaluator(df)
+
+    def test_not_a_dataframe_raises(self):
+        with pytest.raises(ExpressionError, match="DataFrame"):
+            Evaluator([1, 2, 3])  # type: ignore[arg-type]
+
+    def test_missing_column_raises_on_reference(self):
+        """panel 无 adj_close 列时 evaluate $close → raise。"""
+        idx = pd.MultiIndex.from_product(
+            [pd.date_range("2024-01-01", periods=3), ["X"]],
+            names=["date", "ticker"],
+        )
+        # 故意不放 adj_close
+        df = pd.DataFrame({"open": [1, 2, 3]}, index=idx)
+        with pytest.raises(ExpressionError, match="adj_close"):
+            evaluate(parse("$close"), df)
+
+    def test_three_level_index_raises(self):
+        """(date, exchange, ticker) 三级索引必须被拒绝。
+
+        否则 groupby(level='ticker') 只挑一级分组，rolling 会跨 exchange
+        把同一 ticker 在不同 exchange 的行串成一段假连续序列，
+        输出数值错误且无法被 unit test 捕获（bug 由 Codex P2 review 发现）。
+        """
+        idx = pd.MultiIndex.from_tuples(
+            [
+                (pd.Timestamp("2024-01-01"), "NYSE",   "X"),
+                (pd.Timestamp("2024-01-01"), "NASDAQ", "X"),
+                (pd.Timestamp("2024-01-02"), "NYSE",   "X"),
+                (pd.Timestamp("2024-01-02"), "NASDAQ", "X"),
+            ],
+            names=["date", "exchange", "ticker"],
+        )
+        df = pd.DataFrame({"adj_close": [1.0, 2.0, 3.0, 4.0]}, index=idx)
+        with pytest.raises(ExpressionError, match="2 级"):
+            Evaluator(df)
+
+
+# ---------------------------------------------------------------------------
+# TestEvaluatorEdgeCases — 回归测试（P2/P3 Codex review fixes）
+# ---------------------------------------------------------------------------
+
+class TestMaxMinScalarConstants:
+    """MAX/MIN overload 在纯标量表达式上必须正常返回，不崩溃。
+
+    Bug 由 Codex P3 review 发现：pure-scalar MAX(1, 2) 会错误地命中
+    rolling 分支（因为 arg[1]=2 满足 int≥2 条件），然后把标量 1 传给
+    _impl_max_rolling → .groupby(...) → AttributeError。
+    修复：rolling 分支增加 isinstance(a, Series) 守卫，退化到 element-wise。
+    """
+
+    def test_max_two_int_constants(self, panel):
+        """MAX(1, 2) 纯标量 → 返回 Python int 2。"""
+        assert evaluate(parse("MAX(1, 2)"), panel) == 2
+        # 类型保留为 Python int（不是 numpy 标量）
+        assert type(evaluate(parse("MAX(1, 2)"), panel)) is int
+
+    def test_min_two_int_constants(self, panel):
+        """MIN(5, 3) 纯标量 → 3。"""
+        assert evaluate(parse("MIN(5, 3)"), panel) == 3
+        assert type(evaluate(parse("MIN(5, 3)"), panel)) is int
+
+    def test_max_int_with_large_window_syntax(self, panel):
+        """MAX(7, 10) 虽然 arg[1]=10 满足 rolling 语法，
+        但 arg[0] 是标量，必须回落到 element-wise，返回 10。"""
+        assert evaluate(parse("MAX(7, 10)"), panel) == 10
+
+    def test_max_float_constants(self, panel):
+        """MAX(1.5, 2.5)：float 常量本就走 elem-wise 分支。"""
+        result = evaluate(parse("MAX(1.5, 2.5)"), panel)
+        assert result == pytest.approx(2.5)
+        assert isinstance(result, float)
+
+    def test_max_series_with_rolling_window_still_works(self, panel):
+        """回归测试：修复 P3 不能破坏正常的 rolling 分支。"""
+        result = evaluate(parse("MAX($close, 3)"), panel)
+        # 之前已经验证过的数值，必须依然正确
+        assert _aaa(result).iloc[2] == pytest.approx(6.0)

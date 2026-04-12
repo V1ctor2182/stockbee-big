@@ -1,5 +1,5 @@
 progress:
-  completion: 0.125   # 1/8 milestones done
+  completion: 0.25   # 2/8 milestones done
   milestones:
     - id: "m1a-tokenizer-parser"
       name: "Tokenizer + Parser + AST"
@@ -21,9 +21,14 @@ progress:
         注：m3 的 max_lookback() 依赖此处暴露的 walk() 接口，需在本 milestone 锁定。
 
     - id: "m1b-evaluator-basic-funcs"
-      name: "Evaluator + 16 基础函数"
-      status: pending
-      completed_at: null
+      name: "Evaluator + 12 基础函数"
+      status: completed
+      completed_at: "2026-04-11"
+      actual_files:
+        - "src/stockbee/factor_data/expression_engine.py"
+        - "src/stockbee/factor_data/__init__.py"
+        - "tests/test_factor_data.py"
+      actual_lines: 866  # expression_engine +281 / tests +504 / __init__ +4
       estimated_files: ["src/stockbee/factor_data/expression_engine.py", "tests/test_factor_data.py"]
       estimated_lines: 250
       depends_on: [m1a-tokenizer-parser]
@@ -31,9 +36,10 @@ progress:
       description: |
         Evaluator：遍历 AST，变量映射 CLOSE→adj_close/OPEN/HIGH/LOW/VOLUME/VWAP，
         在 MultiIndex DataFrame (date, ticker) 上执行，rolling 必须 groupby(ticker)。
-        16 基础函数：REF/DELAY, MA/MEAN, STD, SUM, MAX, MIN, DELTA, ABS, LOG, SIGN。
-        MAX/MIN 重载：第二参数整数≥2 → rolling，否则 → element-wise。
-        测试：造假 OHLCV（内存 DataFrame，2 tickers）验证各函数数值。
+        12 基础函数（10 impl）：REF/DELAY, MA/MEAN, STD, SUM, MAX, MIN, DELTA, ABS, LOG, SIGN。
+        MAX/MIN 重载：第二参数整数≥2 → rolling，否则 → element-wise（Evaluator 内 hardcode 分支，不走 register_impl）。
+        min_periods=window（Alpha158 约定）。
+        测试：造假 OHLCV（2 tickers × 10 天），33 个 m1b case，含 ticker 隔离 + adj_close 映射验证。
 
     - id: "m2-advanced-functions"
       name: "高级表达式函数"

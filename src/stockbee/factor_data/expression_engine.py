@@ -27,6 +27,9 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, Callable, Iterator
 
+import numpy as np
+import pandas as pd
+
 # ---------------------------------------------------------------------------
 # 错误类
 # ---------------------------------------------------------------------------
@@ -578,3 +581,293 @@ def parse(src: str) -> Node:
     """
     tokens = tokenize(src)
     return _Parser(tokens).parse()
+
+
+# ---------------------------------------------------------------------------
+# m1b: Evaluator（遍历 AST，在 MultiIndex (date, ticker) Panel 上求值）
+# ---------------------------------------------------------------------------
+#
+# 变量映射（硬编码，2026-04-09 决策）:
+#   CLOSE  → adj_close  (唯一被复权映射的价格)
+#   OPEN   → open       (非复权)
+#   HIGH   → high       (非复权)
+#   LOW    → low        (非复权)
+#   VOLUME → volume     (非复权)
+#   VWAP   → vwap       (可选列，缺列时引用即 raise)
+#
+# Rolling 合约:
+#   - 所有滚动函数通过 groupby(level='ticker') + transform 保证 ticker 隔离
+#   - min_periods = window（窗口不足返回 NaN，Alpha158 约定）
+#   - Evaluator 构造时 sort_index() 一次，作为 groupby 的前置不变量
+# ---------------------------------------------------------------------------
+
+_VAR_TO_COLUMN: dict[str, str] = {
+    "CLOSE":  "adj_close",
+    "OPEN":   "open",
+    "HIGH":   "high",
+    "LOW":    "low",
+    "VOLUME": "volume",
+    "VWAP":   "vwap",
+}
+
+
+def _rolling_transform(s: pd.Series, window: int, op: str) -> pd.Series:
+    """在每个 ticker 内做 rolling 聚合，保留 panel.index 对齐。
+
+    核心合约：
+      - groupby(level='ticker')：不跨 ticker 串数据
+      - min_periods=window：窗口不足返回 NaN
+      - transform：输出 shape/index 与输入一致
+    """
+    return (
+        s.groupby(level="ticker", sort=False, group_keys=False)
+         .transform(lambda x: getattr(x.rolling(window=window, min_periods=window), op)())
+    )
+
+
+# --- 基础函数实现（element-wise + rolling） ---
+
+def _impl_ref(s: pd.Series, n: int) -> pd.Series:
+    """REF/DELAY：在每个 ticker 内沿时间 shift n 个周期（正向 = 取过去）。"""
+    return s.groupby(level="ticker", sort=False, group_keys=False).shift(n)
+
+
+def _impl_ma(s: pd.Series, n: int) -> pd.Series:
+    return _rolling_transform(s, n, "mean")
+
+
+def _impl_std(s: pd.Series, n: int) -> pd.Series:
+    # pandas rolling.std 默认 ddof=1（样本标准差）
+    return _rolling_transform(s, n, "std")
+
+
+def _impl_sum(s: pd.Series, n: int) -> pd.Series:
+    return _rolling_transform(s, n, "sum")
+
+
+def _impl_delta(s: pd.Series, n: int) -> pd.Series:
+    """DELTA(x, n) = x - REF(x, n)。"""
+    return s - _impl_ref(s, n)
+
+
+def _impl_max_rolling(s: pd.Series, n: int) -> pd.Series:
+    return _rolling_transform(s, n, "max")
+
+
+def _impl_min_rolling(s: pd.Series, n: int) -> pd.Series:
+    return _rolling_transform(s, n, "min")
+
+
+def _impl_abs(x: Any) -> Any:
+    if isinstance(x, pd.Series):
+        return x.abs()
+    return abs(x)
+
+
+def _impl_log(x: Any) -> Any:
+    # numpy 默认：log(0)=-inf, log(负)=NaN + RuntimeWarning
+    # 按 decision E：不拦截，让数值向下游传播
+    with np.errstate(divide="ignore", invalid="ignore"):
+        if isinstance(x, pd.Series):
+            return pd.Series(np.log(x.to_numpy()), index=x.index)
+        return float(np.log(x))
+
+
+def _impl_sign(x: Any) -> Any:
+    if isinstance(x, pd.Series):
+        return pd.Series(np.sign(x.to_numpy()), index=x.index)
+    return float(np.sign(x))
+
+
+# 注册到 FunctionSpec（m1b 范围：12 个名字，10 个 impl）
+# REF / DELAY 共享 _impl_ref；MA / MEAN 共享 _impl_ma
+register_impl("REF",   _impl_ref)
+register_impl("DELAY", _impl_ref)
+register_impl("MA",    _impl_ma)
+register_impl("MEAN",  _impl_ma)
+register_impl("STD",   _impl_std)
+register_impl("SUM",   _impl_sum)
+register_impl("DELTA", _impl_delta)
+register_impl("ABS",   _impl_abs)
+register_impl("LOG",   _impl_log)
+register_impl("SIGN",  _impl_sign)
+# 注意：MAX/MIN 不走 register_impl。它们的 overload 分支在 Evaluator._eval_call
+# 里直接 hardcode（需要访问 AST 节点类型判断 rolling vs element-wise），避免把
+# overload 语义塞进 FunctionSpec.impl 签名。
+
+
+# --- 二元 / 一元运算 ---
+
+def _apply_binop(op: str, left: Any, right: Any) -> Any:
+    """算术 + 比较运算符分发。pandas/numpy 会自动处理 Series 与 scalar 的广播。"""
+    if op == "+":  return left + right
+    if op == "-":  return left - right
+    if op == "*":  return left * right
+    if op == "/":  return left / right
+    if op == "<":  return left < right
+    if op == ">":  return left > right
+    if op == "<=": return left <= right
+    if op == ">=": return left >= right
+    if op == "==": return left == right
+    if op == "!=": return left != right
+    raise ExpressionError(f"未知二元运算符 {op!r}")
+
+
+class Evaluator:
+    """在 MultiIndex (date, ticker) Panel 上求值 AST。
+
+    典型用法：
+        ev = Evaluator(panel)
+        series = ev.evaluate(parse("MA($close, 20)"))
+
+    构造阶段一次性：
+      - 校验 panel.index.names 含 'ticker' 一级（rolling 所需）
+      - sort_index 一次（groupby 前置不变量）
+      - 构建 self._vars: VAR_NAME → panel 列 Series 的映射
+
+    一个 Evaluator 实例绑定一个 panel。多次 evaluate 不同 AST 复用同一 panel
+    的映射和排序结果，避免重复开销（m3 Alpha158 会对同一 panel 跑数百次）。
+    """
+
+    def __init__(self, panel: pd.DataFrame) -> None:
+        if not isinstance(panel, pd.DataFrame):
+            raise ExpressionError(
+                f"Evaluator 需要 pandas DataFrame，实际得到 {type(panel).__name__}"
+            )
+
+        if not isinstance(panel.index, pd.MultiIndex):
+            raise ExpressionError(
+                "Evaluator 要求 panel 是 MultiIndex DataFrame "
+                "(levels: date, ticker)"
+            )
+
+        # 必须正好 2 级：否则 (date, exchange, ticker) 这类 panel 会被
+        # groupby(level='ticker') 放过，rolling 在 exchange 维度上串数据。
+        if panel.index.nlevels != 2:
+            raise ExpressionError(
+                f"Evaluator 要求 panel.index 正好 2 级 (date, ticker)，"
+                f"实际 {panel.index.nlevels} 级 levels={list(panel.index.names)}"
+            )
+
+        if "ticker" not in (panel.index.names or []):
+            raise ExpressionError(
+                f"Evaluator 要求 panel.index 含 'ticker' 一级，"
+                f"实际 levels={list(panel.index.names)}"
+            )
+
+        # 不在用户对象上原地 sort，拷贝索引排序后的视图
+        self._panel = panel.sort_index()
+
+        # 预构建 VAR → Series 映射。缺列的变量（如 vwap）不提前 raise，
+        # 等真正引用时才 raise —— 避免 panel 只含 OHLCV 的正常场景下被卡。
+        self._vars: dict[str, pd.Series] = {}
+        for var_name, col in _VAR_TO_COLUMN.items():
+            if col in self._panel.columns:
+                self._vars[var_name] = self._panel[col]
+
+    @property
+    def panel(self) -> pd.DataFrame:
+        """返回 sort_index 后的 panel 视图（只读语义，调用方不应修改）。"""
+        return self._panel
+
+    @property
+    def index(self) -> pd.MultiIndex:
+        return self._panel.index  # type: ignore[return-value]
+
+    def evaluate(self, root: Node) -> Any:
+        """求值 AST 根节点。
+
+        返回：
+          - pd.Series 对齐 panel.index（大多数情况）
+          - Python scalar（当 root 是 Constant 时）
+        """
+        return self._eval(root)
+
+    # --- 内部派发 ---
+
+    def _eval(self, node: Node) -> Any:
+        if isinstance(node, Constant):
+            return node.value
+
+        if isinstance(node, Variable):
+            series = self._vars.get(node.name)
+            if series is None:
+                col = _VAR_TO_COLUMN.get(node.name, "?")
+                raise ExpressionError(
+                    f"Panel 缺少变量 {node.name} 所需的列 {col!r}；"
+                    f"panel 现有列={list(self._panel.columns)}"
+                )
+            return series
+
+        if isinstance(node, UnaryOp):
+            val = self._eval(node.operand)
+            if node.op == "-":
+                return -val
+            raise ExpressionError(f"未知一元运算符 {node.op!r}")
+
+        if isinstance(node, BinaryOp):
+            left = self._eval(node.left)
+            right = self._eval(node.right)
+            return _apply_binop(node.op, left, right)
+
+        if isinstance(node, FunctionCall):
+            return self._eval_call(node)
+
+        raise ExpressionError(f"未知 AST 节点类型 {type(node).__name__}")
+
+    def _eval_call(self, node: FunctionCall) -> Any:
+        spec = _get_spec(node.name)
+
+        # --- MAX / MIN overload：arg[1] 为 int ≥ 2 → rolling，否则 element-wise ---
+        if spec.overloaded_max_min:
+            win_node = node.args[1]
+            is_rolling_syntax = (
+                isinstance(win_node, Constant)
+                and isinstance(win_node.value, int)
+                and win_node.value >= 2
+            )
+            # 先评估第一个操作数。rolling 分支只在 data 是 Series 时才合法；
+            # 若 data 退化为标量（如 MAX(1, 2) 这类纯常量表达式），
+            # 走 element-wise 路径返回标量 max/min，而不是调 rolling 崩溃。
+            a = self._eval(node.args[0])
+            if is_rolling_syntax and isinstance(a, pd.Series):
+                win = int(win_node.value)  # type: ignore[union-attr]
+                if node.name == "MAX":
+                    return _impl_max_rolling(a, win)
+                return _impl_min_rolling(a, win)
+            # element-wise 分支：两个操作数都求值后走 np.maximum/minimum
+            b = self._eval(node.args[1])
+            if isinstance(a, pd.Series) or isinstance(b, pd.Series):
+                fn = np.maximum if node.name == "MAX" else np.minimum
+                base = a if isinstance(a, pd.Series) else b
+                return pd.Series(fn(a, b), index=base.index)
+            # 纯标量：用 Python 内置 max/min 保留原生 int/float 类型
+            py_fn = max if node.name == "MAX" else min
+            return py_fn(a, b)
+
+        # --- 横截面函数 / element-wise / 纯 rolling 的统一派发 ---
+        if spec.impl is None:
+            raise ExpressionError(
+                f"函数 {node.name} 尚未注册实现（m1b 范围：REF/DELAY/MA/MEAN/"
+                f"STD/SUM/DELTA/MAX/MIN/ABS/LOG/SIGN；其余函数在 m2 实现）"
+            )
+
+        win_idx = spec.rolling_arg_index
+        args: list[Any] = []
+        for i, arg in enumerate(node.args):
+            if i == win_idx:
+                # parse 阶段已校验为 Constant int ≥ 1
+                assert isinstance(arg, Constant) and isinstance(arg.value, int)
+                args.append(int(arg.value))
+            else:
+                args.append(self._eval(arg))
+        return spec.impl(*args)
+
+
+def evaluate(root: Node, panel: pd.DataFrame) -> Any:
+    """便捷 free function：等价于 Evaluator(panel).evaluate(root)。
+
+    一次性求值场景用此函数；多次对同一 panel 求值请直接复用 Evaluator 实例，
+    避免重复 sort_index 和变量映射重建。
+    """
+    return Evaluator(panel).evaluate(root)
