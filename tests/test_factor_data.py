@@ -1453,3 +1453,117 @@ class TestAlpha158Lookback:
             assert a.max_lookback(name) == w + 1, (
                 f"{name} expected lookback={w+1}, got {a.max_lookback(name)}"
             )
+
+
+# ===========================================================================
+# m3 — Alpha158 全量 Evaluation Smoke + 数值金标
+# ===========================================================================
+
+_EVAL_DATES = pd.date_range("2024-01-01", periods=80, freq="B")
+
+
+def _make_eval_panel() -> pd.DataFrame:
+    """2 tickers × 80 交易日合成 panel（覆盖 max lookback 61）。"""
+    rows = []
+    for ticker, base_close in (("AAA", 50.0), ("BBB", 100.0)):
+        for i, date in enumerate(_EVAL_DATES):
+            c = base_close + i * 0.5
+            rows.append({
+                "date": date,
+                "ticker": ticker,
+                "open": c - 0.3,
+                "high": c + 0.8,
+                "low": c - 0.6,
+                "close": c,
+                "adj_close": c * 1.5,
+                "volume": 1000.0 + i * 10.0,
+                "vwap": c + 0.05,
+            })
+    return pd.DataFrame(rows).set_index(["date", "ticker"]).sort_index()
+
+
+@pytest.fixture(scope="module")
+def eval_panel() -> pd.DataFrame:
+    return _make_eval_panel()
+
+
+@pytest.fixture(scope="module")
+def alpha() -> Alpha158:
+    return Alpha158()
+
+
+class TestAlpha158EvalSmoke:
+    """全量 158 因子 evaluate smoke：无异常、返回 Series、index 对齐。"""
+
+    def test_all_158_evaluate_no_exception(self, eval_panel, alpha):
+        ev = Evaluator(eval_panel)
+        for name in alpha.list_factor_names():
+            ast = alpha.get_expression(name)
+            result = ev.evaluate(ast)
+            assert isinstance(result, pd.Series), (
+                f"{name} evaluate 返回 {type(result).__name__}，期望 Series"
+            )
+            assert result.index.equals(eval_panel.sort_index().index), (
+                f"{name} index 不对齐"
+            )
+
+    def test_kmid_numeric(self, eval_panel, alpha):
+        """KMID = ($close-$open)/$open 数值核对。"""
+        ev = Evaluator(eval_panel)
+        result = ev.evaluate(alpha.get_expression("KMID"))
+        p = eval_panel.sort_index()
+        expected = (p["adj_close"] - p["open"]) / p["open"]
+        pd.testing.assert_series_equal(result, expected, check_names=False)
+
+    def test_open0_numeric(self, eval_panel, alpha):
+        """OPEN0 = $open/$close 数值核对。"""
+        ev = Evaluator(eval_panel)
+        result = ev.evaluate(alpha.get_expression("OPEN0"))
+        p = eval_panel.sort_index()
+        expected = p["open"] / p["adj_close"]
+        pd.testing.assert_series_equal(result, expected, check_names=False)
+
+    def test_ma5_against_groundtruth(self, eval_panel, alpha):
+        """MA5 = MEAN($close,5)/$close vs pandas groupby rolling。"""
+        ev = Evaluator(eval_panel)
+        result = ev.evaluate(alpha.get_expression("MA5"))
+        p = eval_panel.sort_index()
+        ma = (
+            p["adj_close"]
+            .groupby(level="ticker", sort=False, group_keys=False)
+            .transform(lambda x: x.rolling(5, min_periods=5).mean())
+        )
+        expected = ma / p["adj_close"]
+        pd.testing.assert_series_equal(result, expected, check_names=False)
+
+    def test_ts_rank5_monotonic(self, eval_panel, alpha):
+        """TS_RANK5：AAA adj_close 单调递增 → rank = 1.0。"""
+        ev = Evaluator(eval_panel)
+        result = ev.evaluate(alpha.get_expression("RANK5"))
+        aaa = result.xs("AAA", level="ticker").sort_index()
+        for i in range(4, len(aaa)):
+            assert aaa.iloc[i] == pytest.approx(1.0), f"row {i}"
+
+    def test_cntp5_nan_comparison_behavior(self, eval_panel, alpha):
+        """CNTP5 第一行 NaN 比较→False（qlib 兼容，非 NaN 传播）。"""
+        ev = Evaluator(eval_panel)
+        result = ev.evaluate(alpha.get_expression("CNTP5"))
+        aaa = result.xs("AAA", level="ticker").sort_index()
+        for i in range(4):
+            assert np.isnan(aaa.iloc[i])
+        assert not np.isnan(aaa.iloc[4])
+
+    def test_vwap0_div_by_close(self, eval_panel, alpha):
+        """VWAP0 = $vwap/$close，分母不为零时正常。"""
+        ev = Evaluator(eval_panel)
+        result = ev.evaluate(alpha.get_expression("VWAP0"))
+        p = eval_panel.sort_index()
+        expected = p["vwap"] / p["adj_close"]
+        pd.testing.assert_series_equal(result, expected, check_names=False)
+
+    def test_wvma60_not_all_nan(self, eval_panel, alpha):
+        """WVMA60 80 天 panel 最后几行应有值（非全 NaN）。"""
+        ev = Evaluator(eval_panel)
+        result = ev.evaluate(alpha.get_expression("WVMA60"))
+        aaa = result.xs("AAA", level="ticker").sort_index()
+        assert not aaa.iloc[-1:].isna().all()
