@@ -308,6 +308,17 @@ class LocalFactorProvider(FactorProvider):
 
         return compute_ic(factor_series, prices, shift=_IC_SHIFT, window=window)
 
+    def refresh_precomputed_index(self) -> None:
+        """强制重建 precomputed col → group 反向索引。
+
+        Lazy build 后若有新 group 落盘（e.g. 同 provider 实例内先 get_factors 再
+        write_factors 后又想读新 group），需要显式调用本方法，否则新 group 的
+        列会被当作 "Unknown factor"。
+        """
+        self._precomputed_index = {}
+        self._precomputed_index_built = False
+        self._ensure_precomputed_index()
+
     # ------ Private helpers ------
 
     def _ensure_precomputed_index(self) -> None:

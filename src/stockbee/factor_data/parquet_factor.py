@@ -8,6 +8,7 @@ Index schema: MultiIndex (date, ticker)
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import date
 from pathlib import Path
 
@@ -154,10 +155,20 @@ class ParquetFactorStore:
         return self._data_path / f"{group}.parquet"
 
     def _atomic_write(self, df: pd.DataFrame, path: Path) -> None:
-        """Write-then-rename 原子写入（POSIX rename 是原子操作）。"""
-        tmp = path.with_suffix(".parquet.tmp")
-        df.to_parquet(tmp)
-        tmp.rename(path)
+        """Write-then-rename 原子写入（POSIX rename 是原子操作）。
+
+        tmp 文件名带 uuid，避免多进程/多线程同时写同 group 时互相覆盖 tmp。
+        注意：本方法保证单次写入的文件完整性，不是跨进程的 read-modify-write 原子性
+        （并发 write_factors 仍可能丢失更新，需上层协调）。
+        """
+        tmp = path.with_suffix(f".parquet.tmp.{uuid.uuid4().hex}")
+        try:
+            df.to_parquet(tmp)
+            tmp.rename(path)
+        except Exception:
+            if tmp.exists():
+                tmp.unlink(missing_ok=True)
+            raise
 
     def _validate_group(self, group: str) -> None:
         """拒绝空 group 名和包含路径穿越字符的 group 名。"""

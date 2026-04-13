@@ -511,6 +511,49 @@ class TestColumnOrderAndAnomalies:
         # 至少一行是有限数（其他正常行）
         assert np.isfinite(values).any()
 
+    def test_refresh_precomputed_index_discovers_new_group(self, tmp_path):
+        """Lazy build 后写入新 group，refresh_precomputed_index 使其可被发现。"""
+        # 第一次 build 时 group 尚未存在
+        provider = _build_provider(tmp_path)
+        provider.initialize()
+        assert "pe_ratio" not in provider._precomputed_index
+
+        # 之后写入新 group —— 不 refresh 时应当认作 unknown factor
+        _write_precomputed(tmp_path, "fundamental",
+                           ["AAPL"], ["2024-01-02"], {"pe_ratio": [1.0]})
+        with pytest.raises(ValueError, match="Unknown factor"):
+            provider.get_factors(
+                ["AAPL"], ["pe_ratio"],
+                date(2024, 1, 2), date(2024, 1, 2),
+            )
+
+        # 调 refresh 后能找到
+        provider.refresh_precomputed_index()
+        assert "pe_ratio" in provider._precomputed_index
+        result = provider.get_factors(
+            ["AAPL"], ["pe_ratio"],
+            date(2024, 1, 2), date(2024, 1, 2),
+        )
+        assert len(result) == 1
+
+    def test_parquet_atomic_write_tmp_has_unique_suffix(self, tmp_path):
+        """并发写场景：tmp 文件名带 uuid，两次 write 不会互相覆盖 tmp。"""
+        import pyarrow.parquet as pq
+        store = ParquetFactorStore(tmp_path)
+        idx = pd.MultiIndex.from_tuples(
+            [(pd.Timestamp("2024-01-02"), "AAPL")], names=["date", "ticker"],
+        )
+        df1 = pd.DataFrame({"x": [1.0]}, index=idx)
+        df2 = pd.DataFrame({"y": [2.0]}, index=idx)
+        store.write_factors("g1", df1)
+        store.write_factors("g2", df2)
+
+        # 两个目标文件都存在，无 tmp 残留
+        leftover = list(tmp_path.glob("*.tmp*"))
+        assert leftover == []
+        assert (tmp_path / "g1.parquet").exists()
+        assert (tmp_path / "g2.parquet").exists()
+
     def test_empty_date_range_returns_empty_dataframe(self, tmp_path):
         """请求的 date range 完全在数据之外 → 空 MultiIndex DataFrame，不 crash。"""
         ohlcv = _make_ohlcv(["AAPL"], "2024-01-01", n_days=30)
