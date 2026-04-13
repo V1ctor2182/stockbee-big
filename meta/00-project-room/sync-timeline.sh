@@ -1,6 +1,5 @@
 #!/bin/bash
-# Convert timeline.yaml → JSON and embed into timeline.html so the page
-# works with file:// protocol without any external JS libraries.
+# Embed timeline.yaml as a JS variable into timeline.html.
 # Run this after updating timeline.yaml.
 # Usage: bash meta/00-project-room/sync-timeline.sh
 
@@ -15,56 +14,39 @@ if [ ! -f "$YAML" ]; then
   exit 1
 fi
 
-python3 - <<PY
-import json
-import re
-import sys
+python3 -c "
+import json, re, sys
 
 try:
     import yaml
 except ImportError:
-    sys.stderr.write(
-        "PyYAML not available — install with: pip install pyyaml\n"
-    )
+    sys.stderr.write('PyYAML not available — install with: pip install pyyaml\n')
     sys.exit(1)
 
-html_path = "$HTML"
-yaml_path = "$YAML"
+html_path = '$HTML'
+yaml_path = '$YAML'
 
-with open(yaml_path, "r") as f:
+with open(yaml_path, 'r') as f:
     data = yaml.safe_load(f)
 
 json_blob = json.dumps(data, ensure_ascii=False, indent=2)
 
-with open(html_path, "r") as f:
+with open(html_path, 'r') as f:
     html = f.read()
 
 pattern = re.compile(
-    r'(<script id="timeline-data" type="application/json">)\n.*?(</script>\n\n</body>)',
+    r'(var TIMELINE_RAW_DATA =)\n.*?;\ninit\(\);',
     re.DOTALL,
 )
-replacement = r"\1\n" + json_blob + "\n" + r"\2"
+replacement = r'\1\n' + json_blob + ';\ninit();'
 html_new, n = pattern.subn(replacement, html)
 
 if n == 0:
-    # First-time migration: replace the older text/yaml placeholder too.
-    legacy = re.compile(
-        r'<script id="timeline-data" type="text/yaml">\n.*?</script>',
-        re.DOTALL,
-    )
-    new_block = (
-        '<script id="timeline-data" type="application/json">\n'
-        + json_blob
-        + "\n</script>"
-    )
-    html_new, n = legacy.subn(new_block, html)
-
-if n == 0:
-    sys.stderr.write("Error: could not find embedded timeline-data script tag\n")
+    sys.stderr.write('Error: could not find TIMELINE_RAW_DATA block in HTML\n')
     sys.exit(2)
 
-with open(html_path, "w") as f:
+with open(html_path, 'w') as f:
     f.write(html_new)
 
-print(f"Synced timeline.yaml → JSON ({len(json_blob)} bytes) into timeline.html")
-PY
+print(f'Synced timeline.yaml → JS ({len(json_blob)} bytes) into timeline.html')
+"
