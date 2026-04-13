@@ -45,11 +45,15 @@ def _normalize_date_index(df: pd.DataFrame) -> pd.DataFrame:
     """确保 MultiIndex date 级别是 datetime64，防止 date vs Timestamp 比较 TypeError。"""
     if df.empty or not isinstance(df.index, pd.MultiIndex):
         return df
+    if "date" not in df.index.names:
+        return df
     date_level = df.index.get_level_values("date")
     if not pd.api.types.is_datetime64_any_dtype(date_level):
         df = df.copy()
+        # 按名字定位 level，不依赖 date 在 MultiIndex 的位置
+        date_pos = df.index.names.index("date")
         df.index = df.index.set_levels(
-            pd.to_datetime(df.index.levels[0]), level="date",
+            pd.to_datetime(df.index.levels[date_pos]), level="date",
         )
     return df
 

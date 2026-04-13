@@ -220,6 +220,20 @@ class TestTickerAndIndexIsolation:
         tickers_in_result = set(result.index.get_level_values("ticker").unique())
         assert tickers_in_result == {"AAPL", "TSLA"}
 
+    def test_date_level_normalization_ticker_date_order(self, tmp_path):
+        """MultiIndex names=['ticker','date'] 顺序时，_normalize_date_index 仍按名字定位 level，不崩。"""
+        from stockbee.factor_data.local_provider import _normalize_date_index
+        tuples = [("AAPL", date(2024, 1, d))
+                  for d in range(2, 10) if date(2024, 1, d).weekday() < 5]
+        idx = pd.MultiIndex.from_tuples(tuples, names=["ticker", "date"])
+        df = pd.DataFrame({"x": [1.0] * len(tuples)}, index=idx)
+        # 反序 MultiIndex，date 在位置 1。若实现用 levels[0] 会把 ticker 字符串
+        # 送进 to_datetime → 抛错；本用例保证 name-based 定位。
+        result = _normalize_date_index(df)
+        assert pd.api.types.is_datetime64_any_dtype(
+            result.index.get_level_values("date"),
+        )
+
     def test_date_level_normalization_end_to_end(self, tmp_path):
         """market_data 返回 datetime.date level index（非 Timestamp）→ 合并不 TypeError。"""
         # 构造 object dtype date level
