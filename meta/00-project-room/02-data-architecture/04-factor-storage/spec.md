@@ -86,7 +86,7 @@ Alpha158 全部 158 个技术因子用表达式引擎动态计算（27 组 × 5 
 
 ## 当前进度
 
-8 milestones — 7/8 完成 (m1a, m1b, m2, m3, m4, m5, m6)
+8 milestones — 8/8 完成 (m1a, m1b, m2, m3, m4, m5, m6, m7) ✅
 
 1. **m1a-tokenizer-parser** — ✅ Tokenizer + Parser + AST（740行）
 2. **m1b-evaluator-basic-funcs** — ✅ Evaluator + 12 基础函数（866行）
@@ -95,11 +95,11 @@ Alpha158 全部 158 个技术因子用表达式引擎动态计算（27 组 × 5 
 5. **m4-parquet-factor-store** — ✅ 预计算因子 Parquet 存储（315行, 17 tests, 184 全量 pass）
 6. **m5-ic-evaluator** — ✅ IC/ICIR 纯数值离线评估（248行, 19 tests, 203 全量 pass）
 7. **m6-local-provider** — ✅ LocalFactorProvider 路由 + 模块导出 + ICUniverse（~470行, 20 tests, 224 全量 pass）
-8. **m7-integration-tests** — 集成层 edge case 测试（12 个场景）(~250行)
+8. **m7-integration-tests** — ✅ 集成层 edge case 测试（18 个场景，7 组，512行, 18 tests, 665 全量 pass）
 
 **并行路径**：m1a / m4 / m5 三条链第一天可同时开工。
 
 ---
 _spec 状态: intent (active), change (active)_
-_spec.md 最后更新: 2026-04-12 (m6 完成)_
+_spec.md 最后更新: 2026-04-13 (m7 完成，Room 全部完成)_
 _specs 目录: 1 intent + 5 change = 6 个 spec 文件_

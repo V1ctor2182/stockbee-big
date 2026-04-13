@@ -1,5 +1,5 @@
 progress:
-  completion: 0.75   # 6/8 milestones done
+  completion: 1.0   # 8/8 milestones done (m1a, m1b, m2, m3, m4, m5, m6, m7)
   milestones:
     - id: "m1a-tokenizer-parser"
       name: "Tokenizer + Parser + AST"
@@ -157,27 +157,31 @@ progress:
 
     - id: "m7-integration-tests"
       name: "集成层 edge case 测试"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-13"
+      actual_files:
+        - "tests/test_factor_integration.py"
+      actual_lines: 512   # helpers + 18 cases 分 7 组
       estimated_files: ["tests/test_factor_integration.py"]
       estimated_lines: 250
       depends_on: [m6-local-provider]
       complexity_flags: []
       description: |
-        专用集成测试文件，覆盖单元测试无法发现的跨模块 edge case。
-        每个 case 显式命名，场景清单：
-        1. test_nested_ref_lookback：MA(REF(c,5),20) lookback=25，trim 后 start 正确
-        2. test_lookback_calendar_vs_trading：lookback 用交易日延伸，trim 回 user start
-        3. test_multiindex_groupby_isolation：2 tickers 不同起止日，rolling 不跨 ticker 串数据
-        4. test_cross_section_rank_multi_ticker：RANK 按日做 cross-section，单 ticker 退化边界
-        5. test_precomputed_expression_index_merge：Parquet (ticker,date) 与 (date,ticker) 对齐
-        6. test_adjusted_price_split_boundary：split 日前后 adj_close ratio 正确，volume 不复权
-        7. test_ic_forward_shift_no_lookahead：shift=1 无前瞻，手工算参考值断言
-        8. test_setter_not_injected_raises：无 MarketData 调 expression 因子 → RuntimeError
-        9. test_unknown_factor_raises：未知 factor name → 明确异常
-        10. test_column_order_preserved：factor_names=["B","A"] 返回 [B,A] 列顺序
-        11. test_open_zero_div_nan：$open=0 → inf → 因子值 NaN 不崩
-        12. test_empty_date_range：无数据日期 → 返回空 MultiIndex DataFrame，不 crash
+        18 个集成测试分 7 组，与 m6 单元测试无重复。Review 后删除与 m6 重复的
+        setter/unknown_factor/single-source column_order case，新增 7 个 corner case。
+        新增回归全量 665 pass。
+        A. Lookback & date (4): 嵌套 lookback / 日历乘数 mock 断言 / trim overshoot /
+           多因子 max_lookback 聚合
+        B. Ticker & index isolation (3): groupby ticker 隔离 / market_data 返回 ticker
+           子集 / datetime.date 级别规范化端到端
+        D. Precomputed merge & routing (3): 索引对齐 / 跨 group 合并 / precomputed
+           与 expression 日期范围不对齐时的 outer-join
+        E. Variable mapping (2): $close→adj_close 端到端 / $volume 不复权
+        F. IC report integration (3): oracle 因子 IC≈1 无 lookahead / 缺 adj_close
+           抛错透传 / ic_universe 超出数据 NaN 报告
+        G. 列序与异常 (3): 交错 precomputed+expression 列序 / $open=0 inf/NaN / 空 date range
+        原计划 case 6 (split) 因 Evaluator 只见 adj_close 改为 $close 映射端到端。
+        原 case 7 (no-lookahead) 强化为 oracle 因子法（factor = fwd_ret → IC ≈ 1）。
   commits:
     - hash: "46c5636"
       date: "2026-04-12"
