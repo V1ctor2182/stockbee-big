@@ -38,6 +38,8 @@ def compute(
         raise ValueError(f"window must be >= 1, got {window}")
 
     factor = _extract_factor(factor_df)
+    if factor.index.duplicated().any():
+        raise ValueError("factor_df has duplicate (date, ticker) rows")
     _validate_multiindex(prices_df, "prices_df")
 
     if _PRICE_COL not in prices_df.columns:
