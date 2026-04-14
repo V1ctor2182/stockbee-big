@@ -7,9 +7,12 @@ room:
   priority: P0
   phase: "1"
   created_at: "2026-03-24"
-  updated_at: "2026-03-24"
+  updated_at: "2026-04-13"
   prompt_test:
     passable: false
     last_tested: null
     token_count: null
-  depends_on: ['02-data-architecture/04-factor-storage']
+  depends_on:
+    - '02-data-architecture/01-stock-data'    # OHLCV 供 LightGBM label (5日前瞻 return)
+    - '02-data-architecture/02-news-data'     # 新闻文本 + news_events 表 (FinBERT/Fin-E5 输入 + 回写)
+    - '02-data-architecture/04-factor-storage' # Alpha158 因子 (LightGBM 输入) + FactorProvider precomputed 路由 (ml_score 落盘)

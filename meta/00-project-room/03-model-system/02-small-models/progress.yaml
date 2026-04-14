@@ -1,24 +1,433 @@
 progress:
-  completion: 0.0
+  completion: 0.143  # 1/7 milestones
+  # 7 milestones，参考 04-factor-storage 的 8-milestone 分法（m1a/m1b 拆、m7 集成测试独立）
+  # 设计原则：
+  #   - 每个 milestone 自带单元测试，可独立验收，不依赖下一个 milestone
+  #   - 非测试代码目标 ~250 行/milestone（少数略超至 280-300，权衡分拆成本）
+  #   - 最后一个 milestone 做跨模块集成测试（参考 04-factor-storage m7 模式）
+  #   - 依赖拓扑：m1 (含 model_io) → {m2a → m2b, m3 → m4, m5} 可并行 → m6
+  # 关键决策（见 spec.md Decisions 表）：
+  #   - XGBoost 因子融合推迟到 04-alpha-mining
+  #   - 周度 refit 推迟到 Phase 2（本 room 不做 CLI / APScheduler 调度）
+  #   - FinBERT / Fin-E5 用预训练，不做 fine-tune
+  #   - Fin-E5 重要性降级为 embedding infra + rule baseline
+  #   - P3: g2_classifier 从私有 FinBERT 实例重构为复用 m2a FinBERTScorer singleton
+  #         新 schema 列 finbert_negative/neutral/confidence + fine5_importance
+  #   - D2: m4 独立新增 evaluate_ml_score(shift=5)，不破坏已稳定的 get_ic_report
   milestones:
-    - id: "m1-FinBERT-部署"
-      name: "FinBERT 部署"
+    - id: "m1-contracts-fixtures-io"
+      name: "Contracts + Fixtures + model_io + DB Migration"
+      status: completed
+      completed_at: "2026-04-13"
+      estimated_files:
+        - "src/stockbee/small_models/__init__.py"
+        - "src/stockbee/small_models/paths.py"
+        - "src/stockbee/small_models/model_io.py"           # 从 m2a 上移：通用 artifact IO
+        - "src/stockbee/news_data/news_store.py"            # schema 扩 4 列
+        - "tests/small_models/__init__.py"                  # 空，pytest 扫描 conftest 用
+        - "tests/small_models/conftest.py"                  # OQ2 锁定：子目录 conftest 自动发现
+        - "tests/small_models/test_contracts.py"
+        - "meta/00-project-room/03-model-system/02-small-models/spec.md"
+      estimated_lines: 300   # non-test ~140 (paths 20 + model_io 80 + schema ALTER 40) + tests/fixtures ~160
+      depends_on: []
+      complexity_flags: [first_of_kind, contract_locking, shared_infra]
+      description: |
+        锁定跨模块契约 + 通用 artifact IO + shared fixtures + SQLite schema 扩列。
+        契约锁定教训来自 04-factor-storage：m1 时未锁 RANK/QUANTILE 横截面/时序 → m2 返工。
+        model_io 上移到 m1（review v2 第 1 轮 blocker）：m2a/m3/m4/m5 都用 save_pickle/load_pickle，
+        若放 m2a 会导致 m3/m4/m5 反向依赖 m2a，违反 "m2a/m3/m5 可并行" 原则。
+
+        非测试代码 (~140 行):
+          - src/stockbee/small_models/paths.py (~20 行)：路径常量
+              MODEL_ROOT = Path("data/models")
+              ML_SCORE_PARQUET = Path("data/factors/ml_score.parquet")
+          - src/stockbee/small_models/model_io.py (~80 行)：通用 artifact IO
+              def artifact_path(name: str, version: str = "current") -> Path
+              def save_pickle(obj, name, version=None, overwrite=False) -> Path  # OQ1：默认拒绝覆盖
+              def load_pickle(name: str, version: str = "current") -> object
+              def update_symlink(name: str, version: str) -> None    # POSIX symlink, Windows fallback = current.txt (OQ3)
+              def list_versions(name: str) -> list[str]               # descending date
+              NotFoundError / InvalidArtifactError 分级 raise
+              # OQ4：save_pickle 不自动 update_symlink，训练完显式调用
+          - src/stockbee/small_models/__init__.py：占位 re-export paths + model_io
+          - news_store.py 扩 schema (~40 行 diff)：
+              新增 finbert_negative REAL   (FinBERT negative softmax 概率)
+              新增 finbert_neutral REAL    (FinBERT neutral softmax 概率)
+              新增 finbert_confidence REAL (= max(sentiment_score, finbert_negative, finbert_neutral)，缓存)
+              新增 fine5_importance REAL   (Fin-E5 + rule baseline，m5 回写)
+              sentiment_score 列保留，按 P3 语义 = FinBERT positive softmax（g2 原有写法一致）
+              实现：_do_initialize() 末尾 PRAGMA table_info 探测后条件执行 ALTER TABLE ADD COLUMN
+              （SQLite 不支持 ADD COLUMN IF NOT EXISTS，必须探测）
+
+        Fixtures (~160 行)：tests/conftest_small_models.py
+          - ohlcv_fixture: 2 tickers × 60 天 adj_close/open/high/low/close/volume
+          - alpha158_fixture: 5 因子 × 50 天 × 2 tickers 的 MultiIndex DataFrame
+          - news_fixture: 20 条假新闻 (含 ticker 关联 + timestamp)
+          - embeddings_fixture: 假 embedding matrix (N, D)，D 参数化（e5-large-v2=1024, base=768）
+          - finbert_golden: 10 条已知情感的金融新闻（正向 4 / 负向 4 / 中性 2）
+          - tmp_artifact_dir: pytest tmp_path 隔离 data/models/
+
+        测试 (本 milestone 约 25 case, ~160 行):
+          - paths 路径格式
+          - model_io: save/load roundtrip；current symlink 覆盖；versions 排序；NotFoundError；损坏 pickle 拒绝
+          - 各 fixture shape / dtype / index 断言
+          - ALTER TABLE idempotency (重复 _do_initialize 不报错)
+          - 老库（无新列）打开后自动扩列，数据不丢
+
+        验收门槛：本 milestone 单独 pytest 通过；fixtures 在 m2-m5 中被复用无需修改。
+
+    - id: "m2a-finbert-scorer"
+      name: "FinBERT Scorer (纯推理 + 性能 gate)"
       status: pending
       completed_at: null
-    - id: "m2-Fin-E5-部署"
-      name: "Fin-E5 部署"
+      estimated_files:
+        - "src/stockbee/small_models/finbert_scorer.py"
+        - "src/stockbee/small_models/__init__.py"
+        - "tests/test_small_models_finbert_scorer.py"
+      estimated_lines: 450   # non-test ~200 (scorer) + tests ~250
+      depends_on: [m1-contracts-fixtures-io]
+      complexity_flags: [first_of_kind, external_model, performance_gate]
+      description: |
+        纯推理层：加载 ProsusAI/finbert，batch tokenize + forward，
+        <100ms 性能基准 hard gate（PRD §3.3 硬约束）。无 DB 副作用，无 g2 改动。
+
+        非测试代码 (~200 行):
+          - finbert_scorer.py：
+              class FinBERTScorer:
+                __init__(device: str | None = None, model_name: str = "ProsusAI/finbert")
+                  auto-detect cuda / cpu / mps；mock 友好（device="mock" 接口）
+                score_texts(texts: list[str], batch_size: int = 32) -> list[dict]
+                  返回 [{positive, negative, neutral, confidence}]
+                  三项 softmax + confidence = max(3)
+                  max_length=128 (Tech Design 约束)，truncation=True
+                __repr__, __len__
+              _SINGLETON: FinBERTScorer | None = None
+              def get_default_scorer() -> FinBERTScorer   # singleton lazy init, g2/m2b 共享
+              def reset_default_scorer() -> None          # test hook
+          - __init__.py 增量导出 FinBERTScorer + get_default_scorer
+
+        测试 (~250 行, 约 18 case):
+          - m1 golden 10 条 → argmax label 正确率 ≥ 8/10
+          - batch_size = 1 / 4 / 32 结果一致 (tol 1e-5)
+          - softmax 三项 sum ≈ 1.0, confidence = max
+          - 空列表 / 超长文本 (> 128 token) 截断不报错
+          - 全空白字符串 → neutral ≈ 1.0 或明确处理
+          - 性能 gate: batch=32, len=128, GPU <100ms / CPU <300ms (@pytest.mark.perf 隔离)
+          - CPU fallback (torch.cuda.is_available mock=False)
+          - get_default_scorer singleton（两次 get 返回同一实例）
+          - reset_default_scorer 清理
+          - HF 加载失败 → 明确错误信息（mock transformers raise）
+
+        验收：独立 pytest，性能 gate 在 @pytest.mark.perf 默认 skip，CI opt-in；功能 case 必过。
+
+    - id: "m2b-local-sentiment-provider"
+      name: "LocalSentimentProvider + g2 重构 + DB 回写"
       status: pending
       completed_at: null
-    - id: "m3-LightGBM-训练推理"
-      name: "LightGBM 训练+推理"
+      estimated_files:
+        - "src/stockbee/small_models/local_sentiment_provider.py"
+        - "src/stockbee/news_data/g2_classifier.py"           # P3 重构：复用 m2a scorer singleton
+        - "src/stockbee/news_data/news_store.py"              # 扩 insert/update 写新列
+        - "src/stockbee/small_models/__init__.py"
+        - "tests/test_small_models_sentiment_provider.py"
+      estimated_lines: 550   # non-test ~280 (provider 180 + g2 diff 50 + news_store diff 50) + tests ~270
+      depends_on: [m2a-finbert-scorer]
+      complexity_flags: [integration, refactor]
+      description: |
+        三件事：
+        (1) 实现 providers/interfaces.py:281 的 SentimentProvider
+        (2) P3 重构：g2_classifier 从私有 FinBERT 实例切到 m2a FinBERTScorer singleton
+            → 消除重复推理（同一条新闻不再跑两遍 ProsusAI/finbert）
+        (3) 扩 news_store insert/update 写 finbert_negative/neutral/confidence
+            （sentiment_score = positive 保持 g2 原语义，向后兼容）
+
+        非测试代码 (~280 行):
+          - local_sentiment_provider.py (~180 行):
+              class LocalSentimentProvider(BaseProvider, SentimentProvider):
+                __init__(scorer: FinBERTScorer | None = None, news_store: NewsStore | None = None)
+                  scorer 默认 = get_default_scorer() (m2a singleton)
+                score_texts(texts) -> list[dict]         # 透传 m2a scorer
+                get_ticker_sentiment(ticker, lookback_days=7) -> dict
+                  SELECT news_events JOIN news_tickers WHERE ticker, ts >= now - lookback
+                  加权公式：Σ(conf_i × prob_i) / Σ conf_i，conf = finbert_confidence
+                  返回 {positive, negative, neutral, confidence, count}
+                  无匹配 → 全 0 + count=0
+                backfill(since: date | None = None, limit: int = 1000) -> int
+                  查 WHERE finbert_confidence IS NULL [AND timestamp >= since] LIMIT
+                  批量 scorer.score_texts → 写 finbert_negative/neutral/confidence
+                  不覆盖 sentiment_score（g2 已写）
+                register_default()  # class method, 在 __init__.py 或显式触发注册到 PROVIDER_REGISTRY
+          - g2_classifier.py (~50 行 diff):
+              self._scorer = get_default_scorer()  # 替代原私有 pipeline
+              _classify_sentiment_batch 改调 self._scorer.score_texts
+              G2Result 新增可选 finbert_negative/finbert_neutral 字段
+              classify_batch 返回 3-way softmax，供 news_store 持久化
+              保留 use_finbert=False fallback 到规则引擎（接口无变化）
+          - news_store.py (~50 行 diff):
+              insert/update 接受 finbert_negative, finbert_neutral, finbert_confidence 参数
+              g2 sync 管道在 save_event / bulk_insert 时带入三值（None 兼容老代码路径）
+
+        测试 (~270 行, 约 22 case):
+          - score_texts 透传一致性（和 m2a 直接调用同结果）
+          - get_ticker_sentiment:
+              * 空结果 → zeros + count=0（不 raise）
+              * 加权均值公式断言（手算 golden）
+              * lookback_days 过滤
+              * 多 ticker 共享新闻
+              * NaN confidence 跳过
+          - backfill:
+              * 只更新 finbert_confidence IS NULL 的行
+              * 不覆盖 sentiment_score（g2 所写）
+              * since 过滤
+              * limit 分页
+              * 空 DB → 返回 0
+              * 1K rows chunked commit 不 OOM（performance smoke）
+          - g2 重构回归:
+              * 相同 headline 新旧路径 sentiment / score 一致 (tol 1e-4)
+              * use_finbert=False 规则降级仍工作
+              * classify_batch 写入 finbert_negative/neutral/confidence 到 DB
+              * g2 和 m2b 共享同一 FinBERTScorer 实例（get_default_scorer identity 断言）
+          - PROVIDER_REGISTRY 注册验证
+
+        验收：mock FinBERTScorer 避免测试加载 HF；real SQLite temp DB。
+
+    - id: "m3-lightgbm-trainer"
+      name: "LightGBM Trainer + label_utils"
       status: pending
       completed_at: null
-    - id: "m4-周度-refit-调度"
-      name: "周度 refit 调度"
+      estimated_files:
+        - "src/stockbee/small_models/label_utils.py"
+        - "src/stockbee/small_models/lightgbm_trainer.py"
+        - "src/stockbee/small_models/__init__.py"
+        - "tests/test_small_models_lightgbm_train.py"
+      estimated_lines: 560   # non-test ~280 (label 80 + trainer 200) + tests ~280
+      depends_on: [m1-contracts-fixtures-io]   # 用 m1 model_io.save_pickle
+      complexity_flags: [first_of_kind, ml_training]
+      description: |
+        训练路径：Alpha158 × 5日前瞻 return label (决策 B3) → LightGBM booster → pickle 落盘。
+        与 m2a/m2b/m5 可并行开发（只依赖 m1）。
+
+        非测试代码 (~280 行):
+          - label_utils.py (~80 行):
+              def forward_return_5d(prices_df: MultiIndex (date, ticker) x adj_close,
+                                    horizon: int = 5) -> Series
+                决策 B3: mean(daily_returns[t+1 .. t+horizon])
+                实现:
+                  daily_ret = prices.groupby(level="ticker").pct_change()
+                  fwd = daily_ret.groupby(level="ticker").shift(-1).rolling(horizon).mean().shift(-(horizon-1))
+                  （等价 [t+1, t+horizon] 5 天日收益率的均值）
+                尾部最后 horizon 天 NaN（预期行为，训练时 drop）
+                NaN 传播 / 停牌 / adj_close 缺失端到端处理
+          - lightgbm_trainer.py (~200 行):
+              def walk_forward_splits(dates, train_size=252, test_size=21, step=21) -> Iter[(train_idx, test_idx)]
+                严格无前看（train.max < test.min）
+              DEFAULT_PARAMS = {objective: regression, learning_rate: 0.05, ...}
+              def train_lightgbm(factor_df, label_sr, params=None, num_rounds=500, early_stop=50) -> lgb.Booster
+                seed 固定；valid set = last train_size*0.2
+              def train_and_save(factor_provider, market_data_provider,
+                                 tickers, start, end, version: str | None = None) -> Path
+                组装 Alpha158 + label（forward_return_5d）+ 训 + model_io.save_pickle
+                version 默认 = today().strftime("%Y%m%d")
+                训练完自动 update_symlink("lightgbm", version)
+              if __name__ == "__main__": argparse CLI
+
+        测试 (~280 行, 约 20 case):
+          - label_utils:
+              * 常数价 → label = 0
+              * 线性上升 → label > 0 monotonic
+              * 尾部 horizon 天 NaN 位置正确
+              * 停牌（中间 NaN 价）传播正确
+              * ticker 隔离（A 的尾部 NaN 不影响 B）
+              * B3 公式手算 golden
+          - walk_forward_splits:
+              * 无前看断言 (all train.max < test.min)
+              * step 滑动正确
+              * 最后一窗 fit 不出界
+              * train_size / test_size 边界
+          - train_lightgbm:
+              * 造假 factor + 线性 label (label = 0.5*f1 - 0.3*f2) → 训练后 IC > 0.5
+              * NaN row 自动 drop（不引入 bias）
+              * seed 固定 → 结果复现
+              * early stop 触发（noisy label）
+              * artifact pickle roundtrip (m1 model_io)
+              * update_symlink("lightgbm", version) 正确覆盖
+          - train_and_save E2E (m1 fixtures)
+
+        验收：独立 pytest，不依赖 m4。
+
+    - id: "m4-lightgbm-inference"
+      name: "LightGBM 推理 → ml_score precomputed + evaluate_ml_score"
       status: pending
       completed_at: null
-    - id: "m5-测试"
-      name: "测试"
+      estimated_files:
+        - "src/stockbee/small_models/lightgbm_scorer.py"
+        - "src/stockbee/small_models/__init__.py"
+        - "tests/test_small_models_lightgbm_infer.py"
+      estimated_lines: 470   # non-test ~200 (scorer 150 + evaluate 50) + tests ~270
+      depends_on: [m3-lightgbm-trainer]
+      complexity_flags: [integration, performance_gate]
+      description: |
+        推理路径：加载 current.pkl → 批预测 → 写 data/factors/ml_score.parquet。
+        依赖 LocalFactorProvider 的 precomputed 路由（已验证自动发现 parquet 文件，0 行 diff 到 factor-storage 代码）。
+        决策 D2：新增独立 evaluate_ml_score(shift=5)，不破坏已稳定的 get_ic_report。
+
+        非测试代码 (~200 行):
+          - lightgbm_scorer.py (~150 行):
+              class LightGBMScorer:
+                __init__(version: str = "current")  # m1 model_io.load_pickle("lightgbm", version)
+                predict(factor_df: MultiIndex x 158 cols) -> Series
+                  NaN row 自动 drop 或填充（按训练时策略）
+                predict_and_save(factor_provider, tickers, start, end) -> Path
+                  结果 MultiIndex (date, ticker) → ParquetFactorStore merge-write ml_score 分组
+                  落盘路径 = paths.ML_SCORE_PARQUET
+                <50ms hard gate (1000 rows × 158 cols)
+          - evaluate_ml_score (~50 行) in lightgbm_scorer.py 或同模块:
+              def evaluate_ml_score(
+                  factor_provider: FactorProvider,
+                  market_data_provider: MarketDataProvider,
+                  universe: list[str],
+                  start: date, end: date,
+                  shift: int = 5,
+                  window: int = 252
+              ) -> dict[str, float]:
+                # D2: 独立于 get_ic_report，直接调 ic_evaluator.compute(shift=5)
+                factor_df = factor_provider.get_factors(universe, ["ml_score"], start, end)
+                prices = market_data_provider.get_ohlcv(universe, start, end + shift*CALENDAR_MULTIPLIER)
+                return compute_ic(factor_df["ml_score"], prices["adj_close"], shift=shift, window=window)
+
+          显式交付（progress.yaml 原未列）:
+          - list_factors() 应返回包含 {"name": "ml_score", "type": "precomputed"}
+            （LocalFactorProvider 自动发现，m4 只做断言验证）
+
+        测试 (~270 行, 约 20 case):
+          - predict shape / MultiIndex (date, ticker) 保持
+          - <50ms gate (1000 × 158, GPU <50ms / CPU <150ms, @pytest.mark.perf)
+          - predict_and_save 幂等（同日重跑 merge-write 不爆）
+          - ParquetFactorStore 读写 round-trip
+          - 混合路由: FactorProvider.get_factors(["MA5", "ml_score", "RESI60"]) 列序正确，expression + precomputed 合并
+          - list_factors() 返回中包含 ml_score (type=precomputed) 断言
+          - evaluate_ml_score:
+              * 造假线性 factor → linear label → IC ≈ 1 (shift=5)
+              * shift=5 传递到 compute_ic 验证
+              * universe 为空 → raise 明确
+              * 日期范围外 → NaN 报告
+          - 空 factor df → raise
+          - artifact 不存在 → raise
+          - mock booster (np.array linear regression) 避免单测重训
+
+        验收：独立 pytest；性能 gate @pytest.mark.perf 隔离。
+
+    - id: "m5-fine5-embedding-infra"
+      name: "Fin-E5 Embedding + Rule Baseline Importance"
       status: pending
       completed_at: null
+      estimated_files:
+        - "src/stockbee/small_models/fine5_scorer.py"
+        - "src/stockbee/small_models/importance_baseline.py"
+        - "src/stockbee/small_models/__init__.py"
+        - "tests/test_small_models_fine5.py"
+      estimated_lines: 530   # non-test ~260 (scorer 180 + baseline 80) + tests ~270
+      depends_on: [m1-contracts-fixtures-io]   # 用 m1 model_io（若后续缓存 embedding）
+      complexity_flags: [scope_downgrade, external_model]
+      description: |
+        Fin-E5 降级 scope（见 spec.md 决策）：
+          - 纯 embedding infra (加载 + batch encode + cosine 相似度 + 去重)
+          - importance_score 用 rule baseline：count × |sentiment - 0.5| × reliability
+          - 精确 importance fine-tune 推迟至 04-alpha-mining
+        与 m2a/m3 可并行。
+
+        非测试代码 (~260 行):
+          - fine5_scorer.py (~180 行):
+              class FinE5Scorer:
+                __init__(device: str | None = None, model_name: str = "intfloat/e5-large-v2")
+                  HF 无 canonical fin-e5，用 e5-large-v2 fallback（spec.md 锁定）
+                  embedding_dim 参数化（通过 model.config.hidden_size 动态取，避免硬编码 1024）
+                encode(texts: list[str], batch_size: int = 16, max_length: int = 512) -> np.ndarray
+                cosine_sim(a: np.ndarray, b: np.ndarray | None = None) -> np.ndarray
+                  b=None 时返回对称矩阵
+                cosine_dedup(embeds: np.ndarray, threshold: float = 0.95) -> list[int]
+                  union-find 聚类；对称但非传递相似度下的行为：
+                  决策 → "同一 cluster" 语义 = 传递闭包（A~B, B~C, A 与 C 无视直接距离都归一组）
+                  spec.md 显式锁定该语义
+          - importance_baseline.py (~80 行):
+              def baseline_importance(news_df: DataFrame) -> Series
+                要求列：count_30d, sentiment_score (FinBERT positive), reliability_score
+                公式: min(count_30d/10, 1.0) × |sentiment_score - 0.5| × 2 × clip(reliability_score, 0, 1)
+                值域 [0, 1]
+              def backfill_importance(news_store: NewsStore, batch: int = 1000) -> int
+                读需要列 → 计算 baseline → 回写 fine5_importance（不覆盖已有非空值）
+
+        测试 (~270 行, 约 19 case):
+          - encode shape (N, hidden_size)（参数化 fixture：hidden_size 从 scorer 读）
+          - batch 一致性（batch=1 vs batch=16 tol 1e-5）
+          - 对称 cosine_sim 矩阵 diag ≈ 1，对称
+          - cosine_dedup:
+              * 2 条近似文本 → 同 cluster
+              * 无关文本 → 不同 cluster
+              * 传递闭包语义断言（A-B 相似，B-C 相似，A-C 不直接相似 → 三者同组）
+              * 空输入
+          - baseline_importance:
+              * 值域 [0, 1]
+              * 高 count + 极端 sentiment + 高 reliability → 接近 1
+              * 低 count OR 中性 sentiment → 接近 0
+              * 手算 golden
+          - backfill:
+              * 只写 NULL 行
+              * 批次分页
+              * 空 DB
+          - mock model 加载（torch.nn.Linear dummy 避免下 HF ~400MB）
+
+        验收：独立 pytest；importance 弱 baseline 不设硬门槛。
+
+    - id: "m6-integration-tests"
+      name: "跨模块集成测试"
+      status: pending
+      completed_at: null
+      estimated_files:
+        - "tests/test_small_models_integration.py"
+      estimated_lines: 520   # 纯集成测试，非测试代码 = 0
+      depends_on: [m2b-local-sentiment-provider, m4-lightgbm-inference, m5-fine5-embedding-infra]
+      complexity_flags: [cross_module_integration]
+      description: |
+        参考 04-factor-storage m7 模式（18 cases, 512 行）。
+        单元测试已覆盖单模块正确性；本 milestone 只做组合/边界/冲突验证。
+
+        集成测试分组（7 组约 16-18 case）：
+          A. Contracts + artifact 流转 (2):
+            - model_io 在 m2a / m3 / m4 / m5 间共享 (并发读/写 current symlink)
+            - artifact 版本 list → 跨模型列出（finbert / lightgbm / fine5）
+
+          B. FinBERT 端到端 (3):
+            - news → g2_classifier (复用 m2a singleton) → DB (finbert_negative/neutral/confidence) → LocalSentimentProvider.backfill（空操作，因 g2 已写）
+            - LocalSentimentProvider.get_ticker_sentiment 加权公式手算一致
+            - g2 和 m2b 共享 FinBERTScorer 同一实例（identity 断言）
+
+          C. LightGBM 端到端 (3):
+            - Alpha158 → train_lightgbm → artifact → LightGBMScorer → ml_score.parquet
+            - FactorProvider.get_factors(["ml_score"]) 读取通
+            - 混合请求 get_factors(["MA5", "ml_score", "RESI60"]) 列序 + 路由正确
+            - LocalFactorProvider.list_factors() 含 ml_score (type=precomputed)
+
+          D. evaluate_ml_score wire (2):
+            - oracle 因子验证无前看泄漏 (ml_score = fwd_ret_5d shift-6 → IC ≈ 1)
+            - shift=5 传递断言（vs get_ic_report 的硬编码 shift=1 不冲突）
+
+          E. 列冲突并存策略 (2):
+            - sentiment_score (= finbert positive, g2 写) + finbert_negative/neutral/confidence (g2 写) 一致
+            - fine5_importance 与 g2 写的 importance_score 并存、可独立查询
+            - 重构前后旧数据：老新闻只有 sentiment_score，无 finbert_negative → backfill 补齐
+
+          F. 性能回归 (2, @pytest.mark.perf 隔离，默认 CI skip):
+            - FinBERT 批推理 32 条，P95 延迟 < tolerance（GPU 100ms / CPU 300ms）
+            - LightGBM 推理 1000 条，P95 < tolerance（GPU 50ms / CPU 150ms）
+            - 3 次 warm-up + 10 次采样中位数（避免冷启动噪声）
+
+          G. Edge cases (3):
+            - universe 尾部 5 天 label 缺失 → train 不爆（自动 drop）
+            - FinBERT GPU OOM → CPU fallback 路径 invoked (仅断言 fallback_invoked=True；不验证 CPU 推理正确性等价，因 mock 不可信)
+            - 空新闻 DB → backfill 返回 0，不 raise
+            - LocalSentimentProvider.backfill 在 100K news 下 chunked commit 不 OOM（performance smoke）
+
+        验收：所有 case pass + 全量回归 (m1-m6 + factor-storage 基线 665) 全绿。
+
   commits: []

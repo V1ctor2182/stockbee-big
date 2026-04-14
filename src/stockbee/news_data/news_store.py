@@ -76,6 +76,22 @@ CREATE TABLE IF NOT EXISTS g3_daily_counts (
 );
 """
 
+# 02-small-models m1 扩列迁移。
+# SQLite 不支持 ADD COLUMN IF NOT EXISTS,_migrate_schema 先 PRAGMA 探测再条件 ALTER。
+# 语义 (见 02-small-models spec.md Decisions 表):
+#   - finbert_negative REAL   FinBERT negative softmax (g2 写)
+#   - finbert_neutral  REAL   FinBERT neutral softmax (g2 写)
+#   - finbert_confidence REAL max(positive, negative, neutral) (g2 写,m2b 查询加权用)
+#   - fine5_importance REAL   Fin-E5 + rule baseline importance (m5 回写)
+# sentiment_score 保留 = FinBERT positive softmax (g2 原语义)。
+# importance_score 保留 = g2 规则评分,与 fine5_importance 并存。
+_SMALL_MODELS_NEW_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("finbert_negative", "REAL"),
+    ("finbert_neutral", "REAL"),
+    ("finbert_confidence", "REAL"),
+    ("fine5_importance", "REAL"),
+)
+
 
 def _normalize_timestamp(ts: str | datetime) -> str | None:
     """归一化时间戳为 UTC ISO 8601 字符串。无法解析时返回 None。"""
@@ -145,9 +161,47 @@ class SqliteNewsProvider(NewsProvider):
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(_SCHEMA_SQL)
+        self._migrate_schema()
         self._conn.commit()
         count = self._count_all()
         logger.info("SqliteNewsProvider ready: %s (%d events)", self._db_path, count)
+
+    def _migrate_schema(self) -> None:
+        """老库自动升级:PRAGMA 探测缺失列后条件 ALTER TABLE ADD COLUMN。
+
+        幂等:重复调用不报错。老数据 NULL,不丢。
+
+        并发安全:两进程首次同时开库时,双方都会检测到列缺失并尝试 ALTER;
+        第二次 ALTER 会抛 `sqlite3.OperationalError: duplicate column name`,
+        此时重新 PRAGMA 探测,若列已被另一进程添加则视为成功。
+        """
+        if not self._conn:
+            raise RuntimeError("Provider not initialized")
+        for col_name, col_type in _SMALL_MODELS_NEW_COLUMNS:
+            existing = self._columns()
+            if col_name in existing:
+                continue
+            try:
+                self._conn.execute(
+                    f"ALTER TABLE news_events ADD COLUMN {col_name} {col_type}"
+                )
+                logger.info("news_events: added column %s %s", col_name, col_type)
+            except sqlite3.OperationalError as exc:
+                # 另一进程赢得了 ALTER;重新探测确认列确实已到位。
+                if col_name in self._columns():
+                    logger.debug("%s already added by peer", col_name)
+                    continue
+                raise RuntimeError(
+                    f"schema migration failed for {col_name}: {exc}"
+                ) from exc
+
+    def _columns(self) -> set[str]:
+        """返回 news_events 当前所有列名。"""
+        assert self._conn is not None
+        return {
+            row[1]
+            for row in self._conn.execute("PRAGMA table_info(news_events)").fetchall()
+        }
 
     def _do_shutdown(self) -> None:
         if self._conn:
