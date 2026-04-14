@@ -3,11 +3,11 @@ room:
   name: "因子存储"
   parent: "02-data-architecture"
   type: feature
-  lifecycle: planning
+  lifecycle: completed
   priority: P0
   phase: "1"
   created_at: "2026-03-24"
-  updated_at: "2026-03-24"
+  updated_at: "2026-04-13"
   prompt_test:
     passable: false
     last_tested: null

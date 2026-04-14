@@ -1,20 +1,212 @@
 progress:
-  completion: 0.0
+  completion: 1.0   # 8/8 milestones done (m1a, m1b, m2, m3, m4, m5, m6, m7)
   milestones:
-    - id: "m1-表达式引擎"
-      name: "表达式引擎"
-      status: pending
-      completed_at: null
-    - id: "m2-预计算-Parquet-存储"
-      name: "预计算 Parquet 存储"
-      status: pending
-      completed_at: null
-    - id: "m3-因子读取-API"
-      name: "因子读取 API"
-      status: pending
-      completed_at: null
-    - id: "m4-测试"
-      name: "测试"
-      status: pending
-      completed_at: null
-  commits: []
+    - id: "m1a-tokenizer-parser"
+      name: "Tokenizer + Parser + AST"
+      status: completed
+      completed_at: "2026-04-11"
+      actual_files:
+        - "src/stockbee/factor_data/__init__.py"
+        - "src/stockbee/factor_data/expression_engine.py"
+        - "tests/test_factor_data.py"
+      actual_lines: 740   # expression_engine ~500 + tests ~240
+      estimated_files: ["src/stockbee/factor_data/expression_engine.py", "tests/test_factor_data.py"]
+      estimated_lines: 200
+      depends_on: []
+      complexity_flags: [first_of_kind]
+      description: |
+        Tokenizer (regex) → 递归下降 Parser → AST 节点。
+        AST 必须暴露 walk() / lookback() 方法，供 max_lookback 和集成测试使用。
+        测试：只验证 AST 形状，不跑 OHLCV 数据（纯 parser 单元测试）。
+        注：m3 的 max_lookback() 依赖此处暴露的 walk() 接口，需在本 milestone 锁定。
+
+    - id: "m1b-evaluator-basic-funcs"
+      name: "Evaluator + 12 基础函数"
+      status: completed
+      completed_at: "2026-04-11"
+      actual_files:
+        - "src/stockbee/factor_data/expression_engine.py"
+        - "src/stockbee/factor_data/__init__.py"
+        - "tests/test_factor_data.py"
+      actual_lines: 866  # expression_engine +281 / tests +504 / __init__ +4
+      estimated_files: ["src/stockbee/factor_data/expression_engine.py", "tests/test_factor_data.py"]
+      estimated_lines: 250
+      depends_on: [m1a-tokenizer-parser]
+      complexity_flags: [first_of_kind]
+      description: |
+        Evaluator：遍历 AST，变量映射 CLOSE→adj_close/OPEN/HIGH/LOW/VOLUME/VWAP，
+        在 MultiIndex DataFrame (date, ticker) 上执行，rolling 必须 groupby(ticker)。
+        12 基础函数（10 impl）：REF/DELAY, MA/MEAN, STD, SUM, MAX, MIN, DELTA, ABS, LOG, SIGN。
+        MAX/MIN 重载：第二参数整数≥2 → rolling，否则 → element-wise（Evaluator 内 hardcode 分支，不走 register_impl）。
+        min_periods=window（Alpha158 约定）。
+        测试：造假 OHLCV（2 tickers × 10 天），33 个 m1b case，含 ticker 隔离 + adj_close 映射验证。
+
+    - id: "m2-advanced-functions"
+      name: "高级表达式函数"
+      status: completed
+      completed_at: "2026-04-11"
+      actual_files:
+        - "src/stockbee/factor_data/expression_engine.py"
+        - "tests/test_factor_data.py"
+        - "meta/00-project-room/02-data-architecture/04-factor-storage/spec.md"
+      actual_lines: 687   # engine +244 / tests +443
+      estimated_files: ["src/stockbee/factor_data/expression_engine.py", "tests/test_factor_data.py"]
+      estimated_lines: 300
+      depends_on: [m1b-evaluator-basic-funcs]
+      complexity_flags: [first_of_kind]
+      description: |
+        追加 10 个函数：EMA, SLOPE, RSQUARE, RESI, CORR, RANK, IF, QUANTILE, IDXMAX, IDXMIN。
+        SLOPE/RSQUARE/RESI 共享 _rolling_ols kernel：per-ticker cumcount() 做全局行号 k，
+        Σxy = Σ(k·y) − (k_t−n+1)·Σy 代数展开，避免 rolling.apply(lstsq) 慢路径。
+        RSQUARE 闭式 r² = slope²·SSxx/SStot。RESI = last-point residual（qlib 约定）。
+        RANK/QUANTILE 横截面（groupby level='date'），QUANTILE 广播回 (date,ticker)。
+        IF 支持 6 种 (cond, a, b) 标量/Series 组合。CORR via concat + apply + droplevel。
+        FunctionSpec 加 min_window 字段，EMA/SLOPE/RSQUARE/RESI/CORR 设为 2（n=1 数学退化）。
+        EMA 决策：pandas ewm(adjust=False) IIR 递推，与 qlib FIR 在前 ~2n 行有差异（见 spec.md）。
+        Evaluator dispatch 零改动——m1a 预留的 cross_section/rolling_arg_index 元数据完全够用。
+        43 个 m2 test case，全量 122 pass。5 commit 按函数分组落盘。
+
+    - id: "m3-alpha158-full"
+      name: "Alpha158 全量因子定义"
+      status: completed
+      completed_at: "2026-04-11"
+      actual_files:
+        - "src/stockbee/factor_data/expression_engine.py"
+        - "src/stockbee/factor_data/alpha158.py"
+        - "src/stockbee/factor_data/__init__.py"
+        - "config/factors-alpha158.yaml"
+        - "tests/test_factor_data.py"
+        - "meta/00-project-room/02-data-architecture/04-factor-storage/spec.md"
+      actual_lines: 516   # engine +51 / alpha158 85 / yaml 57 / __init__ +3 / tests +320
+      estimated_files: ["src/stockbee/factor_data/alpha158.py", "src/stockbee/factor_data/expression_engine.py", "config/factors-alpha158.yaml", "tests/test_factor_data.py"]
+      estimated_lines: 940
+      depends_on: [m1a-tokenizer-parser, m2-advanced-functions]
+      complexity_flags: []
+      description: |
+        expression_engine.py：新增 TS_RANK/TS_QUANTILE 时序滚动函数（与横截面 RANK/QUANTILE 共存）。
+        alpha158.py：YAML 加载，factor registry，AST cache，max_lookback()。
+        max_lookback()：直接调用 AST.lookback()（嵌套相加，MA(REF(c,5),20) → 25）。
+        config/factors-alpha158.yaml：全部 158 因子（9 KBAR + 4 price + 5 VMA + 28算子×5窗口）。
+        全量 YAML 定义（含长表达式），不混合 Python factory。
+        测试：全部 158 parse + lookback 参数化断言 + 全量 evaluate smoke + 数值金标。
+        新增 decisions：NaN 比较语义（保持 pandas 默认=qlib 兼容）、TS ties/interpolation、因子别名表。
+
+    - id: "m4-parquet-factor-store"
+      name: "预计算因子 Parquet 存储"
+      status: completed
+      completed_at: "2026-04-11"
+      actual_files:
+        - "src/stockbee/factor_data/parquet_factor.py"
+        - "src/stockbee/factor_data/__init__.py"
+        - "tests/test_factor_data.py"
+      actual_lines: 315   # parquet_factor ~150 + __init__ +3 + tests +130 (13 cases)
+      estimated_files: ["src/stockbee/factor_data/parquet_factor.py", "tests/test_factor_data.py"]
+      estimated_lines: 250
+      depends_on: []
+      complexity_flags: []
+      description: |
+        参照 parquet_macro.py（234行）。存储路径：data/factors/{group}.parquet。
+        group 粒度：按数据来源分组（e.g. fundamental, sentiment, ml_score），每组一文件。
+        接口：read_factors(group, tickers, start, end)，write_factors(group, df)（merge-write
+        按 (date, ticker) 主键去重），list_precomputed_factors() → list[str]。
+        merge-write 用 combine_first+update（非 concat+duplicated），保留旧列值。
+        新增输入校验：MultiIndex (date, ticker) 验证 + group 名路径穿越防护。
+        tickers=None/[] 均返回全部 tickers；start/end=None 不过滤。
+        测试：13 个 case，180 全量 pass。
+
+    - id: "m5-ic-evaluator"
+      name: "IC / ICIR 离线评估"
+      status: completed
+      completed_at: "2026-04-12"
+      actual_files:
+        - "src/stockbee/factor_data/ic_evaluator.py"
+        - "src/stockbee/factor_data/__init__.py"
+        - "tests/test_factor_data.py"
+      actual_lines: 248   # ic_evaluator ~125 + __init__ +3 + tests ~120 (19 cases)
+      estimated_files: ["src/stockbee/factor_data/ic_evaluator.py", "tests/test_factor_data.py"]
+      estimated_lines: 200
+      depends_on: []
+      complexity_flags: []
+      description: |
+        纯数值模块，无 provider 依赖，可与 m1-m4 并行开发。
+        接口：compute(factor_df, prices_df, shift=1, window=252) → dict(ic_mean, ic_std, icir)。
+        shift 在本层做（factor at t vs return at t+shift），禁止让 caller shift。
+        逐日截面 Spearman rank IC，纯 pandas rank().corr()（零 scipy 依赖）。
+        NaN gate：有效 IC < 20 → 全 NaN。ICIR = mean/std(ddof=1)，std=0 → NaN。
+        输入校验：shift>=1, window>=1, duplicate index, 单列 factor, adj_close 存在。
+        19 个测试 case（含 golden ±1.0、noisy、边界 19/20、corner case），203 全量 pass。
+
+    - id: "m6-local-provider"
+      name: "LocalFactorProvider + 模块导出"
+      status: completed
+      completed_at: "2026-04-12"
+      actual_lines: 470  # local_provider ~230 + __init__ +3 + tests ~237 (20 cases)
+      estimated_files: ["src/stockbee/factor_data/local_provider.py", "src/stockbee/factor_data/__init__.py", "tests/test_factor_data.py"]
+      estimated_lines: 280
+      depends_on: [m1b-evaluator-basic-funcs, m2-advanced-functions, m3-alpha158-full, m4-parquet-factor-store, m5-ic-evaluator]
+      complexity_flags: []
+      description: |
+        实现 FactorProvider 接口。MarketDataProvider setter 注入（未注入时 expression 请求
+        raise RuntimeError，错误信息明确）。
+        get_factors 路由：expression → Alpha158.get_expression → Evaluator（+ lookback trim）；
+        precomputed → ParquetFactorStore。merge 时统一 (date, ticker) 索引顺序，
+        保持调用方请求的列顺序，unknown factor name 直接 raise。
+        get_ic_report() wire 到 ic_evaluator.compute()。
+        __init__.py 增量导出本模块全部公共类。
+        集成测试（happy path）：2 tickers，2 expression + 1 precomputed，验证输出 shape 和列顺序。
+
+    - id: "m7-integration-tests"
+      name: "集成层 edge case 测试"
+      status: completed
+      completed_at: "2026-04-13"
+      actual_files:
+        - "tests/test_factor_integration.py"
+      actual_lines: 512   # helpers + 18 cases 分 7 组
+      estimated_files: ["tests/test_factor_integration.py"]
+      estimated_lines: 250
+      depends_on: [m6-local-provider]
+      complexity_flags: []
+      description: |
+        18 个集成测试分 7 组，与 m6 单元测试无重复。Review 后删除与 m6 重复的
+        setter/unknown_factor/single-source column_order case，新增 7 个 corner case。
+        新增回归全量 665 pass。
+        A. Lookback & date (4): 嵌套 lookback / 日历乘数 mock 断言 / trim overshoot /
+           多因子 max_lookback 聚合
+        B. Ticker & index isolation (3): groupby ticker 隔离 / market_data 返回 ticker
+           子集 / datetime.date 级别规范化端到端
+        D. Precomputed merge & routing (3): 索引对齐 / 跨 group 合并 / precomputed
+           与 expression 日期范围不对齐时的 outer-join
+        E. Variable mapping (2): $close→adj_close 端到端 / $volume 不复权
+        F. IC report integration (3): oracle 因子 IC≈1 无 lookahead / 缺 adj_close
+           抛错透传 / ic_universe 超出数据 NaN 报告
+        G. 列序与异常 (3): 交错 precomputed+expression 列序 / $open=0 inf/NaN / 空 date range
+        原计划 case 6 (split) 因 Evaluator 只见 adj_close 改为 $close 映射端到端。
+        原 case 7 (no-lookahead) 强化为 oracle 因子法（factor = fwd_ret → IC ≈ 1）。
+  commits:
+    - hash: "46c5636"
+      date: "2026-04-12"
+      message: "[04-factor-storage] feat: m4 ParquetFactorStore — 预计算因子存储 + 17 tests"
+      files_changed: 5
+      specs_affected:
+        - "intent-04-factor-storage-001 (draft → active)"
+        - "change-2026-04-12-m4-parquet-store (created)"
+      milestones_affected:
+        - "m4-parquet-factor-store (→ completed)"
+    - hash: "461ebfc"
+      date: "2026-04-12"
+      message: "[04-factor-storage] feat: m5 IC/ICIR evaluator — 纯数值离线评估 + 19 tests"
+      files_changed: 3
+      specs_affected:
+        - "intent-04-factor-storage-001 (anchor updated)"
+        - "change-2026-04-12-m5-ic-evaluator (created)"
+      milestones_affected:
+        - "m5-ic-evaluator (→ completed)"
+    - hash: "15af978"
+      date: "2026-04-12"
+      message: "[04-factor-storage] feat: m6 LocalFactorProvider — 因子路由 + IC 报告 + 20 tests"
+      files_changed: 6
+      specs_affected:
+        - "intent-04-factor-storage-001 (anchor updated)"
+        - "change-2026-04-12-m6-local-provider (created)"
+      milestones_affected:
+        - "m6-local-provider (→ completed)"

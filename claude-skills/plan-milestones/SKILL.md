@@ -157,7 +157,8 @@ Feature Room 的 milestones 最初由 room-init 从 PRD 机械生成，粒度不
 
 ### Phase 2.5: 多方案对比（关键 milestone）
 
-对于带有 `complexity_flags` 的 milestone，必须生成 **至少 2 个实施方案** 供开发者选择。
+对于带有 `complexity_flags` 的 milestone，必须生成 **至少 2 个实施方案** 供开发者选择并 **思考是否应该拆成更多milestone**。
+
 
 方案对比维度：
 
@@ -292,7 +293,7 @@ Tech Design: §2.3 新闻数据处理管道
 | **发现 Tech Design 和 PRD 不一致** | "Tech Design 说 19 个指标，但 FRED 只能映射 17 个，怎么处理？" |
 | **字段/功能有消费者吗** | "impact_pct 现在没有下游模块消费，先加还是 defer？" |
 | **实施方案有多种路径** | 必须展示 ≥2 个方案 + 推荐理由，开发者最终选择 |
-| **设计决策的可逆性不同** | 用 sub-agent 分析：现在做 vs 后续改的工作量/风险，哪些必须锁定 |
+| **设计决策的可逆性不同** | 用 sub-agent 分析：现在做 vs 后续改的工作量/风险，哪些必须锁定，**哪些优化可以 defer 到 phase 2**。defer 的条目先记入 spec.md 的 Deferred 章节（planning loop 内部，无外部副作用）；Phase 4 用户最终确认后，再由开发者决定是否人工提 github issue——**禁止在 Phase 3 草稿阶段直接 `gh issue create`**，避免每次迭代产生重复/失效 ticket |
 
 **不问的情况**：
 - 文件命名、目录结构 → 参考已完成 Room 的模式

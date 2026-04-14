@@ -1,0 +1,96 @@
+id: change-2026-04-13-m7-integration-tests
+type: change
+state: active
+room: 04-factor-storage
+date: "2026-04-13"
+summary: "m7 集成测试 + adversarial review fix — 18 edge cases + 3 个修复，Room 全部完成"
+
+description: |
+  完成 Room 04-factor-storage 最后一个 milestone。18 个集成测试覆盖跨模块
+  edge case；adversarial review 发现 3 个生产层问题，全部修复。
+
+  测试分 7 组 18 cases（单元层无法抓到的跨模块问题）：
+    A. Lookback & date arithmetic (4):
+       - 嵌套 lookback 通过 provider 正确传递
+       - extended_start 用日历乘数 × max_lookback 计算（mock 断言）
+       - trim 移除 lookback overshoot
+       - 多因子时 extended_start 用 max(lookback)
+    B. Ticker & index isolation (3):
+       - groupby ticker rolling 隔离
+       - market_data 返回 ticker 子集不崩
+       - datetime.date level 端到端正规化
+    D. Precomputed merge & routing (3):
+       - 索引完整对齐 (date,ticker)
+       - 跨 Parquet group 合并
+       - precomputed 与 expression 日期范围不对齐 → outer-join NaN
+    E. Variable mapping (2):
+       - $close → adj_close 端到端 (adj_close=2*close 验证)
+       - $volume 不复权
+    F. IC report integration (3):
+       - Oracle 因子 (factor=fwd_ret) IC ≈ 1.0，证明 provider 无二次 shift
+       - prices 缺 adj_close → ValueError 透传
+       - ic_universe 超出数据 → NaN 报告不崩
+    G. 列序 / 异常 / 空输入 (3):
+       - [precomp, expr, precomp, expr] 交错列序保持
+       - $open=0 → inf/NaN，其他行正常
+       - 请求范围在数据外 → 空 MultiIndex DataFrame
+
+  Plan review 驱动的改动（原计划 12 → 最终 18 cases）:
+    删除与 m6 重复的 3 个 case:
+      - test_setter_not_injected_raises
+      - test_unknown_factor_raises
+      - test_column_order_preserved (原 single-source 版)
+    重构：
+      - 原 split boundary case → $close 映射端到端 (Evaluator 只见 adj_close)
+      - 原 no-lookahead case → oracle 因子法 (IC≈1)
+    新增 7 个 corner case:
+      - max_lookback 聚合
+      - ticker subset
+      - datetime.date 规范化
+      - cross-group merge
+      - date range divergence
+      - missing adj_close
+      - ic_universe out-of-data
+
+  Adversarial review 修复:
+    1. _normalize_date_index 按位置假设 date 在 level[0]，改为 name-based 定位
+       (若 MultiIndex names=['ticker','date'] 会把 ticker 字符串送 pd.to_datetime)
+    2. ParquetFactorStore._atomic_write tmp 文件带 uuid 后缀，多进程同时写同 group
+       不再互相覆盖 tmp；加 try/unlink 清理
+    3. LocalFactorProvider.refresh_precomputed_index() 公开方法：lazy build 之后
+       写入新 group 时需要显式 refresh 才能发现（否则 "Unknown factor"）
+
+files_changed:
+  - tests/test_factor_integration.py (created, 560+ lines, 21 cases)
+  - src/stockbee/factor_data/local_provider.py (modified: _normalize_date_index
+    name-based + refresh_precomputed_index 公开方法)
+  - src/stockbee/factor_data/parquet_factor.py (modified: _atomic_write uuid tmp + cleanup)
+  - meta/00-project-room/02-data-architecture/04-factor-storage/progress.yaml (m7 completed, 1.0)
+  - meta/00-project-room/02-data-architecture/04-factor-storage/spec.md (8/8 完成)
+  - meta/00-project-room/02-data-architecture/04-factor-storage/room.yaml (lifecycle: completed)
+  - meta/00-project-room/_tree.yaml (04-factor-storage 已完成)
+
+decisions_locked:
+  - Oracle 因子法是 IC no-lookahead 的黄金测试（vs 手算参考值）
+  - _CALENDAR_MULTIPLIER=2 对当前 Alpha158 所有 lookback 够用（WVMA60 = 61 最大）
+  - 空 date range 返回空 MultiIndex DataFrame 带正确列名（不抛异常）
+  - provider.refresh_precomputed_index() 是 lazy index 失效的逃生舱
+
+anchors:
+  file:
+    - tests/test_factor_integration.py
+    - src/stockbee/factor_data/local_provider.py
+    - src/stockbee/factor_data/parquet_factor.py
+  symbols:
+    - LocalFactorProvider.refresh_precomputed_index
+    - _normalize_date_index
+    - ParquetFactorStore._atomic_write
+
+followups:
+  - "Parquet write 跨进程 read-modify-write 原子性（当前 tmp 名已唯一，但两进程并发
+     write_factors 同 group 仍可能丢失更新）"
+  - "EMA IIR burn-in：EMA60 实际 ~85 交易日 buffer 下残留初始偏差 5.8%"
+  - "IDXMAX/IDXMIN 使用 rolling.apply 慢路径（~100x 可提速）"
+  - "Factor 计算无 cache，IC 报告会重复算同一因子"
+  - "$vwap 缺列 raise，建议提供 strict=False 模式跳过"
+  - "conftest.py 提取 _make_ohlcv helper（跨 test_factor_data / test_factor_integration）"

@@ -1,0 +1,42 @@
+spec_id: "change-2026-04-12-m5-ic-evaluator"
+type: change
+state: active
+intent:
+  summary: "m5 完成：IC/ICIR 离线评估纯数值模块"
+  detail: |
+    实现 ic_evaluator.py，计算因子值与前向收益的 Spearman rank IC / ICIR。
+
+    实现内容：
+    - compute(factor_df, prices_df, shift=1, window=252) → dict(ic_mean, ic_std, icir)
+    - 前向收益内部计算：groupby(ticker).shift(-shift) / price - 1
+    - 逐日截面 IC：groupby(date).apply(rank().corr())，纯 pandas 无 scipy
+    - NaN gate：有效 IC < 20 → 三项全 NaN
+    - ICIR = ic_mean / ic_std(ddof=1)，std=0 → NaN
+    - 输入校验：MultiIndex (date, ticker)、单列 factor、adj_close 存在、shift >= 1、window >= 1、无 duplicate index
+
+    经 Codex + sub-agent 双重 plan review 修正的关键问题：
+    1. golden test 修正：Spearman IC 用 perfect corr (≈1.0/-1.0) 替代错误的 0.8 目标
+    2. 删除 price_col/min_valid 公开参数（内部常量化）
+    3. 纯 pandas rank().corr() 替代 scipy spearmanr（零新依赖）
+    4. 补全 corner case：shift/window 校验、duplicate index、partial overlap、flat prices
+
+    19 个测试 case，203 全量 pass。
+
+constraints: []
+indexing:
+  type: change
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["factor-storage", "ic-evaluator", "m5", "spearman-ic"]
+provenance:
+  source_type: implementation
+  confidence: 1.0
+  source_ref: "m5-ic-evaluator milestone implementation"
+relations:
+  - { type: implements, target: "intent-04-factor-storage-001", reason: "实现 IC/ICIR 离线评估部分" }
+  - { type: refines, target: "change-2026-04-12-m4-parquet-store", reason: "完成 m5 milestone" }
+anchors:
+  - { file: "src/stockbee/factor_data/ic_evaluator.py", type: source }
+  - { file: "src/stockbee/factor_data/__init__.py", type: source }
+  - { file: "tests/test_factor_data.py", type: test }

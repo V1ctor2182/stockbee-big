@@ -1,0 +1,62 @@
+spec_id: "change-2026-04-11-m3-alpha158"
+type: change
+state: active
+intent:
+  summary: "m3-alpha158-full 实现：158 因子注册表 + TS_RANK/TS_QUANTILE + 全量测试"
+  detail: |
+    实现 Alpha158 全量 158 因子定义（m3-alpha158-full milestone）。
+
+    主要交付：
+    1. expression_engine.py 新增 TS_RANK/TS_QUANTILE 时序滚动函数
+       - 与横截面 RANK/QUANTILE 共存（不破坏 m2 已有语义）
+       - TS_QUANTILE parse 阶段 q∈[0,1] 校验
+       - TS_RANK ties=average, TS_QUANTILE interpolation=linear（pandas 默认）
+    2. config/factors-alpha158.yaml 全量 158 因子 YAML 定义
+       - 9 KBAR + 4 price + 29 算子×5 窗口 = 158
+       - 长表达式（WVMA/CORD/SUMD 等）也全写 YAML，无 Python factory 混合
+    3. alpha158.py 因子注册表
+       - YAML 加载 + 笛卡尔展开 + AST 延迟解析缓存
+       - max_lookback() = AST.lookback()（嵌套相加）
+       - list_factor_names() 固定顺序（contract）
+    4. 全量测试覆盖（167 pass，m3 新增 45 case）
+       - 全部 158 parse 成功
+       - 全部 158 lookback 参数化断言（按家族：KBAR=0, simple=w, nested=w+1）
+       - 全量 158 evaluate smoke（Series + index 对齐）
+       - 无 vwap 157 因子 smoke（真实数据源兼容性）
+       - VWAP0 无 vwap 时 raise 验证
+       - 数值金标：KMID, OPEN0, MA5, RANK5, CNTP5 NaN 行为
+
+    新增 spec decisions（8 条）：
+    - 因子分布 158 = 9+4+5+140（修正 PRD "27组×5"）
+    - TS_RANK/TS_QUANTILE 命名 + ties/interpolation
+    - NaN 比较语义（保持 pandas 默认 = qlib 兼容）
+    - 混合价格 schema（known constraint, m6 解决）
+    - VWAP0 可选依赖
+    - max_lookback 用 lookback() 非 walk()
+    - 因子定义源 = 全 YAML
+
+    Codex review findings 已处理：
+    - Finding 1 (混合 adj_close + raw OHLV): m1b 决策，非 m3 bug，记为 known constraint
+    - Finding 2 (VWAP0 smoke 假阳性): 已修复，加 157 无 vwap smoke + raise 验证
+
+constraints: []
+indexing:
+  type: change
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["factor-storage", "alpha158", "expression-engine", "ts-rank", "ts-quantile"]
+provenance:
+  source_type: implementation
+  confidence: 1.0
+  source_ref: "m3-alpha158-full implementation, 7 commits ecef8db..24605e6"
+relations:
+  - { type: implements, target: "intent-04-factor-storage-001", reason: "实现 Alpha158 因子注册表" }
+  - { type: extends, target: "change-2026-04-11-milestone-replan", reason: "完成 m3 milestone" }
+anchors:
+  - { file: "src/stockbee/factor_data/expression_engine.py", type: implementation }
+  - { file: "src/stockbee/factor_data/alpha158.py", type: implementation }
+  - { file: "config/factors-alpha158.yaml", type: config }
+  - { file: "tests/test_factor_data.py", type: test }
+  - { file: "meta/00-project-room/02-data-architecture/04-factor-storage/spec.md", type: docs }
+  - { file: "meta/00-project-room/02-data-architecture/04-factor-storage/progress.yaml", type: planning }

@@ -1,0 +1,42 @@
+spec_id: "change-2026-04-10-factor-storage-plan"
+type: change
+state: superseded
+intent:
+  summary: "04-factor-storage 里程碑重规划 + pytest 根目录配置"
+  detail: |
+    为 04-factor-storage Room 重新拆分了 6 个可开发的 milestones：
+    - m1-expression-engine-core: Tokenizer / Parser / Evaluator + 16 个基础函数
+    - m2-advanced-functions: EMA / rolling OLS / rank / quantile / idxmax/min 等高级函数
+    - m3-alpha158-full: YAML 加载 + 全量 158 因子定义
+    - m4-parquet-factor-store: 预计算因子 Parquet 读写与枚举
+    - m5-local-provider: expression / precomputed 双路由 + IC/ICIR 离线评估
+    - m6-tests: 模块导出 + 约 30 个测试
+
+    同步更新了 spec.md 的 Decisions / Contracts / 当前进度段落，使人类可读视图和
+    progress.yaml 中的新 milestone 结构一致。
+
+    同时新增根目录 pyproject.toml：
+    - [tool.pytest.ini_options]
+    - pythonpath = ["src"]
+
+    这样从仓库根目录运行 pytest 时可以直接导入 stockbee 包，不需要手动设置 PYTHONPATH。
+    .gitignore 也补充了 .DS_Store，避免本地 Finder 元数据持续污染工作区。
+constraints: []
+indexing:
+  type: change
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["planning", "factor-storage", "pytest", "repo-config"]
+provenance:
+  source_type: commit
+  confidence: 1.0
+  source_ref: "feature/factor-storage planning sync, 2026-04-10"
+relations:
+  - { type: refines, target: "intent-04-factor-storage-001", reason: "将 Room 目标拆分为可执行 milestones，并补充测试运行约定" }
+anchors:
+  - { file: "meta/00-project-room/02-data-architecture/04-factor-storage/progress.yaml", type: planning }
+  - { file: "meta/00-project-room/02-data-architecture/04-factor-storage/spec.md", type: docs }
+  - { file: "meta/00-project-room/02-data-architecture/04-factor-storage/specs/change-2026-04-10-factor-storage-plan.yaml", type: spec }
+  - { file: "pyproject.toml", type: test_config }
+  - { file: ".gitignore", type: config }
