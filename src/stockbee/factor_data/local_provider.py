@@ -258,8 +258,9 @@ class LocalFactorProvider(FactorProvider):
 
         self._ensure_precomputed_index()
         u = self._ic_universe
-        # 多取 shift 天价格数据，供 compute_ic 计算前向收益
-        price_end = u.end + timedelta(days=_IC_SHIFT * _CALENDAR_MULTIPLIER)
+        # 多取价格数据，供 compute_ic 计算前向收益（shift(-1) 需要 T+1 价格）
+        # 用 5 天 buffer 覆盖周末 + 节假日（原 _IC_SHIFT * 2 = 2 天在周五结尾时不够）
+        price_end = u.end + timedelta(days=max(_IC_SHIFT * _CALENDAR_MULTIPLIER, 5))
 
         if factor_name in self._alpha158:
             lookback = self._alpha158.max_lookback(factor_name)
