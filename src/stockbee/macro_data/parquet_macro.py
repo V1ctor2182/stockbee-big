@@ -195,20 +195,27 @@ class ParquetMacroProvider(MacroProvider):
         self._data_path.mkdir(parents=True, exist_ok=True)
         df.index = pd.to_datetime(df.index)
         df.index.name = "date"
+        tmp_path = self._parquet_path.with_suffix(".parquet.tmp")
 
         if self._parquet_path.exists():
             existing = pd.read_parquet(self._parquet_path)
             existing.index = pd.to_datetime(existing.index)
+            # Column-level merge: union columns, keep existing values where df has
+            # no column, and let df overwrite only the columns it actually provides.
+            # A plain concat+drop_duplicates would overwrite whole rows and nullify
+            # columns absent from the increment — corrupting historical data when
+            # callers fetch a subset of indicators.
             combined = existing.combine_first(df)
-            # 用新数据覆盖重叠日期
             combined.update(df)
             combined.sort_index(inplace=True)
-            combined.to_parquet(self._parquet_path)
+            combined.to_parquet(tmp_path)
+            tmp_path.replace(self._parquet_path)  # cross-platform atomic replace
             logger.debug("Updated macro parquet: %d rows, %d columns",
                          len(combined), len(combined.columns))
         else:
             df.sort_index(inplace=True)
-            df.to_parquet(self._parquet_path)
+            df.to_parquet(tmp_path)
+            tmp_path.replace(self._parquet_path)  # cross-platform atomic replace
             logger.debug("Created macro parquet: %d rows, %d columns",
                          len(df), len(df.columns))
 

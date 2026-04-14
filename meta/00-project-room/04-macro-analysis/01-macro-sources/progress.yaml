@@ -1,31 +1,34 @@
 progress:
-  completion: 0.0
+  completion: 1.0
   milestones:
-    - id: "m1-polymarket-fetcher"
-      name: "Polymarket 事件概率抓取"
-      status: pending
-      completed_at: null
+    - id: "m1-polymarket-and-calendar"
+      name: "Polymarket 事件概率 + FRED 经济日历"
+      status: completed
+      completed_at: "2026-04-06"
       description: |
-        爬取 Polymarket 前 30 大宏观事件的隐含概率。
-        存储到 SQLite（event_id, title, probability, fetched_at）。
-        检测概率悬崖（前后差值 > 阈值）。
-      estimated_files: ["src/stockbee/macro_sources/polymarket.py"]
-      estimated_lines: 150
+        1. Polymarket REST API (gamma-api.polymarket.com) 抓取前 30 大宏观事件概率
+           - 存储到 SQLite（event_id, title, probability, previous_probability, fetched_at）
+           - 概率悬崖检测（diff > 阈值）
+        2. FRED release calendar API 拉取经济数据发布日历
+           - FOMC 会议、非农、CPI、GDP 等关键事件日
+           - 标记高波动事件日
+      estimated_files:
+        - "src/stockbee/macro_sources/polymarket.py"
+        - "src/stockbee/macro_sources/calendar.py"
+        - "src/stockbee/macro_sources/__init__.py"
+      estimated_lines: 250
 
-    - id: "m2-economic-calendar"
-      name: "经济日历集成"
-      status: pending
-      completed_at: null
-      description: |
-        FOMC 会议、非农、CPI 等关键事件日历。
-        标记高波动事件日。可从 FRED release calendar 或静态维护。
-      estimated_files: ["src/stockbee/macro_sources/calendar.py"]
-      estimated_lines: 100
-
-    - id: "m3-tests"
+    - id: "m2-tests"
       name: "测试"
-      status: pending
-      completed_at: null
-      estimated_files: ["tests/test_macro_sources.py"]
+      status: completed
+      completed_at: "2026-04-06"
+      estimated_files:
+        - "tests/test_macro_sources.py"
       estimated_lines: 150
-  commits: []
+  commits:
+    - { date: "2026-04-06", hash: "222215a", message: "plan: 2 milestones" }
+    - { date: "2026-04-06", hash: "2ad071a", message: "feat: Polymarket + FRED calendar" }
+    - { date: "2026-04-06", hash: "973bbf4", message: "docs: Room completed" }
+    - { date: "2026-04-07", hash: "c45713c", message: "fix: API key sanitization, URL encoding, datetime" }
+    - { date: "2026-04-09", hash: "18f8d8b", message: "docs: comprehensive spec update — 6 specs" }
+    - { date: "2026-04-09", hash: "4b46421", message: "fix: User-Agent header + macro keyword filtering" }

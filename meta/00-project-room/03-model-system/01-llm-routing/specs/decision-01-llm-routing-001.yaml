@@ -1,0 +1,33 @@
+spec_id: "decision-01-llm-routing-001"
+type: decision
+state: active
+intent:
+  summary: "litellm 统一接口 vs 直接 OpenAI + Anthropic SDK"
+  detail: |
+    决策：使用 litellm 作为统一 LLM 调用层。
+
+    评估选项：
+    - 直接 OpenAI SDK + Anthropic SDK：两套不同的 API 格式，需要各写 adapter
+    - litellm：统一 completion() 接口，一行代码切换 100+ 模型
+
+    决策理由：
+    - 一个 model 参数（如 "openai/gpt-4.1-nano"）即可选模型
+    - completion_cost() 内置成本计算
+    - 未来换模型（如 Gemini、Mistral）零改动
+    - 降级链实现只需切换 model 字符串
+
+    代价：多一个依赖（litellm），但它本身是轻量包装层。
+constraints: []
+indexing:
+  type: decision
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["litellm", "sdk", "adr"]
+provenance:
+  source_type: implementation
+  confidence: 1.0
+  source_ref: "plan-milestones 讨论 2026-04-07"
+relations: []
+anchors:
+  - { file: "src/stockbee/llm_routing/router.py", type: implementation }

@@ -34,11 +34,17 @@ class AlpacaMarketData(MarketDataProvider):
         self._api_secret = params.get("api_secret", "")
         self._base_url = params.get("base_url", "https://paper-api.alpaca.markets")
         self._client: Any = None
+        self._trading_client: Any = None
 
     def _do_initialize(self) -> None:
         try:
             from alpaca.data.historical import StockHistoricalDataClient
+            from alpaca.trading.client import TradingClient
             self._client = StockHistoricalDataClient(
+                api_key=self._api_key,
+                secret_key=self._api_secret,
+            )
+            self._trading_client = TradingClient(
                 api_key=self._api_key,
                 secret_key=self._api_secret,
             )
@@ -51,6 +57,7 @@ class AlpacaMarketData(MarketDataProvider):
 
     def _do_shutdown(self) -> None:
         self._client = None
+        self._trading_client = None
 
     def get_daily_bars(
         self,
@@ -60,7 +67,7 @@ class AlpacaMarketData(MarketDataProvider):
         fields: list[str] | None = None,
     ) -> pd.DataFrame:
         fields = fields or OHLCV_FIELDS
-        cache_key = f"alpaca:ohlcv:{','.join(sorted(tickers))}:{start}:{end}"
+        cache_key = f"alpaca:ohlcv:{','.join(sorted(tickers))}:{start}:{end}:{','.join(fields)}"
 
         if self.cache:
             cached = self.cache.get(cache_key)
@@ -144,20 +151,14 @@ class AlpacaMarketData(MarketDataProvider):
             DataFrame: ticker, name, exchange, status, tradable,
                        shortable, market_cap (None from this API)
         """
-        from alpaca.trading.client import TradingClient
         from alpaca.trading.requests import GetAssetsRequest
         from alpaca.trading.enums import AssetClass, AssetStatus
-
-        trading_client = TradingClient(
-            api_key=self._api_key,
-            secret_key=self._api_secret,
-        )
 
         request = GetAssetsRequest(
             asset_class=AssetClass.US_EQUITY,
             status=AssetStatus.ACTIVE,
         )
-        assets = trading_client.get_all_assets(request)
+        assets = self._trading_client.get_all_assets(request)
 
         records = []
         for asset in assets:

@@ -369,6 +369,17 @@ class TestL2ParquetCache:
         assert cache.get("key_a")["v"].iloc[0] == 1
         assert cache.get("key_b")["v"].iloc[0] == 2
 
+    # Regression: cache filename must be derived via SHA-256 (not MD5).
+    # This locks in the hash choice so a future revert to MD5 breaks loudly.
+    def test_key_filename_uses_sha256(self, tmp_cache_dir):
+        import hashlib
+        cache = L2ParquetCache(tmp_cache_dir)
+        path = cache._key_to_path("some-cache-key")
+        expected = hashlib.sha256(b"some-cache-key").hexdigest()
+        assert path.stem == expected
+        # SHA-256 hex is 64 chars; MD5 would be 32.
+        assert len(path.stem) == 64
+
 
 # =========================================================================
 # CacheManager 三层联动测试

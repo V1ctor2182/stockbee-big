@@ -182,6 +182,77 @@ class TestParquetMarketData:
         )
         assert not result.empty
 
+    def test_write_is_atomic_no_tmp_leftover(self, parquet_provider, ohlcv_data):
+        """After a successful write there must be no .tmp file left behind.
+
+        Regression for the atomic-write bugfix: tmp file + replace() must
+        clean up the staging path on success.
+        """
+        parquet_provider.write_ticker("AAPL", ohlcv_data)
+        # Second write exercises the "existing file" branch.
+        parquet_provider.write_ticker("AAPL", ohlcv_data)
+
+        data_dir = Path(parquet_provider._data_path)
+        leftover = list(data_dir.glob("*.parquet.tmp"))
+        assert leftover == [], f"unexpected tmp file left: {leftover}"
+        final = list(data_dir.glob("*.parquet"))
+        assert len(final) == 1
+
+
+# =========================================================================
+# AlpacaMarketData cache-key regression — fields must be part of the key
+# so that narrow/wide reads don't return stale partial cache hits.
+# =========================================================================
+
+class TestAlpacaCacheKey:
+
+    def test_cache_key_includes_fields(self):
+        from unittest.mock import MagicMock
+        from stockbee.providers.base import ProviderConfig
+        from stockbee.providers.cache import L1MemoryCache
+        from stockbee.stock_data.alpaca_market import AlpacaMarketData, OHLCV_FIELDS
+
+        provider = AlpacaMarketData(
+            ProviderConfig(
+                implementation="AlpacaMarketData",
+                params={"api_key": "k", "api_secret": "s"},
+            )
+        )
+        provider._client = MagicMock()
+        provider._trading_client = MagicMock()
+        provider.cache = L1MemoryCache(max_size=16)
+
+        narrow_df = pd.DataFrame({"close": [1.0, 2.0]},
+                                 index=pd.date_range("2026-01-05", periods=2))
+        wide_df = pd.DataFrame(
+            {"close": [1.0, 2.0], "volume": [100, 200]},
+            index=pd.date_range("2026-01-05", periods=2),
+        )
+
+        calls = []
+
+        def fake_fetch(tickers, start, end, fields):
+            calls.append(tuple(fields))
+            return narrow_df if fields == ["close"] else wide_df
+
+        provider._fetch_bars = fake_fetch  # type: ignore[method-assign]
+
+        start = date(2026, 1, 5)
+        end = date(2026, 1, 6)
+
+        # First call with narrow fields populates the cache.
+        r1 = provider.get_daily_bars(["AAPL"], start, end, fields=["close"])
+        assert list(r1.columns) == ["close"]
+
+        # Second call with a wider field set must NOT hit the narrow cache.
+        r2 = provider.get_daily_bars(["AAPL"], start, end, fields=["close", "volume"])
+        assert set(r2.columns) == {"close", "volume"}
+
+        # _fetch_bars ran twice because the cache key differentiates fields.
+        assert len(calls) == 2
+        assert calls[0] == ("close",)
+        assert calls[1] == ("close", "volume")
+
 
 # =========================================================================
 # SqliteUniverseProvider Tests
@@ -273,6 +344,41 @@ class TestSqliteUniverseProvider:
         universe_provider.initialize()
         result = universe_provider.get_universe("broad_all")
         assert len(result) == 100
+
+    def test_batch_upsert_round_trip_matches_row_iteration(self, universe_provider):
+        """The refactor from iterrows() to executemany must not silently drop
+        or reorder columns for insert OR update paths."""
+        initial = pd.DataFrame({
+            "ticker": ["AAPL", "MSFT"],
+            "sector": ["Tech", "Tech"],
+            "market_cap": [3e12, 2.5e12],
+            "avg_volume": [5e7, 4e7],
+            "avg_dollar_volume": [1e10, 8e9],
+            "short_able": [True, True],
+        })
+        universe_provider.upsert_members("u100", initial, date(2026, 1, 1))
+
+        # Second call: AAPL updated, GOOG inserted, MSFT removed — all three
+        # code paths (update / insert / remove) run in one call.
+        updated = pd.DataFrame({
+            "ticker": ["AAPL", "GOOG"],
+            "sector": ["Tech", "Tech"],
+            "market_cap": [3.2e12, 2e12],
+            "avg_volume": [5.5e7, 3e7],
+            "avg_dollar_volume": [1.1e10, 6e9],
+            "short_able": [True, False],
+        })
+        universe_provider.upsert_members("u100", updated, date(2026, 2, 1))
+
+        result = universe_provider.get_universe("u100")
+        rows = {row.ticker: row for row in result.itertuples()}
+        assert set(rows) == {"AAPL", "GOOG"}
+        # AAPL's market_cap got updated, not stale.
+        assert rows["AAPL"].market_cap == pytest.approx(3.2e12)
+        assert rows["AAPL"].avg_volume == pytest.approx(5.5e7)
+        # GOOG's short_able=False must round-trip (regression for the
+        # `int(shortable) if shortable is not None else 1` branch).
+        assert rows["GOOG"].short_able == 0 or rows["GOOG"].short_able is False
 
 
 # =========================================================================
