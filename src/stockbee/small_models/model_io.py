@@ -119,15 +119,22 @@ def save_pickle(
 
     target = _model_dir(name) / f"{version_str}{_PICKLE_SUFFIX}"
     target.parent.mkdir(parents=True, exist_ok=True)
-    if target.exists() and not overwrite:
-        raise FileExistsError(
-            f"artifact already exists: {target}; pass overwrite=True to replace"
-        )
     tmp = target.parent / f"{version_str}.pkl.tmp.{os.getpid()}.{uuid.uuid4().hex[:8]}"
     try:
         with tmp.open("wb") as f:
             pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
-        os.replace(tmp, target)
+        if overwrite:
+            os.replace(tmp, target)
+        else:
+            # 原子"存在即失败"建链。os.link 在目标存在时抛 FileExistsError,
+            # 消除 check-then-replace 的 TOCTOU — 两进程并发 save 同版本,
+            # 只有一个能成功;另一个拿到 FileExistsError 而不是静默覆盖。
+            try:
+                os.link(tmp, target)
+            except FileExistsError:
+                raise FileExistsError(
+                    f"artifact already exists: {target}; pass overwrite=True to replace"
+                )
     finally:
         if tmp.exists():
             tmp.unlink(missing_ok=True)

@@ -120,6 +120,32 @@ class TestSaveLoadPickle:
         save_pickle({"x": 2}, "model", version="20260413", overwrite=True)
         assert load_pickle("model", "20260413") == {"x": 2}
 
+    def test_concurrent_save_race_no_silent_overwrite(
+        self, tmp_artifact_dir, monkeypatch
+    ):
+        """Codex P2: 并发 save_pickle(overwrite=False) 必须原子。
+
+        模拟两进程 race: A 和 B 同时 save 同 (name, version),B 在 A 的 os.link
+        调用之前抢先把目标文件建好。A 的 os.link 应 raise FileExistsError,
+        而不是靠 pre-check + os.replace 的非原子组合静默覆盖。
+        """
+        name, version = "model", "20260413"
+        target = artifact_path(name, version)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        real_link = os.link
+
+        def racing_link(src, dst, *a, **kw):
+            # 模拟对方进程抢在我们 link 前写了目标文件
+            if not Path(dst).exists():
+                Path(dst).write_bytes(b"peer wrote first")
+            return real_link(src, dst, *a, **kw)
+
+        monkeypatch.setattr(os, "link", racing_link)
+        with pytest.raises(FileExistsError, match="already exists"):
+            save_pickle({"mine": True}, name, version=version)
+        # 对方内容不应被我们覆盖
+        assert target.read_bytes() == b"peer wrote first"
+
     def test_load_missing_raises_notfound(self, tmp_artifact_dir):
         with pytest.raises(NotFoundError):
             load_pickle("nowhere", "20260101")
