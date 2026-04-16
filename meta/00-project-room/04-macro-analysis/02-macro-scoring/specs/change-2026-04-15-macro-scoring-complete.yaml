@@ -1,0 +1,35 @@
+spec_id: "change-2026-04-15-macro-scoring-complete"
+type: change
+state: active
+intent:
+  summary: "02-macro-scoring Room 完成 — 4 milestones, 74 tests"
+  detail: |
+    m1: MacroScorer 规则引擎 — 5 regime 分类 + 日度 bull/bear 评分 [-1, +1]
+    m2: LLMMacroAnalyst — Claude Opus 周度深度分析 + 7天 SQLite 缓存
+    m3: MacroScoringProvider — BaseProvider 子类 + SQLite 持久化 + backtest/live 模式
+    m4: 测试 — 74 tests inline with m1-m3
+
+    关键设计决策:
+    - Regime 分类: 规则引擎 (Phase 2 可升级 HMM)
+    - LLM 融合: 0.7 rules + 0.3 LLM weekly outlook (live mode)
+    - 传播权重: propagation_weight=0.0 (Phase 2 知识图谱完成后 → 0.4)
+    - Polymarket cliff: 负向调整 (概率上升 → 不确定性 → bearish)
+    - HV 日: 0.8x dampening (低 conviction)
+constraints: []
+indexing:
+  type: change
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["macro-scoring", "regime-classification", "llm-analysis"]
+provenance:
+  source_type: implementation
+  confidence: 1.0
+  source_ref: "feature/macro-scoring branch, commits 7484f83..4e61c7f"
+relations:
+  - { spec_id: "intent-02-macro-scoring-001", relation: "implements" }
+anchors:
+  - file: "src/stockbee/macro_scoring/scorer.py"
+  - file: "src/stockbee/macro_scoring/llm_analyst.py"
+  - file: "src/stockbee/macro_scoring/provider.py"
+  - file: "tests/test_macro_scoring.py"

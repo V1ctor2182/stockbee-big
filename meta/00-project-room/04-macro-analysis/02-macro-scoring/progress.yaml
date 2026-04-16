@@ -75,6 +75,7 @@ progress:
         LLM analyst: mock LLMRouter 测试 prompt 构建 + 输出解析 + fallback。
         Provider: SQLite CRUD, 回测 vs 实盘模式, get_history 时间范围查询。
   commits:
-    - { date: "2026-04-15", message: "[02-macro-scoring] feat: m1 MacroScorer — regime classification + daily scoring + 36 tests" }
-    - { date: "2026-04-15", message: "[02-macro-scoring] feat: m2 LLMMacroAnalyst — weekly LLM analysis + prompt + cache + 24 tests" }
-    - { date: "2026-04-15", message: "[02-macro-scoring] feat: m3 MacroScoringProvider — Provider interface + SQLite + backtest/live + 14 tests" }
+    - { date: "2026-04-15", hash: "7484f83", message: "[02-macro-scoring] feat: m1 MacroScorer — regime classification + daily scoring + 36 tests", files_changed: 5 }
+    - { date: "2026-04-15", hash: "d1f1dd2", message: "[02-macro-scoring] feat: m2 LLMMacroAnalyst — weekly LLM analysis + prompt + cache + 24 tests", files_changed: 4 }
+    - { date: "2026-04-15", hash: "2df1168", message: "[02-macro-scoring] feat: m3 MacroScoringProvider — Provider interface + SQLite + backtest/live + 14 tests", files_changed: 4 }
+    - { date: "2026-04-15", hash: "4e61c7f", message: "[02-macro-scoring] done: Room completed — 4/4 milestones, 74 tests", files_changed: 2 }
