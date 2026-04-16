@@ -104,10 +104,10 @@ timeline:
           target_start: "2026-04-14"
           target_end: "2026-04-25"
           estimated_days: 9
-          status: implementing
-          completion: 0.75
+          status: completed
+          completion: 1.0
           depends_on: ["01-stock-data", "07-provider-arch"]
-          note: "6/8 milestones done (m1a,m1b,m2,m3,m4,m5). 剩余: m6-provider, m7-integration"
+          note: "已完成 2026-04-13, 8/8 milestones done"
 
         # --- Sprint 2: 模型层 + 宏观 (Week 3-6) ---
         - room: "01-llm-routing"
@@ -160,9 +160,10 @@ timeline:
           target_start: "2026-04-28"
           target_end: "2026-05-09"
           estimated_days: 9
-          status: planning
-          completion: 0.0
+          status: completed
+          completion: 1.0
           depends_on: ["01-macro-sources", "01-llm-routing"]
+          note: "已完成 2026-04-15, 4 milestones, 74 tests"
 
         - room: "03-sector-tilts"
           parent: "04-macro-analysis"
@@ -508,7 +509,7 @@ timeline:
     phase_1_rooms: 26
     phase_2_rooms: 11
     phase_3_rooms: 3
-    completed: 5
+    completed: 6
     in_progress: 0
     planning: 21
     backlog: 14

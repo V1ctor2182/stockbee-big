@@ -1,20 +1,81 @@
 progress:
-  completion: 0.0
+  completion: 1.0
   milestones:
-    - id: "m1-Z-score-标准化"
-      name: "Z-score 标准化"
-      status: pending
-      completed_at: null
-    - id: "m2-经济周期分类5种"
-      name: "经济周期分类(5种)"
-      status: pending
-      completed_at: null
-    - id: "m3-日度评分输出"
-      name: "日度评分输出"
-      status: pending
-      completed_at: null
-    - id: "m4-测试"
+    - id: "m1-macro-scorer"
+      name: "MacroScorer 核心 — 经济周期分类 + 日度评分"
+      status: completed
+      completed_at: "2026-04-15"
+      estimated_files:
+        - "src/stockbee/macro_scoring/scorer.py"
+      estimated_lines: 250
+      depends_on: []
+      complexity_flags: [design_decisions]
+      open_questions: []
+      description: |
+        5 种 regime 规则引擎分类器 (expansion/overheating/stagflation/recession/recovery)。
+        消费 MacroProvider.get_latest_z_scores() 的 19 个 FRED 指标 Z-score，
+        基于阈值规则判断当前经济周期。日度 macro_score: -1.0 (极度看跌) ~ +1.0 (极度看涨)。
+        regime_confidence: 各 regime 的概率分布 dict。
+        消费 PolymarketFetcher cliff 信号调整评分。
+        消费 EconomicCalendar 高波动日标记。
+        预留 propagation_weight 参数（默认 0.0，Phase 2 知识图谱完成后改为 0.4）。
+
+    - id: "m2-llm-analyst"
+      name: "LLM 周度宏观分析 — Claude Opus 深度解读"
+      status: completed
+      completed_at: "2026-04-15"
+      estimated_files:
+        - "src/stockbee/macro_scoring/llm_analyst.py"
+      estimated_lines: 200
+      depends_on: ["m1-macro-scorer"]
+      complexity_flags: [external_api, prompt_engineering, error_handling_heavy]
+      open_questions: []
+      description: |
+        构建 prompt: Z-scores + regime + Polymarket 概率 + 经济日历。
+        调用 LLMRouter.route(TaskType.MACRO_ANALYSIS, prompt)。
+        解析 LLM 输出 → structured MacroInsight (regime_override, risk_factors, outlook)。
+        缓存结果 (每周一次，不重复调用)。
+        LLM 输出可覆盖/调整 rule-based score (加权融合)。
+        错误处理: LLM 超时/失败时 fallback 到纯规则评分。
+
+    - id: "m3-provider"
+      name: "MacroScoringProvider — Provider 接口 + 持久化"
+      status: completed
+      completed_at: "2026-04-15"
+      estimated_files:
+        - "src/stockbee/macro_scoring/provider.py"
+        - "src/stockbee/macro_scoring/__init__.py"
+      estimated_lines: 180
+      depends_on: ["m1-macro-scorer", "m2-llm-analyst"]
+      complexity_flags: []
+      open_questions: []
+      description: |
+        统一 Provider 接口: get_macro_score(date) → float, get_regime(date) → str,
+        get_history(start, end) → DataFrame。
+        SQLite 存储: macro_scores 表 (date, score, regime, confidence_json, llm_insight)。
+        回测模式: 从历史 Z-scores 重算 (无 LLM，纯规则)。
+        实盘模式: rule-based + LLM weekly overlay。
+        模块 __init__.py 导出。
+
+    - id: "m4-tests"
       name: "测试"
-      status: pending
-      completed_at: null
-  commits: []
+      status: completed
+      completed_at: "2026-04-15"
+      note: "74 tests already written inline with m1-m3, no additional tests needed"
+      estimated_files:
+        - "tests/test_macro_scoring.py"
+      estimated_lines: 400
+      depends_on: ["m3-provider"]
+      complexity_flags: []
+      open_questions: []
+      description: |
+        Regime 分类: 5 种 regime 的典型 Z-score 输入 → 正确分类。
+        日度评分: 边界值 (-1, 0, +1), 混合信号场景。
+        Polymarket cliff 信号 → score 调整验证。
+        LLM analyst: mock LLMRouter 测试 prompt 构建 + 输出解析 + fallback。
+        Provider: SQLite CRUD, 回测 vs 实盘模式, get_history 时间范围查询。
+  commits:
+    - { date: "2026-04-15", hash: "7484f83", message: "[02-macro-scoring] feat: m1 MacroScorer — regime classification + daily scoring + 36 tests", files_changed: 5 }
+    - { date: "2026-04-15", hash: "d1f1dd2", message: "[02-macro-scoring] feat: m2 LLMMacroAnalyst — weekly LLM analysis + prompt + cache + 24 tests", files_changed: 4 }
+    - { date: "2026-04-15", hash: "2df1168", message: "[02-macro-scoring] feat: m3 MacroScoringProvider — Provider interface + SQLite + backtest/live + 14 tests", files_changed: 4 }
+    - { date: "2026-04-15", hash: "4e61c7f", message: "[02-macro-scoring] done: Room completed — 4/4 milestones, 74 tests", files_changed: 2 }
