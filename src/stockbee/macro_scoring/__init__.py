@@ -7,9 +7,12 @@
 """
 
 from .scorer import MacroScorer, MacroScore, RegimeType
+from .llm_analyst import LLMMacroAnalyst, MacroInsight
 
 __all__ = [
     "MacroScorer",
     "MacroScore",
     "RegimeType",
+    "LLMMacroAnalyst",
+    "MacroInsight",
 ]

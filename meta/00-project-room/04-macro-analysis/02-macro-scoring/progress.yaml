@@ -1,5 +1,5 @@
 progress:
-  completion: 0.25
+  completion: 0.50
   milestones:
     - id: "m1-macro-scorer"
       name: "MacroScorer 核心 — 经济周期分类 + 日度评分"
@@ -22,8 +22,8 @@ progress:
 
     - id: "m2-llm-analyst"
       name: "LLM 周度宏观分析 — Claude Opus 深度解读"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-15"
       estimated_files:
         - "src/stockbee/macro_scoring/llm_analyst.py"
       estimated_lines: 200
@@ -75,3 +75,4 @@ progress:
         Provider: SQLite CRUD, 回测 vs 实盘模式, get_history 时间范围查询。
   commits:
     - { date: "2026-04-15", message: "[02-macro-scoring] feat: m1 MacroScorer — regime classification + daily scoring + 36 tests" }
+    - { date: "2026-04-15", message: "[02-macro-scoring] feat: m2 LLMMacroAnalyst — weekly LLM analysis + prompt + cache + 24 tests" }

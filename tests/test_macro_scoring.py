@@ -1,11 +1,12 @@
-"""Tests for macro_scoring module — m1 MacroScorer.
+"""Tests for macro_scoring module — m1 MacroScorer + m2 LLMMacroAnalyst.
 
 Covers:
-- Regime classification for all 5 regimes
-- Base score computation + clipping
-- Polymarket cliff adjustment
-- Calendar high-volatility dampening
-- Edge cases: empty z_scores, partial indicators, extreme values
+- m1: Regime classification for all 5 regimes
+- m1: Base score computation + clipping
+- m1: Polymarket cliff adjustment
+- m1: Calendar high-volatility dampening
+- m1: Edge cases: empty z_scores, partial indicators, extreme values
+- m2: Prompt building, LLM response parsing, SQLite caching, error handling
 """
 
 from __future__ import annotations
@@ -22,6 +23,11 @@ from stockbee.macro_scoring.scorer import (
     RegimeType,
     _REGIME_RULES,
     _SCORE_WEIGHTS,
+)
+from stockbee.macro_scoring.llm_analyst import (
+    LLMMacroAnalyst,
+    MacroInsight,
+    _SYSTEM_PROMPT,
 )
 
 
@@ -429,3 +435,283 @@ class TestEdgeCases:
         )
         with pytest.raises(AttributeError):
             result.score = 0.0  # type: ignore[misc]
+
+
+# ===================================================================
+# m2: LLMMacroAnalyst tests
+# ===================================================================
+
+SAMPLE_LLM_RESPONSE = """\
+REGIME: expansion
+OUTLOOK_SCORE: 0.65
+RISK_FACTORS:
+- Rising inflation expectations could force Fed to hold rates longer
+- Credit spreads widening modestly signals caution
+- Geopolitical tensions in trade policy
+REASONING:
+The US economy remains in an expansion phase with solid GDP growth and improving \
+employment metrics. The labor market is tight with unemployment below the historical average.
+
+However, inflation remains sticky above the Fed's 2% target, which may delay rate cuts. \
+Credit conditions are tightening modestly but not at alarming levels. Overall, the macro \
+environment supports a mildly bullish equity stance with sector rotation toward cyclicals.
+"""
+
+
+@dataclass
+class FakeReleaseEvent:
+    """Minimal ReleaseEvent for testing."""
+    release_id: int = 1
+    release_name: str = "CPI"
+    release_date: str = "2026-04-20"
+    high_volatility: bool = True
+
+
+def _make_router(content: str = SAMPLE_LLM_RESPONSE, raise_error: bool = False):
+    """Create a mock LLMRouter."""
+    router = MagicMock()
+    if raise_error:
+        router.route.side_effect = RuntimeError("LLM unavailable")
+    else:
+        resp = MagicMock()
+        resp.content = content
+        resp.model_used = "anthropic/claude-opus-4-6"
+        router.route.return_value = resp
+    return router
+
+
+class TestPromptBuilding:
+    """Test _build_prompt."""
+
+    def test_basic_prompt_has_zscores(self):
+        analyst = LLMMacroAnalyst(
+            _make_router(), _make_macro_provider(EXPANSION_ZSCORES)
+        )
+        prompt = analyst._build_prompt(EXPANSION_ZSCORES, date(2026, 4, 15))
+        assert "2026-04-15" in prompt
+        assert "Z-Scores" in prompt
+        assert "GDP" in prompt
+
+    def test_prompt_with_polymarket(self):
+        events = [FakeMarketEvent(
+            question="Fed rate cut in May?", probability=0.35,
+            previous_probability=0.2, is_cliff=True
+        )]
+        poly = MagicMock()
+        poly.get_latest_events.return_value = events
+        analyst = LLMMacroAnalyst(
+            _make_router(), _make_macro_provider(EXPANSION_ZSCORES), polymarket=poly
+        )
+        prompt = analyst._build_prompt(EXPANSION_ZSCORES, date(2026, 4, 15))
+        assert "Polymarket" in prompt
+        assert "Fed rate cut" in prompt
+        assert "CLIFF" in prompt
+
+    def test_prompt_with_calendar(self):
+        cal = MagicMock()
+        cal.get_events.return_value = [
+            FakeReleaseEvent(release_name="CPI", release_date="2026-04-20"),
+        ]
+        analyst = LLMMacroAnalyst(
+            _make_router(), _make_macro_provider(EXPANSION_ZSCORES), calendar=cal
+        )
+        prompt = analyst._build_prompt(EXPANSION_ZSCORES, date(2026, 4, 15))
+        assert "High-Volatility" in prompt
+        assert "CPI" in prompt
+
+    def test_prompt_without_optional_sources(self):
+        analyst = LLMMacroAnalyst(
+            _make_router(), _make_macro_provider(EXPANSION_ZSCORES)
+        )
+        prompt = analyst._build_prompt(EXPANSION_ZSCORES, date(2026, 4, 15))
+        assert "Polymarket" not in prompt
+        assert "High-Volatility" not in prompt
+
+    def test_prompt_polymarket_exception_graceful(self):
+        poly = MagicMock()
+        poly.get_latest_events.side_effect = RuntimeError("API down")
+        analyst = LLMMacroAnalyst(
+            _make_router(), _make_macro_provider(EXPANSION_ZSCORES), polymarket=poly
+        )
+        prompt = analyst._build_prompt(EXPANSION_ZSCORES, date(2026, 4, 15))
+        # Should not crash, polymarket section omitted
+        assert "Z-Scores" in prompt
+
+    def test_prompt_calendar_exception_graceful(self):
+        cal = MagicMock()
+        cal.get_events.side_effect = RuntimeError("DB error")
+        analyst = LLMMacroAnalyst(
+            _make_router(), _make_macro_provider(EXPANSION_ZSCORES), calendar=cal
+        )
+        prompt = analyst._build_prompt(EXPANSION_ZSCORES, date(2026, 4, 15))
+        assert "Z-Scores" in prompt
+
+
+class TestResponseParsing:
+    """Test _parse_response."""
+
+    def test_parse_full_response(self):
+        analyst = LLMMacroAnalyst(
+            _make_router(), _make_macro_provider(EXPANSION_ZSCORES)
+        )
+        insight = analyst._parse_response(
+            SAMPLE_LLM_RESPONSE, "claude-opus-4-6", date(2026, 4, 15)
+        )
+        assert insight is not None
+        assert insight.regime_assessment == "expansion"
+        assert abs(insight.outlook_score - 0.65) < 1e-9
+        assert len(insight.risk_factors) == 3
+        assert "inflation" in insight.risk_factors[0].lower()
+        assert "expansion" in insight.reasoning.lower()
+        assert insight.model_used == "claude-opus-4-6"
+        assert insight.analyzed_at == date(2026, 4, 15)
+
+    def test_parse_empty_response(self):
+        analyst = LLMMacroAnalyst(
+            _make_router(), _make_macro_provider(EXPANSION_ZSCORES)
+        )
+        assert analyst._parse_response("", "test", date(2026, 4, 15)) is None
+        assert analyst._parse_response("   ", "test", date(2026, 4, 15)) is None
+
+    def test_parse_malformed_outlook_defaults_to_zero(self):
+        bad_response = "REGIME: expansion\nOUTLOOK_SCORE: not-a-number\nRISK_FACTORS:\n- test\nREASONING:\ntest"
+        analyst = LLMMacroAnalyst(
+            _make_router(), _make_macro_provider(EXPANSION_ZSCORES)
+        )
+        insight = analyst._parse_response(bad_response, "test", date(2026, 4, 15))
+        assert insight is not None
+        assert insight.outlook_score == 0.0
+
+    def test_parse_outlook_clipped(self):
+        response = "REGIME: recession\nOUTLOOK_SCORE: -5.0\nRISK_FACTORS:\n- doom\nREASONING:\nbad"
+        analyst = LLMMacroAnalyst(
+            _make_router(), _make_macro_provider(EXPANSION_ZSCORES)
+        )
+        insight = analyst._parse_response(response, "test", date(2026, 4, 15))
+        assert insight is not None
+        assert insight.outlook_score == -1.0
+
+    def test_parse_missing_risk_factors(self):
+        response = "REGIME: expansion\nOUTLOOK_SCORE: 0.5\nREASONING:\nall good"
+        analyst = LLMMacroAnalyst(
+            _make_router(), _make_macro_provider(EXPANSION_ZSCORES)
+        )
+        insight = analyst._parse_response(response, "test", date(2026, 4, 15))
+        assert insight is not None
+        assert insight.risk_factors == []
+
+    def test_parse_missing_reasoning(self):
+        response = "REGIME: expansion\nOUTLOOK_SCORE: 0.5\nRISK_FACTORS:\n- test"
+        analyst = LLMMacroAnalyst(
+            _make_router(), _make_macro_provider(EXPANSION_ZSCORES)
+        )
+        insight = analyst._parse_response(response, "test", date(2026, 4, 15))
+        assert insight is not None
+        assert insight.reasoning == ""
+
+
+class TestLLMAnalystIntegration:
+    """Test full analyze() flow with mock LLM."""
+
+    def test_analyze_calls_router(self, tmp_path):
+        router = _make_router()
+        analyst = LLMMacroAnalyst(
+            router, _make_macro_provider(EXPANSION_ZSCORES), cache_dir=tmp_path
+        )
+        insight = analyst.analyze(as_of=date(2026, 4, 15))
+        assert insight is not None
+        assert insight.regime_assessment == "expansion"
+        router.route.assert_called_once()
+
+    def test_analyze_empty_zscores_returns_none(self, tmp_path):
+        router = _make_router()
+        analyst = LLMMacroAnalyst(
+            router, _make_macro_provider({}), cache_dir=tmp_path
+        )
+        result = analyst.analyze(as_of=date(2026, 4, 15))
+        assert result is None
+        router.route.assert_not_called()
+
+    def test_analyze_llm_failure_returns_none(self, tmp_path):
+        router = _make_router(raise_error=True)
+        analyst = LLMMacroAnalyst(
+            router, _make_macro_provider(EXPANSION_ZSCORES), cache_dir=tmp_path
+        )
+        result = analyst.analyze(as_of=date(2026, 4, 15))
+        assert result is None
+
+    def test_analyze_caches_result(self, tmp_path):
+        router = _make_router()
+        analyst = LLMMacroAnalyst(
+            router, _make_macro_provider(EXPANSION_ZSCORES), cache_dir=tmp_path
+        )
+        # First call → LLM
+        insight1 = analyst.analyze(as_of=date(2026, 4, 15))
+        assert insight1 is not None
+        assert router.route.call_count == 1
+
+        # Second call same week → cache
+        insight2 = analyst.analyze(as_of=date(2026, 4, 18))
+        assert insight2 is not None
+        assert router.route.call_count == 1  # not called again
+        assert insight2.regime_assessment == insight1.regime_assessment
+
+    def test_analyze_cache_expired(self, tmp_path):
+        router = _make_router()
+        analyst = LLMMacroAnalyst(
+            router, _make_macro_provider(EXPANSION_ZSCORES), cache_dir=tmp_path
+        )
+        # First call
+        analyst.analyze(as_of=date(2026, 4, 8))
+        assert router.route.call_count == 1
+
+        # 8 days later → cache expired → new LLM call
+        analyst.analyze(as_of=date(2026, 4, 16))
+        assert router.route.call_count == 2
+
+    def test_close_db(self, tmp_path):
+        analyst = LLMMacroAnalyst(
+            _make_router(), _make_macro_provider(EXPANSION_ZSCORES), cache_dir=tmp_path
+        )
+        analyst.analyze(as_of=date(2026, 4, 15))
+        analyst.close()
+        assert analyst._db is None
+
+    def test_frozen_macro_insight(self):
+        insight = MacroInsight(
+            regime_assessment="expansion",
+            risk_factors=["test"],
+            outlook_score=0.5,
+            reasoning="test",
+            model_used="test",
+            analyzed_at=date(2026, 4, 15),
+        )
+        with pytest.raises(AttributeError):
+            insight.outlook_score = 0.0  # type: ignore[misc]
+
+
+class TestExtractHelpers:
+    """Test static parsing helpers."""
+
+    def test_extract_field(self):
+        text = "REGIME: expansion\nOUTLOOK_SCORE: 0.5"
+        assert LLMMacroAnalyst._extract_field(text, "REGIME", "x") == "expansion"
+        assert LLMMacroAnalyst._extract_field(text, "OUTLOOK_SCORE", "0") == "0.5"
+        assert LLMMacroAnalyst._extract_field(text, "MISSING", "default") == "default"
+
+    def test_extract_list(self):
+        text = "RISK_FACTORS:\n- item one\n- item two\n- item three\nREASONING:\nfoo"
+        items = LLMMacroAnalyst._extract_list(text, "RISK_FACTORS")
+        assert items == ["item one", "item two", "item three"]
+
+    def test_extract_list_missing(self):
+        assert LLMMacroAnalyst._extract_list("no list here", "RISK_FACTORS") == []
+
+    def test_extract_section(self):
+        text = "REASONING:\nline one\nline two\n\nline three"
+        result = LLMMacroAnalyst._extract_section(text, "REASONING")
+        assert "line one" in result
+        assert "line three" in result
+
+    def test_extract_section_missing(self):
+        assert LLMMacroAnalyst._extract_section("no section", "REASONING") == ""
