@@ -8,6 +8,7 @@
 
 from .scorer import MacroScorer, MacroScore, RegimeType
 from .llm_analyst import LLMMacroAnalyst, MacroInsight
+from .provider import MacroScoringProvider
 
 __all__ = [
     "MacroScorer",
@@ -15,4 +16,5 @@ __all__ = [
     "RegimeType",
     "LLMMacroAnalyst",
     "MacroInsight",
+    "MacroScoringProvider",
 ]

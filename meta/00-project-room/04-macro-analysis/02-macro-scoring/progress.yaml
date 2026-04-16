@@ -1,5 +1,5 @@
 progress:
-  completion: 0.50
+  completion: 0.75
   milestones:
     - id: "m1-macro-scorer"
       name: "MacroScorer 核心 — 经济周期分类 + 日度评分"
@@ -40,8 +40,8 @@ progress:
 
     - id: "m3-provider"
       name: "MacroScoringProvider — Provider 接口 + 持久化"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-15"
       estimated_files:
         - "src/stockbee/macro_scoring/provider.py"
         - "src/stockbee/macro_scoring/__init__.py"
@@ -76,3 +76,4 @@ progress:
   commits:
     - { date: "2026-04-15", message: "[02-macro-scoring] feat: m1 MacroScorer — regime classification + daily scoring + 36 tests" }
     - { date: "2026-04-15", message: "[02-macro-scoring] feat: m2 LLMMacroAnalyst — weekly LLM analysis + prompt + cache + 24 tests" }
+    - { date: "2026-04-15", message: "[02-macro-scoring] feat: m3 MacroScoringProvider — Provider interface + SQLite + backtest/live + 14 tests" }

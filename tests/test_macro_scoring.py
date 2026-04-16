@@ -29,6 +29,8 @@ from stockbee.macro_scoring.llm_analyst import (
     MacroInsight,
     _SYSTEM_PROMPT,
 )
+from stockbee.macro_scoring.provider import MacroScoringProvider
+from stockbee.providers.base import ProviderConfig
 
 
 # ---------------------------------------------------------------------------
@@ -715,3 +717,172 @@ class TestExtractHelpers:
 
     def test_extract_section_missing(self):
         assert LLMMacroAnalyst._extract_section("no section", "REASONING") == ""
+
+
+# ===================================================================
+# m3: MacroScoringProvider tests
+# ===================================================================
+
+def _make_provider(tmp_path, mode="backtest") -> MacroScoringProvider:
+    """Create a MacroScoringProvider with tmp SQLite."""
+    config = ProviderConfig(
+        implementation="MacroScoringProvider",
+        params={"db_path": str(tmp_path / "macro_scores.db"), "mode": mode},
+    )
+    provider = MacroScoringProvider(config)
+    provider.initialize()
+    return provider
+
+
+class TestProviderLifecycle:
+    """Test initialize / shutdown / health_check."""
+
+    def test_initialize_creates_db(self, tmp_path):
+        provider = _make_provider(tmp_path)
+        assert provider.is_initialized
+        assert provider.health_check()
+        assert (tmp_path / "macro_scores.db").exists()
+
+    def test_shutdown(self, tmp_path):
+        provider = _make_provider(tmp_path)
+        provider.shutdown()
+        assert not provider.is_initialized
+
+    def test_double_initialize(self, tmp_path):
+        provider = _make_provider(tmp_path)
+        provider.initialize()  # should be idempotent
+        assert provider.is_initialized
+
+
+class TestScoreAndStore:
+    """Test score_and_store + retrieval."""
+
+    def test_score_and_store_backtest(self, tmp_path):
+        provider = _make_provider(tmp_path)
+        scorer = MacroScorer(_make_macro_provider(EXPANSION_ZSCORES))
+        provider.set_scorer(scorer)
+
+        result = provider.score_and_store(as_of=date(2026, 4, 15))
+        assert result is not None
+        assert result.score > 0.0
+        assert result.regime == RegimeType.EXPANSION
+
+        # Verify persisted
+        score = provider.get_macro_score(date(2026, 4, 15))
+        assert score is not None
+        assert abs(score - result.score) < 1e-9
+
+        regime = provider.get_regime(date(2026, 4, 15))
+        assert regime == "expansion"
+
+    def test_score_and_store_no_scorer(self, tmp_path):
+        provider = _make_provider(tmp_path)
+        result = provider.score_and_store(as_of=date(2026, 4, 15))
+        assert result is None
+
+    def test_score_and_store_replaces_existing(self, tmp_path):
+        provider = _make_provider(tmp_path)
+        scorer = MacroScorer(_make_macro_provider(EXPANSION_ZSCORES))
+        provider.set_scorer(scorer)
+
+        provider.score_and_store(as_of=date(2026, 4, 15))
+        # Score again same date — should replace, not error
+        result2 = provider.score_and_store(as_of=date(2026, 4, 15))
+        assert result2 is not None
+
+    def test_score_and_store_live_with_llm(self, tmp_path):
+        provider = _make_provider(tmp_path, mode="live")
+        scorer = MacroScorer(_make_macro_provider(EXPANSION_ZSCORES))
+        provider.set_scorer(scorer)
+
+        router = _make_router()
+        analyst = LLMMacroAnalyst(
+            router, _make_macro_provider(EXPANSION_ZSCORES),
+            cache_dir=tmp_path / "llm_cache",
+        )
+        provider.set_analyst(analyst)
+
+        result = provider.score_and_store(as_of=date(2026, 4, 15))
+        assert result is not None
+        assert "llm_blend" in result.signals
+        assert "llm_outlook" in result.signals
+        router.route.assert_called_once()
+
+    def test_score_and_store_live_llm_failure(self, tmp_path):
+        provider = _make_provider(tmp_path, mode="live")
+        scorer = MacroScorer(_make_macro_provider(EXPANSION_ZSCORES))
+        provider.set_scorer(scorer)
+
+        router = _make_router(raise_error=True)
+        analyst = LLMMacroAnalyst(
+            router, _make_macro_provider(EXPANSION_ZSCORES),
+            cache_dir=tmp_path / "llm_cache",
+        )
+        provider.set_analyst(analyst)
+
+        # Should fallback to pure rule-based score
+        result = provider.score_and_store(as_of=date(2026, 4, 15))
+        assert result is not None
+        assert "llm_blend" not in result.signals
+
+
+class TestGetHistory:
+    """Test get_history."""
+
+    def test_history_multiple_dates(self, tmp_path):
+        provider = _make_provider(tmp_path)
+        scorer = MacroScorer(_make_macro_provider(EXPANSION_ZSCORES))
+        provider.set_scorer(scorer)
+
+        for day in range(10, 16):
+            provider.score_and_store(as_of=date(2026, 4, day))
+
+        df = provider.get_history(date(2026, 4, 10), date(2026, 4, 15))
+        assert len(df) == 6
+        assert list(df.columns) == ["date", "score", "regime", "llm_outlook"]
+        assert all(df["regime"] == "expansion")
+
+    def test_history_empty_range(self, tmp_path):
+        provider = _make_provider(tmp_path)
+        df = provider.get_history(date(2026, 1, 1), date(2026, 1, 31))
+        assert len(df) == 0
+        assert list(df.columns) == ["date", "score", "regime", "llm_outlook"]
+
+    def test_history_partial_range(self, tmp_path):
+        provider = _make_provider(tmp_path)
+        scorer = MacroScorer(_make_macro_provider(EXPANSION_ZSCORES))
+        provider.set_scorer(scorer)
+
+        provider.score_and_store(as_of=date(2026, 4, 12))
+        provider.score_and_store(as_of=date(2026, 4, 14))
+
+        df = provider.get_history(date(2026, 4, 10), date(2026, 4, 15))
+        assert len(df) == 2
+
+
+class TestProviderQuery:
+    """Test get_macro_score / get_regime edge cases."""
+
+    def test_query_missing_date(self, tmp_path):
+        provider = _make_provider(tmp_path)
+        assert provider.get_macro_score(date(2026, 4, 15)) is None
+        assert provider.get_regime(date(2026, 4, 15)) is None
+
+    def test_query_after_shutdown_and_reinit(self, tmp_path):
+        provider = _make_provider(tmp_path)
+        scorer = MacroScorer(_make_macro_provider(EXPANSION_ZSCORES))
+        provider.set_scorer(scorer)
+        provider.score_and_store(as_of=date(2026, 4, 15))
+        provider.shutdown()
+
+        # Re-initialize — data should persist
+        provider.initialize()
+        score = provider.get_macro_score(date(2026, 4, 15))
+        assert score is not None
+
+    def test_recession_regime_stored(self, tmp_path):
+        provider = _make_provider(tmp_path)
+        scorer = MacroScorer(_make_macro_provider(RECESSION_ZSCORES))
+        provider.set_scorer(scorer)
+        provider.score_and_store(as_of=date(2026, 4, 15))
+        assert provider.get_regime(date(2026, 4, 15)) == "recession"
