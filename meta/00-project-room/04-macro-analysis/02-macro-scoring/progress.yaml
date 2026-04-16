@@ -1,5 +1,5 @@
 progress:
-  completion: 0.75
+  completion: 1.0
   milestones:
     - id: "m1-macro-scorer"
       name: "MacroScorer 核心 — 经济周期分类 + 日度评分"
@@ -59,8 +59,9 @@ progress:
 
     - id: "m4-tests"
       name: "测试"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-15"
+      note: "74 tests already written inline with m1-m3, no additional tests needed"
       estimated_files:
         - "tests/test_macro_scoring.py"
       estimated_lines: 400
