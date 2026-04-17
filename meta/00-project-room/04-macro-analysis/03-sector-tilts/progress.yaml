@@ -38,4 +38,5 @@ progress:
         各 regime 下 tilt 方向正确性
         Edge cases: 空 z_scores, 部分指标, 极端值, 矩阵缺失行业
   commits:
-    - { date: "2026-04-17", message: "[03-sector-tilts] feat: m1 SectorTilter — SQLite sensitivity matrix + regime adjustment + 24 tests" }
+    - { date: "2026-04-17", hash: "5ebb7ae", message: "[03-sector-tilts] feat: m1 SectorTilter — SQLite sensitivity matrix + regime adjustment + 24 tests", files_changed: 5 }
+    - { date: "2026-04-17", hash: "153f976", message: "[03-sector-tilts] done: Room completed — 2/2 milestones, 24 tests", files_changed: 2 }

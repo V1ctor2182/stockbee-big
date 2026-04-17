@@ -48,7 +48,7 @@ tree:
           children:
             - { id: "01-macro-sources", type: feature, priority: P0, phase: 1, status: "已完成", note: "Polymarket + 经济日历" }
             - { id: "02-macro-scoring", type: feature, priority: P0, phase: 1, status: "已完成" }
-            - { id: "03-sector-tilts", type: feature, priority: P0, phase: 1, status: "待研究" }
+            - { id: "03-sector-tilts", type: feature, priority: P0, phase: 1, status: "已完成" }
             - { id: "04-style-tilts", type: feature, priority: P0, phase: 1, status: "待研究" }
 
         - id: "05-factor-scoring"
