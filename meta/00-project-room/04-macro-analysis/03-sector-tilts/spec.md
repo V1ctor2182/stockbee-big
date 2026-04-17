@@ -4,19 +4,33 @@
 
 **11 个 GICS 行业动态加权**
 
-行业对宏观指标的敏感度矩阵（预训练，存于 SQLite）。如能源对油价敏感度 0.8。±3% 权重调整。
+行业对宏观指标的敏感度矩阵（SQLite 存储）。如能源对油价敏感度 0.8。±3% 权重调整。
 
 来源：Feature Hierarchy §4.3, Tech Design §3.5
-研究状态：待研究
 
 ## Decisions
 
-_暂无决策记录_
+- **敏感度矩阵存储**: SQLite (Plan B)。支持运行时调参，Phase 2 月度因子评审可动态更新。
+- **模块位置**: `macro_scoring/sector_tilts.py`，和 style_tilts 对称。
+- **Tilt cap**: ±3% (±0.03)，作为 soft overlay 不硬约束 RL Agent。
 
 ## Contracts
 
-_暂无接口约定_
+- **SectorTilter**:
+  - `compute_tilts(as_of) → dict[str, float]` — 11 行业 tilt 权重 (±0.03)
+  - `get_sensitivity_matrix() → DataFrame` — 当前敏感度矩阵
+  - `update_sensitivity(sector, indicator, value)` — 更新单个敏感度
+- **上游消费**: MacroScoringProvider (regime + score), MacroProvider (z_scores)
+- **下游消费者**: 01-multi-factor-fusion (因子评分时叠加行业 tilt)
+
+## 当前进度
+
+2 milestones, 0% 完成:
+- m1: 敏感度矩阵 (SQLite) + SectorTilter 核心 (~250 行)
+- m2: 测试 (~250 行)
+
+总计: ~500 行, 2 files
 
 ---
 _所有 spec 状态: draft（需要 review 后升为 active）_
-_spec.md 由 room-init 自动生成，specs/*.yaml 为源数据_
+_spec.md 由 plan-milestones 更新, 2026-04-17_

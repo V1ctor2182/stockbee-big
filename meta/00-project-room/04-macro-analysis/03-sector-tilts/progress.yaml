@@ -1,20 +1,40 @@
 progress:
-  completion: 0.0
+  completion: 0.5
   milestones:
-    - id: "m1-11-行业敏感度矩阵"
-      name: "11 行业敏感度矩阵"
-      status: pending
-      completed_at: null
-    - id: "m2-Tilt-计算逻辑"
-      name: "Tilt 计算逻辑"
-      status: pending
-      completed_at: null
-    - id: "m3-权重调整"
-      name: "权重调整"
-      status: pending
-      completed_at: null
-    - id: "m4-测试"
+    - id: "m1-sector-tilter"
+      name: "敏感度矩阵 (SQLite) + SectorTilter 核心"
+      status: completed
+      completed_at: "2026-04-17"
+      estimated_files:
+        - "src/stockbee/macro_scoring/sector_tilts.py"
+      estimated_lines: 250
+      depends_on: []
+      complexity_flags: [design_decisions]
+      open_questions: []
+      description: |
+        11 GICS 行业定义。SQLite 敏感度矩阵表 (sector, indicator, sensitivity)
+        含种子数据。SectorTilter 类:
+        - compute_tilts(as_of) → dict[str, float] (sector → tilt ±3%)
+        - 消费 MacroProvider.get_latest_z_scores() + MacroScoringProvider.get_regime()
+        - tilt = Σ(z_score × sensitivity), capped ±0.03
+        - regime 调整: 不同 regime 下行业偏好不同
+        - CRUD: get/update sensitivity matrix
+
+    - id: "m2-tests"
       name: "测试"
       status: pending
       completed_at: null
-  commits: []
+      estimated_files:
+        - "tests/test_sector_tilts.py"
+      estimated_lines: 250
+      depends_on: ["m1-sector-tilter"]
+      complexity_flags: []
+      open_questions: []
+      description: |
+        敏感度矩阵: 11 行业全覆盖, SQLite CRUD
+        Tilt 计算: expansion→cyclicals偏高, recession→defensives偏高
+        ±3% cap 验证
+        各 regime 下 tilt 方向正确性
+        Edge cases: 空 z_scores, 部分指标, 极端值, 矩阵缺失行业
+  commits:
+    - { date: "2026-04-17", message: "[03-sector-tilts] feat: m1 SectorTilter — SQLite sensitivity matrix + regime adjustment + 24 tests" }
