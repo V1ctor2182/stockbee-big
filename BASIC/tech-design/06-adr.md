@@ -20,7 +20,7 @@
 | **知识图谱存储** | NetworkX + CSV 备份 | Neo4j / SQLite 邻接表 | 两层传播图（宏观 30 节点+70 边，公司 100 节点+500 边）需要高效的图遍历和传播计算，NetworkX 内存图毫秒级完成。CSV 备份方便手动检查和版本控制。Neo4j 过重，SQLite 邻接表查询图遍历不便。 | research-knowledge-graph-20260324.md §5, §7 |
 | **情绪分类模型** | FinBERT | FinGPT / 通用 BERT | FinBERT 专为金融文本微调，开箱即用无需额外训练。FinGPT 更强但计算贵、延迟高不适合日间处理。 | 新闻小模型.md §1, finbert.md |
 | **收益预测模型** | LightGBM | XGBoost / LSTM | Qlib 基准测试中 LightGBM 在金融数据上表现最优（IC 持久性高），训练快。XGBoost 略慢，LSTM 易过拟合且需大量历史。 | 量化小模型.md §1, qlib 因子挖掘和量化模型.md |
-| **新闻信息源多元化** | NewsAPI + Perigon + SEC EDGAR | 单一来源 | 多源互补：NewsAPI 提供广泛覆盖（70k+ 媒体），Perigon 聚焦金融深度，SEC EDGAR 提供权威基本面。单一来源会漏掉关键信息。 | 信息.md §1, §2, §3 |
+| **新闻信息源多元化** | NewsAPI + Perplexity + SEC EDGAR | 单一来源 | 多源互补：NewsAPI 提供广泛覆盖（70k+ 媒体），Perplexity 提供 AI 搜索聚合（同级数据源，跨源去重），SEC EDGAR 提供权威基本面。单一来源会漏掉关键信息。 | 信息.md §1, §2, §3 |
 | **Prediction Market 使用** | Polymarket 事件概率作补充因子 | 不使用 / 只作参考 | Polymarket 提供市场共识的制度变化预测（如降息概率），免费 API，可作为 MacroTiltEngine 的外生输入。与自有预测交叉验证。 | polymarket的数据如何运用.md |
 | **成本控制上限** | $200/月 预算 | 无上限 | 即使全用最强/最昂贵模型（Opus 4 处理所有新闻、手动信息源等），月成本也不超 $75。$200 预算为充分安全边际，覆盖峰值 2.5 倍。 | research-llm-selection.md §4 |
 

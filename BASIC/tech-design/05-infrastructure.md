@@ -68,7 +68,7 @@ Host Machine
 | 项目 | 月度预算 | 说明 |
 |------|---------|------|
 | LLM API 调用 | $15 | G1(1) + G2(2) + G3(5) + SEC(3) + Macro(4)，使用 Batch API 优化 | research-llm-selection.md §4 |
-| 新闻数据源 | $0-30 | NewsAPI 免费层 + Perigon 按用量 | 信息.md §1 |
+| 新闻数据源 | $0-30 | NewsAPI 免费层 + Perplexity 按用量 | 信息.md §1 |
 | 市场数据 | $0-20 | Alpaca 免费 + Polygon.io 基础版 | research-stock-data-storage.md |
 | GPU 电力 | ~$10 | RTX 3070 周日训练约 20 小时 | research-rl-algorithms.md §3 |
 | **合计** | **< $75** | 远低于 $200 月预算上限 | research-llm-selection.md §4 |

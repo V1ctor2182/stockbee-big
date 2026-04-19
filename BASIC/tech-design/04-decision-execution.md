@@ -11,7 +11,7 @@
   │
   ├─→ 数据更新模块
   │   ├─ 日线 OHLCV (Alpaca Historical)
-  │   ├─ 新闻摄入 (NewsAPI)
+  │   ├─ 新闻摄入 (NewsAPI + Perplexity)
   │   └─ 宏观指标 (FRED latest)
   │
   ├─→ 因子计算模块

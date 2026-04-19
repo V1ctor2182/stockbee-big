@@ -10,9 +10,9 @@
 
 ```
 新闻源 → [LLM 路由器]
-            ├─→ G1 快速过滤 (GPT-4.1 nano, <$1/月)
-            ├─→ G2 分类 (Claude Sonnet 4, <$2/月)
-            └─→ G3 深度分析 (GPT-4.1, <$5/月，可选)
+            ├─→ G1 快速过滤 (规则引擎, 零成本)
+            ├─→ G2 分类 (FinBERT 本地, 零 API 成本)
+            └─→ G3 深度分析 (Claude Haiku, <$2/月，可选)
 
 因子输入层：
   ├─ OHLCV 数据 → [Alpha158 技术因子]
@@ -47,9 +47,9 @@
 
 | 任务 | 选择模型 | 备选模型 | 月成本 | 输入规模 | 输出格式 |
 |------|---------|---------|--------|---------|---------|
-| G1 新闻快速过滤 | GPT-4.1 nano | Gemini Flash | < $1 | 标题+摘要 (100-300 tokens) | JSON: {relevant: bool} |
-| G2 新闻分类 (情绪/主题) | Claude Sonnet 4 | GPT-4o mini | < $2 | 摘要+部分正文 (500-1k tokens) | JSON: {sentiment, category, urgency} |
-| G3 深度基本面分析 | GPT-4.1 | Claude Opus 4 | < $5 | 完整新闻+持仓情景 (2-5k tokens) | Markdown：影响评估 |
+| G1 新闻快速过滤 | 规则引擎 (本地) | — | $0 | 标题+摘要 | 通过/淘汰 + ticker 提取 |
+| G2 新闻分类 (情绪/主题) | FinBERT (本地) | — | $0 | 标题+摘要 (max 128 tokens) | JSON: {sentiment, category, urgency, importance} |
+| G3 深度基本面分析 | Claude Haiku | Claude Sonnet 4 | < $2 | 完整新闻+持仓情景 (2-5k tokens) | JSON：影响评估 + 权重建议 |
 | SEC 10-K/10-Q 解析 | GPT-4.1 (long context) | Claude Sonnet 4 | < $3 | 完整 10-K (60k tokens) | JSON：关键财务指标 |
 | 宏观环境分析 (周度) | Claude Sonnet 4 | GPT-4.1 | < $4 | 19 个 FRED 指标 + 描述 (2k tokens) | Markdown：经济周期判断 |
 | **月度合计** | | | **< $15** | ~2.5M 输入 + 420K 输出 token | 远低于 $200 预算 |

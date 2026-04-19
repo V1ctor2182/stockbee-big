@@ -38,7 +38,7 @@
 
 ## 3. 新闻数据处理管道
 
-所有新闻进入 G1 快速过滤：检查时间戳、数据源合法性、去重（同一新闻多个来源）。通过 G1 的新闻进入 SQLite 持久化，同时触发 G2 LLM 分类（GPT-4.1 nano，<$1/月）。G2 产生：情绪（正/中/负）、主题分类、紧急度评分。可选的 G3 由 Claude Sonnet 4 执行深度分析（仅限分数>70 的新闻，日限 10 篇，<$5/月）。→ 参考：research-news-storage.md §3-§4, research-llm-selection.md §3
+新闻来源（NewsAPI + Perplexity 两个同级数据源，跨源去重）进入 G1 快速过滤：检查时间戳、数据源合法性、去重。通过 G1 的新闻进入 SQLite 持久化，同时触发 G2 本地 FinBERT 情绪分类（零 API 成本）。G2 产生：情绪（正/中/负）、主题分类、紧急度评分。可选的 G3 由 Claude Haiku 执行深度分析（仅限分数>70 的新闻，日限 10 篇，<$2/月）。→ 参考：research-news-storage.md §3-§4, research-llm-selection.md §3
 
 ---
 
