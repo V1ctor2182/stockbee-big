@@ -11,134 +11,176 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     background: #0f172a;
     color: #e2e8f0;
-    padding: 40px;
-    min-width: 900px;
+    padding: 40px 20px;
+    overflow-x: auto;
   }
 
-  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; color: #f8fafc; }
-  .subtitle { color: #94a3b8; font-size: 13px; margin-bottom: 20px; }
+  h1 { font-size: 20px; font-weight: 700; color: #f8fafc; text-align: center; }
+  .subtitle { color: #64748b; font-size: 12px; text-align: center; margin-bottom: 24px; }
 
   .legend {
-    display: flex; gap: 20px; margin-bottom: 28px; flex-wrap: wrap;
+    display: flex; gap: 16px; justify-content: center; margin-bottom: 32px; flex-wrap: wrap;
   }
-  .legend-item {
-    display: flex; align-items: center; gap: 6px; font-size: 12px; color: #94a3b8;
-  }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #94a3b8; }
   .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
 
-  /* ── Tree ── */
-  .tree ul { list-style: none; padding-left: 28px; }
-  .tree > ul { padding-left: 0; }
-  .tree li { position: relative; padding: 3px 0; }
+  /* ── Horizontal tree via flexbox ── */
+  .htree, .htree ul {
+    display: flex; flex-direction: column; align-items: center;
+    list-style: none; padding: 0; margin: 0;
+  }
 
-  .tree ul li::before {
-    content: ''; position: absolute; left: -16px; top: 0; bottom: 50%;
-    border-left: 1.5px solid #334155;
+  /* children laid out horizontally */
+  .htree ul {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 0;
+    padding-top: 20px;
+    position: relative;
   }
-  .tree ul li::after {
-    content: ''; position: absolute; left: -16px; top: 50%;
-    width: 16px; border-top: 1.5px solid #334155;
+
+  /* vertical connector from parent down */
+  .htree ul::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%;
+    width: 1px; height: 20px;
+    background: #334155;
   }
-  .tree ul li:not(:last-child)::before { bottom: 0; }
-  .tree > ul > li::before, .tree > ul > li::after { display: none; }
+
+  /* horizontal bar across siblings */
+  .htree ul::after {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 0; right: 0;
+    /* calculated by JS */
+    height: 1px;
+    background: #334155;
+  }
+
+  .htree li {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 0 6px;
+    position: relative;
+  }
+
+  /* connector from horizontal bar down to each child */
+  .htree ul > li::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%;
+    width: 1px; height: 20px;
+    background: #334155;
+  }
+
+  /* hide bar overflow for single child */
+  .htree ul:has(> li:only-child)::after { display: none; }
 
   /* ── Nodes ── */
   .n {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 4px 12px; border-radius: 6px; font-size: 13px;
-    line-height: 1.5; border: 1.5px solid transparent;
-    transition: transform 0.1s;
+    display: inline-flex; flex-direction: column; align-items: center;
+    padding: 6px 10px; border-radius: 6px; font-size: 11px;
+    line-height: 1.4; border: 1.5px solid transparent;
+    text-align: center; max-width: 160px; min-width: 80px;
+    white-space: normal;
   }
-  .n:hover { transform: translateX(2px); }
 
   .n-root {
     background: #1e40af; color: #fff; font-weight: 700;
-    font-size: 15px; padding: 8px 18px; border-radius: 8px;
-  }
-  .n-src {
-    background: #064e3b; border-color: #059669; font-weight: 600;
-  }
-  .n-proc {
-    background: #1e293b; border-color: #475569;
-  }
-  .n-store {
-    background: #1e1b4b; border-color: #6366f1;
-  }
-  .n-model {
-    background: #451a03; border-color: #d97706;
+    font-size: 14px; padding: 10px 20px; border-radius: 8px; max-width: none;
   }
 
-  /* Chain destination nodes */
-  .n-mc {
-    background: rgba(59,130,246,0.15); border-color: #3b82f6; font-weight: 600;
-  }
-  .n-fc {
-    background: rgba(245,158,11,0.15); border-color: #f59e0b; font-weight: 600;
-  }
-  .n-tr {
-    background: rgba(139,92,246,0.15); border-color: #8b5cf6; font-weight: 600;
-  }
+  .n-src { background: #064e3b; border-color: #059669; font-weight: 600; }
+  .n-proc { background: #1e293b; border-color: #475569; }
+  .n-store { background: #1e1b4b; border-color: #6366f1; }
+  .n-mdl { background: #451a03; border-color: #d97706; }
 
-  /* Badges */
+  .n-mc { background: rgba(59,130,246,0.2); border-color: #3b82f6; font-weight: 600; }
+  .n-fc { background: rgba(245,158,11,0.2); border-color: #f59e0b; font-weight: 600; }
+  .n-tr { background: rgba(139,92,246,0.2); border-color: #8b5cf6; font-weight: 600; }
+  .n-guard { background: rgba(239,68,68,0.2); border-color: #ef4444; font-weight: 700; }
+
+  .n-shared { border-style: dashed; }
+
+  .badges { display: flex; gap: 3px; margin-top: 3px; justify-content: center; }
   .b {
-    font-size: 9px; font-weight: 800; padding: 1px 5px; border-radius: 3px;
-    letter-spacing: 0.5px; margin-left: 2px;
+    font-size: 8px; font-weight: 800; padding: 1px 4px; border-radius: 2px;
+    letter-spacing: 0.3px;
   }
   .b-mc { background: #3b82f6; color: #fff; }
   .b-fc { background: #f59e0b; color: #000; }
   .b-tr { background: #8b5cf6; color: #fff; }
 
-  .d { color: #64748b; font-size: 11px; font-weight: 400; }
-  .icon { font-size: 14px; flex-shrink: 0; }
+  .d { color: #64748b; font-size: 9px; display: block; margin-top: 2px; }
+  .icon { font-size: 14px; }
 
-  /* shared source highlight */
-  .n-shared {
-    background: #1a2e05; border-color: #65a30d; font-weight: 600;
-    border-style: dashed;
+  /* level label */
+  .lvl {
+    position: absolute; left: -60px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 10px; color: #475569; font-weight: 600;
+    writing-mode: vertical-rl; text-orientation: mixed;
+    letter-spacing: 1px;
   }
 
-  hr.div {
-    margin: 28px 0 20px; border: none; border-top: 1px dashed #334155;
+  /* interactions section */
+  .interact {
+    margin-top: 32px; padding: 16px 24px;
+    background: #1e293b; border-radius: 8px; border: 1px solid #334155;
+    max-width: 700px; margin-left: auto; margin-right: auto;
   }
-  h2.sec {
-    font-size: 16px; font-weight: 700; margin-bottom: 12px; color: #f8fafc;
+  .interact h2 { font-size: 14px; margin-bottom: 10px; color: #f8fafc; }
+  .interact ul { list-style: none; padding: 0; }
+  .interact li {
+    padding: 4px 0; font-size: 12px; color: #cbd5e1;
+    border-bottom: 1px solid #1e293b;
   }
+  .interact li::before { content: '→ '; color: #64748b; }
+  .interact .warn { color: #fca5a5; font-weight: 600; }
 </style>
 </head>
 <body>
 
-<h1>Stockbee Data Pipeline Tree</h1>
-<p class="subtitle">数据源 → 处理 → 存储 → 模型 → MC / FC / Training — 共享数据源用虚线框标记</p>
+<h1>Stockbee Data Pipeline</h1>
+<p class="subtitle">横向 = 并列数据源 / 纵向 = 处理流程 / 虚线框 = 共享数据源</p>
 
 <div class="legend">
   <div class="legend-item"><div class="legend-dot" style="background:#059669"></div>数据源</div>
   <div class="legend-item"><div class="legend-dot" style="background:#475569"></div>处理</div>
   <div class="legend-item"><div class="legend-dot" style="background:#6366f1"></div>存储</div>
   <div class="legend-item"><div class="legend-dot" style="background:#d97706"></div>模型</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>MC 周度</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>FC 实时</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div>训练</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#65a30d; border: 1px dashed #65a30d"></div>共享数据源</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>MC</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>FC</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div>Train</div>
 </div>
 
-<div class="tree"><ul><li>
-  <span class="n n-root">Stockbee Pipeline</span>
+<div class="htree">
+<ul><li>
+  <span class="n n-root">🐝 Stockbee Pipeline</span>
+
+  <!-- LEVEL 1: All data sources horizontal -->
   <ul>
 
-    <!-- ── Alpaca OHLCV ── -->
+    <!-- Alpaca OHLCV -->
     <li>
-      <span class="n n-shared"><span class="icon">📊</span> Alpaca OHLCV <span class="d">4000只×5年, 日度</span> <span class="b b-mc">MC</span><span class="b b-fc">FC</span><span class="b b-tr">TR</span></span>
+      <span class="n n-src n-shared">
+        <span class="icon">📊</span> Alpaca OHLCV
+        <span class="d">4000只 × 5年</span>
+        <div class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span><span class="b b-tr">TR</span></div>
+      </span>
       <ul>
         <li>
-          <span class="n n-store"><span class="icon">💾</span> Parquet 列存</span>
+          <span class="n n-store">💾 Parquet</span>
           <ul>
             <li>
-              <span class="n n-proc">Alpha158 表达式引擎 <span class="d">MA, RSI, MACD, Bollinger</span></span>
+              <span class="n n-proc">Alpha158<br>表达式引擎</span>
               <ul>
-                <li><span class="n n-proc">158 技术因子 (标准化)</span>
+                <li>
+                  <span class="n n-proc">158 技术因子</span>
                   <ul>
-                    <li><span class="n n-mc"><span class="b b-mc">MC</span> 因子融合 → RL 选股</span></li>
-                    <li><span class="n n-tr"><span class="b b-tr">TR</span> RL 环境状态空间</span></li>
+                    <li><span class="n n-mc">MC: 因子融合<br>→ RL 选股</span></li>
+                    <li><span class="n n-tr">TR: RL 环境<br>状态空间</span></li>
                   </ul>
                 </li>
               </ul>
@@ -146,11 +188,12 @@
           </ul>
         </li>
         <li>
-          <span class="n n-proc">实时价格监控 <span class="d">交易时段</span></span>
+          <span class="n n-proc">实时价格<br>监控</span>
           <ul>
-            <li><span class="n n-proc">3σ 异常检测 <span class="d">ATR×1.5</span></span>
+            <li>
+              <span class="n n-proc">3σ 异常检测<br><span class="d">ATR×1.5</span></span>
               <ul>
-                <li><span class="n n-fc"><span class="b b-fc">FC</span> 防守平仓触发</span></li>
+                <li><span class="n n-fc">FC: 防守<br>平仓触发</span></li>
               </ul>
             </li>
           </ul>
@@ -158,19 +201,25 @@
       </ul>
     </li>
 
-    <!-- ── Alpaca Universe ── -->
+    <!-- Alpaca Universe -->
     <li>
-      <span class="n n-shared"><span class="icon">🏛️</span> Alpaca 全美股 <span class="d">8000只, 每周同步</span> <span class="b b-mc">MC</span><span class="b b-fc">FC</span></span>
+      <span class="n n-src n-shared">
+        <span class="icon">🏛️</span> Alpaca 全美股
+        <span class="d">8000只, 每周</span>
+        <div class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></div>
+      </span>
       <ul>
         <li>
-          <span class="n n-store"><span class="icon">💾</span> SQLite broad_universe <span class="d">ticker, sector, mcap, volume, short_able</span></span>
+          <span class="n n-store">💾 SQLite<br>broad_universe</span>
           <ul>
-            <li><span class="n n-proc">四层漏斗 <span class="d">8000→4000→500→100</span></span>
+            <li>
+              <span class="n n-proc">四层漏斗<br><span class="d">8000→4000→500→100</span></span>
               <ul>
-                <li><span class="n n-proc">U100 候选池</span>
+                <li>
+                  <span class="n n-proc">U100 候选池</span>
                   <ul>
-                    <li><span class="n n-mc"><span class="b b-mc">MC</span> DQN 选股范围 (100→8)</span></li>
-                    <li><span class="n n-fc"><span class="b b-fc">FC</span> 开新仓标的范围</span></li>
+                    <li><span class="n n-mc">MC: DQN<br>选股范围</span></li>
+                    <li><span class="n n-fc">FC: 开新仓<br>标的范围</span></li>
                   </ul>
                 </li>
               </ul>
@@ -180,15 +229,21 @@
       </ul>
     </li>
 
-    <!-- ── Polygon / Yahoo ── -->
+    <!-- Polygon -->
     <li>
-      <span class="n n-src"><span class="icon">📈</span> Polygon.io <span class="d">或 Yahoo fallback, 季度</span> <span class="b b-mc">MC</span></span>
+      <span class="n n-src">
+        <span class="icon">📈</span> Polygon.io
+        <span class="d">或 Yahoo, 季度</span>
+        <div class="badges"><span class="b b-mc">MC</span></div>
+      </span>
       <ul>
-        <li><span class="n n-store"><span class="icon">💾</span> Parquet 预计算</span>
+        <li>
+          <span class="n n-store">💾 Parquet<br>预计算</span>
           <ul>
-            <li><span class="n n-proc">基本面因子 <span class="d">PE, PB, ROE, EPS</span></span>
+            <li>
+              <span class="n n-proc">基本面因子<br><span class="d">PE PB ROE EPS</span></span>
               <ul>
-                <li><span class="n n-mc"><span class="b b-mc">MC</span> 因子融合 → RL 选股</span></li>
+                <li><span class="n n-mc">MC: 因子融合</span></li>
               </ul>
             </li>
           </ul>
@@ -196,16 +251,22 @@
       </ul>
     </li>
 
-    <!-- ── SEC EDGAR ── -->
+    <!-- SEC EDGAR -->
     <li>
-      <span class="n n-shared"><span class="icon">🏦</span> SEC EDGAR <span class="d">10-K/10-Q, 8-K 速报</span> <span class="b b-mc">MC</span><span class="b b-fc">FC</span></span>
+      <span class="n n-src n-shared">
+        <span class="icon">🏦</span> SEC EDGAR
+        <span class="d">10-K/Q, 8-K</span>
+        <div class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></div>
+      </span>
       <ul>
-        <li><span class="n n-model"><span class="icon">🤖</span> GPT-4.1 long context <span class="d">60k tokens 解析</span></span>
+        <li>
+          <span class="n n-mdl">🤖 GPT-4.1<br><span class="d">60k tokens</span></span>
           <ul>
-            <li><span class="n n-proc">关键财务指标 JSON</span>
+            <li>
+              <span class="n n-proc">财务指标 JSON</span>
               <ul>
-                <li><span class="n n-mc"><span class="b b-mc">MC</span> 基本面因子补充</span></li>
-                <li><span class="n n-fc"><span class="b b-fc">FC</span> 8-K 速报触发信号</span></li>
+                <li><span class="n n-mc">MC: 基本面<br>因子补充</span></li>
+                <li><span class="n n-fc">FC: 8-K<br>速报触发</span></li>
               </ul>
             </li>
           </ul>
@@ -213,83 +274,51 @@
       </ul>
     </li>
 
-    <!-- ── NewsAPI + Perplexity + Nasdaq RSS (shared pipeline) ── -->
+    <!-- News (3 sources merged) -->
     <li>
-      <span class="n n-shared"><span class="icon">📰</span> NewsAPI + Perplexity + Nasdaq RSS <span class="d">同级数据源, 跨源去重</span> <span class="b b-mc">MC</span><span class="b b-fc">FC</span><span class="b b-tr">TR</span></span>
+      <span class="n n-src n-shared">
+        <span class="icon">📰</span> NewsAPI +<br>Perplexity +<br>Nasdaq RSS
+        <span class="d">跨源去重</span>
+        <div class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span><span class="b b-tr">TR</span></div>
+      </span>
       <ul>
-        <li><span class="n n-proc">G1 快速过滤 <span class="d">&lt;1s, 去重+实体识别+来源检查, 95%淘汰</span></span>
+        <li>
+          <span class="n n-proc">G1 过滤<br><span class="d">&lt;1s, 95%淘汰</span></span>
           <ul>
-            <li><span class="n n-store"><span class="icon">💾</span> SQLite news_events <span class="d">全量持久化, g_level 分级</span></span>
+            <li>
+              <span class="n n-store">💾 SQLite<br>news_events</span>
               <ul>
-                <li><span class="n n-mc"><span class="b b-mc">MC</span> 周度情绪聚合因子</span></li>
-                <li><span class="n n-tr"><span class="b b-tr">TR</span> 新闻-收益关联训练集</span></li>
+                <li><span class="n n-mc">MC: 周度<br>情绪聚合</span></li>
+                <li><span class="n n-tr">TR: 新闻-收益<br>训练集</span></li>
               </ul>
             </li>
-            <li><span class="n n-model"><span class="icon">🧠</span> G2 FinBERT 本地 <span class="d">&lt;5s, 零API成本, 情绪+主题+紧急度+重要度</span></span>
+            <li>
+              <span class="n n-mdl">🧠 G2 FinBERT<br><span class="d">本地, &lt;5s, $0</span></span>
               <ul>
-                <li><span class="n n-model"><span class="icon">🤖</span> G3 Claude Haiku <span class="d">&lt;30s, ≤10篇/天, &lt;$2/月, importance&gt;0.7</span></span>
+                <li>
+                  <span class="n n-mdl">🤖 G3 Haiku<br><span class="d">≤10篇/天, &lt;$2</span></span>
                   <ul>
-                    <li><span class="n n-proc">持仓影响 ±X% + target/stop 建议 <span class="d">Phase 2</span></span></li>
+                    <li><span class="n n-proc">影响 ±X%<br>target/stop</span></li>
                   </ul>
                 </li>
-                <li><span class="n n-proc">信号评分 <span class="d">score = 情绪 × 重要度 × 紧急度</span></span>
+                <li>
+                  <span class="n n-proc">信号评分<br><span class="d">情绪×重要×紧急</span></span>
                   <ul>
-                    <li><span class="n n-fc"><span class="b b-fc">FC</span> Tier-1 (&gt;85): 自动执行</span></li>
-                    <li><span class="n n-fc"><span class="b b-fc">FC</span> Tier-2 (60-85): Victor 15min 审批</span></li>
-                    <li><span class="n n-fc"><span class="b b-fc">FC</span> Tier-3 (&lt;60): 观察列表</span></li>
-                  </ul>
-                </li>
-              </ul>
-            </li>
-          </ul>
-        </li>
-        <li><span class="n n-store"><span class="icon">🕸️</span> 公司关系图 <span class="d">NetworkX, 100节点, 500边</span></span>
-          <ul>
-            <li><span class="n n-proc">新闻传播引擎 <span class="d">G2情绪沿关系边传播: 供应链同向/竞争反向/同行业弱正</span></span>
-              <ul>
-                <li><span class="n n-proc">propagation_score</span>
-                  <ul>
-                    <li><span class="n n-mc"><span class="b b-mc">MC</span> 因子融合补充</span></li>
-                    <li><span class="n n-fc"><span class="b b-fc">FC</span> 关联股信号放大</span></li>
+                    <li><span class="n n-fc">FC: Tier-1<br><span class="d">&gt;85 自动</span></span></li>
+                    <li><span class="n n-fc">FC: Tier-2<br><span class="d">60-85 审批</span></span></li>
+                    <li><span class="n n-fc">FC: Tier-3<br><span class="d">&lt;60 观察</span></span></li>
                   </ul>
                 </li>
               </ul>
             </li>
-          </ul>
-        </li>
-      </ul>
-    </li>
-
-    <!-- ── FRED ── -->
-    <li>
-      <span class="n n-shared"><span class="icon">🏛️</span> FRED API <span class="d">19指标, 8维度 (利率/就业/物价/增长/信用/流动性/汇率/商品)</span> <span class="b b-mc">MC</span><span class="b b-tr">TR</span></span>
-      <ul>
-        <li><span class="n n-store"><span class="icon">💾</span> Parquet (历史) + SQLite (最新值)</span>
-          <ul>
-            <li><span class="n n-proc">Z-score 标准化 <span class="d">252日窗口, [-3,+3]</span></span>
+            <li>
+              <span class="n n-store">🕸️ 公司图<br><span class="d">100节点 500边</span></span>
               <ul>
-                <li><span class="n n-proc">经济周期分类 <span class="d">扩张/过热/滞胀/衰退/复苏</span></span></li>
-                <li><span class="n n-tr"><span class="b b-tr">TR</span> reward shaping</span></li>
-              </ul>
-            </li>
-          </ul>
-        </li>
-        <li><span class="n n-model">MacroTiltEngine <span class="d">敏感度矩阵 (11 GICS × 19 指标)</span></span>
-          <ul>
-            <li><span class="n n-proc">sector_tilt (±3%) + style_tilt (价值/成长)</span>
-              <ul>
-                <li><span class="n n-mc"><span class="b b-mc">MC</span> 宏观覆盖层 (Soft Overlay)</span></li>
-              </ul>
-            </li>
-          </ul>
-        </li>
-        <li><span class="n n-store"><span class="icon">🕸️</span> 宏观传播图 <span class="d">NetworkX DiGraph, 30节点, 70有向边</span></span>
-          <ul>
-            <li><span class="n n-proc">冲击传播引擎 <span class="d">Z&gt;1.0触发, impact=z×polarity×strength, 衰减0.5, 深度3</span></span>
-              <ul>
-                <li><span class="n n-proc">行业 Tilt 补充 <span class="d">0.6规则 + 0.4传播</span></span>
+                <li>
+                  <span class="n n-proc">传播引擎<br><span class="d">供应链/竞争/同业</span></span>
                   <ul>
-                    <li><span class="n n-mc"><span class="b b-mc">MC</span> MacroTiltEngine 融合</span></li>
+                    <li><span class="n n-mc">MC: propagation<br>因子</span></li>
+                    <li><span class="n n-fc">FC: 关联股<br>信号放大</span></li>
                   </ul>
                 </li>
               </ul>
@@ -299,71 +328,157 @@
       </ul>
     </li>
 
-    <!-- ── Polymarket ── -->
+    <!-- FRED -->
     <li>
-      <span class="n n-src"><span class="icon">🎰</span> Polymarket <span class="d">top 30 宏观事件概率, 免费</span> <span class="b b-mc">MC</span></span>
+      <span class="n n-src n-shared">
+        <span class="icon">🏛️</span> FRED API
+        <span class="d">19指标, 8维度</span>
+        <div class="badges"><span class="b b-mc">MC</span><span class="b b-tr">TR</span></div>
+      </span>
       <ul>
-        <li><span class="n n-proc">事件概率 delta 检测 <span class="d">"概率悬崖" 突变</span></span>
+        <li>
+          <span class="n n-store">💾 Parquet<br>+ SQLite</span>
           <ul>
-            <li><span class="n n-mc"><span class="b b-mc">MC</span> MacroTiltEngine 补充因子</span></li>
+            <li>
+              <span class="n n-proc">Z-score<br><span class="d">252日, [-3,+3]</span></span>
+              <ul>
+                <li><span class="n n-proc">经济周期<br><span class="d">5种制度</span></span></li>
+                <li><span class="n n-tr">TR: reward<br>shaping</span></li>
+              </ul>
+            </li>
+            <li>
+              <span class="n n-mdl">MacroTilt<br>Engine<br><span class="d">11GICS × 19指标</span></span>
+              <ul>
+                <li>
+                  <span class="n n-proc">sector_tilt ±3%<br>style_tilt V/G</span>
+                  <ul>
+                    <li><span class="n n-mc">MC: 宏观<br>覆盖层</span></li>
+                  </ul>
+                </li>
+              </ul>
+            </li>
+            <li>
+              <span class="n n-store">🕸️ 宏观图<br><span class="d">30节点 70边</span></span>
+              <ul>
+                <li>
+                  <span class="n n-proc">冲击传播<br><span class="d">Z&gt;1.0触发</span></span>
+                  <ul>
+                    <li><span class="n n-mc">MC: Tilt<br>融合</span></li>
+                  </ul>
+                </li>
+              </ul>
+            </li>
           </ul>
         </li>
       </ul>
     </li>
 
-    <!-- ── 持仓状态 ── -->
+    <!-- Polymarket -->
     <li>
-      <span class="n n-shared"><span class="icon">💼</span> 当前持仓状态 <span class="d">Alpaca 账户实时</span> <span class="b b-mc">MC</span><span class="b b-fc">FC</span></span>
+      <span class="n n-src">
+        <span class="icon">🎰</span> Polymarket
+        <span class="d">top30事件, 免费</span>
+        <div class="badges"><span class="b b-mc">MC</span></div>
+      </span>
       <ul>
-        <li><span class="n n-proc">持仓快照 <span class="d">ticker, weight, pnl, hold_days</span></span>
+        <li>
+          <span class="n n-proc">概率 delta<br><span class="d">突变检测</span></span>
           <ul>
-            <li><span class="n n-mc"><span class="b b-mc">MC</span> 约束检查 <span class="d">sector cap, position cap 20%</span></span></li>
-            <li><span class="n n-fc"><span class="b b-fc">FC</span> 退出管理 <span class="d">TTL倒计时 / target-stop监控</span></span></li>
-            <li><span class="n n-mc"><span class="b b-mc">MC</span> 决策LLM: 当前 vs 建议组合</span></li>
+            <li><span class="n n-mc">MC: MacroTilt<br>补充因子</span></li>
           </ul>
         </li>
       </ul>
     </li>
 
-    <!-- ── 交易记录 ── -->
+    <!-- 持仓 -->
     <li>
-      <span class="n n-src"><span class="icon">📋</span> 历史交易记录 <span class="d">order_id, trigger_source, signal_score</span> <span class="b b-tr">TR</span></span>
+      <span class="n n-src n-shared">
+        <span class="icon">💼</span> 当前持仓
+        <span class="d">Alpaca 账户</span>
+        <div class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></div>
+      </span>
       <ul>
-        <li><span class="n n-store"><span class="icon">💾</span> SQLite trades <span class="d">绩效: Sharpe, 胜率, 回撤</span></span>
+        <li>
+          <span class="n n-proc">持仓快照<br><span class="d">ticker weight pnl</span></span>
           <ul>
-            <li><span class="n n-tr"><span class="b b-tr">TR</span> RL reward 信号</span></li>
-            <li><span class="n n-tr"><span class="b b-tr">TR</span> FC 退出模型训练 <span class="d">ML校准 + RL动态退出</span></span></li>
+            <li><span class="n n-mc">MC: 约束<br>检查</span></li>
+            <li><span class="n n-fc">FC: 退出<br>管理</span></li>
           </ul>
         </li>
       </ul>
     </li>
 
-    <!-- ── 模型权重 ── -->
+    <!-- 交易记录 -->
     <li>
-      <span class="n n-shared"><span class="icon">🧬</span> 模型权重 (.pt) <span class="d">周日训练产出: DQN, PPO/SAC, ML校准器, RL退出</span> <span class="b b-mc">MC</span><span class="b b-fc">FC</span></span>
+      <span class="n n-src">
+        <span class="icon">📋</span> 交易记录
+        <span class="d">历史 trades</span>
+        <div class="badges"><span class="b b-tr">TR</span></div>
+      </span>
       <ul>
-        <li><span class="n n-mc"><span class="b b-mc">MC</span> RL 推理 <span class="d">选股 + 权重分配</span></span></li>
-        <li><span class="n n-fc"><span class="b b-fc">FC</span> 退出模型推理 <span class="d">Phase 2</span></span></li>
+        <li>
+          <span class="n n-store">💾 SQLite<br>trades</span>
+          <ul>
+            <li><span class="n n-tr">TR: RL reward</span></li>
+            <li><span class="n n-tr">TR: 退出模型<br>训练</span></li>
+          </ul>
+        </li>
+      </ul>
+    </li>
+
+    <!-- 模型权重 -->
+    <li>
+      <span class="n n-src n-shared">
+        <span class="icon">🧬</span> 模型权重
+        <span class="d">.pt 周日产出</span>
+        <div class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></div>
+      </span>
+      <ul>
+        <li><span class="n n-mc">MC: RL 推理<br><span class="d">选股+权重</span></span></li>
+        <li><span class="n n-fc">FC: 退出模型<br><span class="d">Phase 2</span></span></li>
       </ul>
     </li>
 
   </ul>
-</li></ul></div>
+</li></ul>
+</div>
 
-<!-- ════ MC↔FC ════ -->
-<hr class="div">
-<h2 class="sec">MC ↔ FC 交互</h2>
-<div class="tree"><ul>
-  <li>
-    <span class="n n-proc" style="font-weight:700">MC 周度重算时评估 FC 仓位</span>
-    <ul>
-      <li><span class="n n-mc">FC 新仓被 MC 选中 → 并入 MC, TTL/target/stop 取消</span></li>
-      <li><span class="n n-fc">FC 新仓未被选中 → 按 FC 退出策略 <span class="d">TTL到期 / target-stop</span></span></li>
-      <li><span class="n n-mc">FC 调仓 MC 持仓 → MC 重算权重, FC 调整归位</span></li>
-      <li><span class="n n-proc" style="background:#7f1d1d; border-color:#ef4444; font-weight:700">3σ 防守触发 → 立即平仓 <span class="d">MC/FC 均适用, 优先级最高</span></span></li>
-    </ul>
-  </li>
-</ul></div>
+<!-- MC↔FC -->
+<div class="interact">
+  <h2>MC ↔ FC 交互规则</h2>
+  <ul>
+    <li>FC 新仓被 MC 选中 → 并入 MC, TTL/target/stop 取消</li>
+    <li>FC 新仓未被选中 → 按 FC 退出策略 (TTL 到期 / target-stop)</li>
+    <li>FC 调仓 MC 持仓 → MC 下周重算归位</li>
+    <li class="warn">⚠ 3σ 防守触发 → 立即平仓 (MC/FC 均适用, 优先级最高)</li>
+  </ul>
+</div>
+
+<script>
+// Draw horizontal connector bars between sibling nodes
+function drawBars() {
+  document.querySelectorAll('.htree ul').forEach(ul => {
+    const kids = Array.from(ul.children).filter(c => c.tagName === 'LI');
+    if (kids.length < 2) return;
+    const first = kids[0], last = kids[kids.length - 1];
+    const ulRect = ul.getBoundingClientRect();
+    const fRect = first.getBoundingClientRect();
+    const lRect = last.getBoundingClientRect();
+    const left = fRect.left + fRect.width / 2 - ulRect.left;
+    const right = lRect.left + lRect.width / 2 - ulRect.left;
+    ul.style.setProperty('--bar-left', left + 'px');
+    ul.style.setProperty('--bar-right', (ulRect.width - right) + 'px');
+  });
+}
+
+// Override the ::after for precise bar positioning
+const style = document.createElement('style');
+style.textContent = `.htree ul::after { left: var(--bar-left, 0); right: var(--bar-right, 0); }`;
+document.head.appendChild(style);
+
+drawBars();
+window.addEventListener('resize', drawBars);
+</script>
 
 </body>
 </html>
