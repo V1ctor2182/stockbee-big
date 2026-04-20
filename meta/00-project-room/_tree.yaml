@@ -37,7 +37,7 @@ tree:
           phase: "1-2"
           children:
             - { id: "01-llm-routing", type: feature, priority: P0, phase: 1, status: "研究完成" }
-            - { id: "02-small-models", type: feature, priority: P0, phase: 1, status: "研究完成" }
+            - { id: "02-small-models", type: feature, priority: P0, phase: 1, status: "已完成" }
             - { id: "03-rl-algorithms", type: feature, priority: P0, phase: 2, status: "待研究" }
             - { id: "04-alpha-mining", type: feature, priority: P0, phase: 1, status: "研究完成" }
 
