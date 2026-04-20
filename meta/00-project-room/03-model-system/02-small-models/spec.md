@@ -154,5 +154,5 @@ m1 (contracts + fixtures + model_io + schema migration)
 m2a / m3 / m5 在 m1 完成后可**并行**开发。
 
 ---
-_所有 spec 状态: draft（需要 review 后升为 active）_
+_所有 spec 状态: active (room 完成后升级, 2026-04-20)_
 _spec.md 由 room-init 自动生成，specs/*.yaml 为源数据_

@@ -1,6 +1,6 @@
 spec_id: "constraint-02-small-models-001"
 type: constraint
-state: draft
+state: active
 intent:
   summary: "FinBERT 情绪准确率 > 80%"
   detail: ""
