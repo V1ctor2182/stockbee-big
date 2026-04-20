@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stockbee Data Pipeline Tree</title>
+<title>Stockbee Data Pipeline</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -11,473 +11,341 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     background: #0f172a;
     color: #e2e8f0;
-    padding: 40px 20px;
+    padding: 32px 20px;
     overflow-x: auto;
   }
 
   h1 { font-size: 20px; font-weight: 700; color: #f8fafc; text-align: center; }
-  .subtitle { color: #64748b; font-size: 12px; text-align: center; margin-bottom: 24px; }
+  .subtitle { color: #64748b; font-size: 12px; text-align: center; margin-bottom: 20px; }
 
   .legend {
-    display: flex; gap: 16px; justify-content: center; margin-bottom: 32px; flex-wrap: wrap;
+    display: flex; gap: 14px; justify-content: center; margin-bottom: 28px; flex-wrap: wrap;
   }
   .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #94a3b8; }
   .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
 
-  /* ── Horizontal tree via flexbox ── */
-  .htree, .htree ul {
-    display: flex; flex-direction: column; align-items: center;
-    list-style: none; padding: 0; margin: 0;
+  /* ── Layered diagram (SVG overlay) ── */
+  .canvas {
+    position: relative; margin: 0 auto;
+    display: flex; flex-direction: column; align-items: stretch; gap: 36px;
+    max-width: 1700px;
   }
 
-  /* children laid out horizontally */
-  .htree ul {
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 0;
-    padding-top: 20px;
-    position: relative;
+  .layer {
+    display: flex; justify-content: center; gap: 10px; flex-wrap: nowrap;
+    position: relative; z-index: 2;
   }
 
-  /* vertical connector from parent down */
-  .htree ul::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 50%;
-    width: 1px; height: 20px;
-    background: #334155;
+  .layer-label {
+    position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+    font-size: 10px; color: #475569; font-weight: 700; letter-spacing: 2px;
+    writing-mode: vertical-rl; text-orientation: mixed;
   }
 
-  /* horizontal bar across siblings */
-  .htree ul::after {
-    content: '';
-    position: absolute;
-    top: 20px;
-    left: 0; right: 0;
-    /* calculated by JS */
-    height: 1px;
-    background: #334155;
+  /* SVG connector layer */
+  svg.wires {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 1;
   }
-
-  .htree li {
-    display: flex; flex-direction: column; align-items: center;
-    padding: 0 6px;
-    position: relative;
-  }
-
-  /* connector from horizontal bar down to each child */
-  .htree ul > li::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 50%;
-    width: 1px; height: 20px;
-    background: #334155;
-  }
-
-  /* hide bar overflow for single child */
-  .htree ul:has(> li:only-child)::after { display: none; }
 
   /* ── Nodes ── */
   .n {
     display: inline-flex; flex-direction: column; align-items: center;
     padding: 6px 10px; border-radius: 6px; font-size: 11px;
-    line-height: 1.4; border: 1.5px solid transparent;
-    text-align: center; max-width: 160px; min-width: 80px;
-    white-space: normal;
-  }
-
-  .n-root {
-    background: #1e40af; color: #fff; font-weight: 700;
-    font-size: 14px; padding: 10px 20px; border-radius: 8px; max-width: none;
+    line-height: 1.3; border: 1.5px solid transparent;
+    text-align: center; min-width: 95px; max-width: 160px;
+    background: #1e293b; border-color: #475569;
+    position: relative; z-index: 2;
   }
 
   .n-src { background: #064e3b; border-color: #059669; font-weight: 600; }
-  .n-proc { background: #1e293b; border-color: #475569; }
   .n-store { background: #1e1b4b; border-color: #6366f1; }
   .n-mdl { background: #451a03; border-color: #d97706; }
 
-  .n-mc { background: rgba(59,130,246,0.2); border-color: #3b82f6; font-weight: 600; }
-  .n-fc { background: rgba(245,158,11,0.2); border-color: #f59e0b; font-weight: 600; }
-  .n-tr { background: rgba(139,92,246,0.2); border-color: #8b5cf6; font-weight: 600; }
-  .n-guard { background: rgba(239,68,68,0.2); border-color: #ef4444; font-weight: 700; }
+  .n-feat-mc { background: rgba(59,130,246,0.15); border-color: #3b82f6; }
+  .n-feat-fc { background: rgba(245,158,11,0.15); border-color: #f59e0b; }
+  .n-feat-both { background: rgba(16,185,129,0.15); border-color: #10b981; }
+  .n-feat-tr { background: rgba(139,92,246,0.15); border-color: #8b5cf6; }
+
+  .n-decision {
+    padding: 12px 20px; font-size: 14px; font-weight: 700;
+    min-width: 180px; max-width: 260px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.4);
+  }
+  .n-mc-core {
+    background: #1e3a8a; border-color: #3b82f6; color: #fff;
+  }
+  .n-fc-core {
+    background: #78350f; border-color: #f59e0b; color: #fff;
+  }
+  .n-tr-core {
+    background: #4c1d95; border-color: #8b5cf6; color: #fff;
+  }
+
+  .n-out {
+    padding: 10px 16px; font-size: 13px; font-weight: 700;
+    background: #0f172a; border: 2px solid #94a3b8; color: #f8fafc;
+    min-width: 200px;
+  }
+
+  .d { color: #94a3b8; font-size: 9px; display: block; margin-top: 2px; font-weight: 400; }
+  .icon { font-size: 13px; }
 
   .n-shared { border-style: dashed; }
 
-  .badges { display: flex; gap: 3px; margin-top: 3px; justify-content: center; }
-  .b {
-    font-size: 8px; font-weight: 800; padding: 1px 4px; border-radius: 2px;
-    letter-spacing: 0.3px;
-  }
+  .badges { display: flex; gap: 3px; margin-top: 3px; }
+  .b { font-size: 8px; font-weight: 800; padding: 1px 4px; border-radius: 2px; }
   .b-mc { background: #3b82f6; color: #fff; }
   .b-fc { background: #f59e0b; color: #000; }
   .b-tr { background: #8b5cf6; color: #fff; }
 
-  .d { color: #64748b; font-size: 9px; display: block; margin-top: 2px; }
-  .icon { font-size: 14px; }
-
-  /* level label */
-  .lvl {
-    position: absolute; left: -60px; top: 50%;
-    transform: translateY(-50%);
-    font-size: 10px; color: #475569; font-weight: 600;
-    writing-mode: vertical-rl; text-orientation: mixed;
-    letter-spacing: 1px;
-  }
-
-  /* interactions section */
   .interact {
-    margin-top: 32px; padding: 16px 24px;
+    margin-top: 28px; padding: 14px 20px;
     background: #1e293b; border-radius: 8px; border: 1px solid #334155;
-    max-width: 700px; margin-left: auto; margin-right: auto;
+    max-width: 720px; margin-left: auto; margin-right: auto;
   }
-  .interact h2 { font-size: 14px; margin-bottom: 10px; color: #f8fafc; }
+  .interact h2 { font-size: 13px; margin-bottom: 8px; color: #f8fafc; }
   .interact ul { list-style: none; padding: 0; }
-  .interact li {
-    padding: 4px 0; font-size: 12px; color: #cbd5e1;
-    border-bottom: 1px solid #1e293b;
-  }
+  .interact li { padding: 3px 0; font-size: 12px; color: #cbd5e1; }
   .interact li::before { content: '→ '; color: #64748b; }
-  .interact .warn { color: #fca5a5; font-weight: 600; }
+  .warn { color: #fca5a5; font-weight: 600; }
 </style>
 </head>
 <body>
 
 <h1>Stockbee Data Pipeline</h1>
-<p class="subtitle">横向 = 并列数据源 / 纵向 = 处理流程 / 虚线框 = 共享数据源</p>
+<p class="subtitle">所有数据源 → 处理 → 特征 → 汇聚到 MC / FC 决策 LLM → 交易指令</p>
 
 <div class="legend">
   <div class="legend-item"><div class="legend-dot" style="background:#059669"></div>数据源</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#475569"></div>处理</div>
   <div class="legend-item"><div class="legend-dot" style="background:#6366f1"></div>存储</div>
   <div class="legend-item"><div class="legend-dot" style="background:#d97706"></div>模型</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>MC</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>FC</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div>Train</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>MC 特征</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>FC 特征</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>MC+FC 共享</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div>训练</div>
 </div>
 
-<div class="htree">
-<ul><li>
-  <span class="n n-root">🐝 Stockbee Pipeline</span>
+<div class="canvas" id="canvas">
+  <svg class="wires" id="wires"></svg>
 
-  <!-- LEVEL 1: All data sources horizontal -->
-  <ul>
+  <!-- LAYER 1: Data Sources -->
+  <div class="layer" data-label="L1 数据源">
+    <div class="n n-src" id="src-ohlcv">📊 Alpaca OHLCV<span class="d">4000只×5年</span></div>
+    <div class="n n-src" id="src-univ">🏛️ Alpaca 全美股<span class="d">8000只/周</span></div>
+    <div class="n n-src" id="src-poly">📈 Polygon / Yahoo<span class="d">基本面, 季度</span></div>
+    <div class="n n-src" id="src-sec">🏦 SEC EDGAR<span class="d">10-K/Q, 8-K</span></div>
+    <div class="n n-src" id="src-news">📰 NewsAPI + Perplexity<span class="d">+ Nasdaq RSS</span></div>
+    <div class="n n-src" id="src-fred">🏛️ FRED API<span class="d">19指标</span></div>
+    <div class="n n-src" id="src-poly2">🎰 Polymarket<span class="d">30事件概率</span></div>
+    <div class="n n-src" id="src-pos">💼 当前持仓<span class="d">Alpaca 账户</span></div>
+    <div class="n n-src" id="src-trades">📋 交易记录<span class="d">历史 trades</span></div>
+  </div>
 
-    <!-- Alpaca OHLCV -->
-    <li>
-      <span class="n n-src n-shared">
-        <span class="icon">📊</span> Alpaca OHLCV
-        <span class="d">4000只 × 5年</span>
-        <div class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span><span class="b b-tr">TR</span></div>
-      </span>
-      <ul>
-        <li>
-          <span class="n n-store">💾 Parquet</span>
-          <ul>
-            <li>
-              <span class="n n-proc">Alpha158<br>表达式引擎</span>
-              <ul>
-                <li>
-                  <span class="n n-proc">158 技术因子</span>
-                  <ul>
-                    <li><span class="n n-mc">MC: 因子融合<br>→ RL 选股</span></li>
-                    <li><span class="n n-tr">TR: RL 环境<br>状态空间</span></li>
-                  </ul>
-                </li>
-              </ul>
-            </li>
-          </ul>
-        </li>
-        <li>
-          <span class="n n-proc">实时价格<br>监控</span>
-          <ul>
-            <li>
-              <span class="n n-proc">3σ 异常检测<br><span class="d">ATR×1.5</span></span>
-              <ul>
-                <li><span class="n n-fc">FC: 防守<br>平仓触发</span></li>
-              </ul>
-            </li>
-          </ul>
-        </li>
-      </ul>
-    </li>
+  <!-- LAYER 2: Processing / Models -->
+  <div class="layer" data-label="L2 处理 / 模型">
+    <div class="n n-store" id="p-alpha">⚙️ Alpha158<br>表达式引擎</div>
+    <div class="n" id="p-funnel">🔽 四层漏斗<span class="d">8000→100</span></div>
+    <div class="n n-store" id="p-fund">💾 Parquet<br>基本面</div>
+    <div class="n n-mdl" id="p-sec">🤖 GPT-4.1<br>long ctx</div>
+    <div class="n" id="p-g1">🔽 G1 过滤<span class="d">去重+实体, 95%淘汰</span></div>
+    <div class="n n-mdl" id="p-g2">🧠 G2 FinBERT<span class="d">本地, &lt;5s</span></div>
+    <div class="n n-mdl" id="p-g3">🤖 G3 Haiku<span class="d">≤10篇/天</span></div>
+    <div class="n n-store" id="p-cgraph">🕸️ 公司图<span class="d">100+500</span></div>
+    <div class="n" id="p-zscore">📐 Z-score<span class="d">252日</span></div>
+    <div class="n n-mdl" id="p-tilt">⚙️ MacroTilt<br>Engine</div>
+    <div class="n n-store" id="p-mgraph">🕸️ 宏观图<span class="d">30+70有向</span></div>
+    <div class="n" id="p-delta">📐 delta<br>检测</div>
+    <div class="n" id="p-3sig">⚡ 3σ 异常<span class="d">ATR×1.5</span></div>
+  </div>
 
-    <!-- Alpaca Universe -->
-    <li>
-      <span class="n n-src n-shared">
-        <span class="icon">🏛️</span> Alpaca 全美股
-        <span class="d">8000只, 每周</span>
-        <div class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></div>
-      </span>
-      <ul>
-        <li>
-          <span class="n n-store">💾 SQLite<br>broad_universe</span>
-          <ul>
-            <li>
-              <span class="n n-proc">四层漏斗<br><span class="d">8000→4000→500→100</span></span>
-              <ul>
-                <li>
-                  <span class="n n-proc">U100 候选池</span>
-                  <ul>
-                    <li><span class="n n-mc">MC: DQN<br>选股范围</span></li>
-                    <li><span class="n n-fc">FC: 开新仓<br>标的范围</span></li>
-                  </ul>
-                </li>
-              </ul>
-            </li>
-          </ul>
-        </li>
-      </ul>
-    </li>
+  <!-- LAYER 3: Features -->
+  <div class="layer" data-label="L3 特征">
+    <div class="n n-feat-mc" id="f-tech">158 技术因子 <span class="badges"><span class="b b-mc">MC</span><span class="b b-tr">TR</span></span></div>
+    <div class="n n-feat-both" id="f-u100">U100 候选池 <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-mc" id="f-fund">基本面因子<span class="d">PE PB ROE</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
+    <div class="n n-feat-both" id="f-sec">财务指标 JSON <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-fc" id="f-signal">信号评分<span class="d">Tier-1/2/3</span> <span class="badges"><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-both" id="f-prop">propagation<br>score <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-mc" id="f-news">周度情绪聚合 <span class="badges"><span class="b b-mc">MC</span></span></div>
+    <div class="n n-feat-mc" id="f-tilt">sector / style<br>tilt (±3%) <span class="badges"><span class="b b-mc">MC</span></span></div>
+    <div class="n n-feat-mc" id="f-cycle">经济周期<span class="d">5种制度</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
+    <div class="n n-feat-mc" id="f-proba">概率悬崖<span class="d">delta</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
+    <div class="n n-feat-both" id="f-pos">持仓快照 <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-fc" id="f-price">实时价格监控 <span class="badges"><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-fc" id="f-guard">3σ 防守信号 <span class="badges"><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-tr" id="f-reward">RL reward + 退出模型 <span class="badges"><span class="b b-tr">TR</span></span></div>
+  </div>
 
-    <!-- Polygon -->
-    <li>
-      <span class="n n-src">
-        <span class="icon">📈</span> Polygon.io
-        <span class="d">或 Yahoo, 季度</span>
-        <div class="badges"><span class="b b-mc">MC</span></div>
-      </span>
-      <ul>
-        <li>
-          <span class="n n-store">💾 Parquet<br>预计算</span>
-          <ul>
-            <li>
-              <span class="n n-proc">基本面因子<br><span class="d">PE PB ROE EPS</span></span>
-              <ul>
-                <li><span class="n n-mc">MC: 因子融合</span></li>
-              </ul>
-            </li>
-          </ul>
-        </li>
-      </ul>
-    </li>
+  <!-- LAYER 4: RL Inference (from trained weights) -->
+  <div class="layer" data-label="L4 RL 推理">
+    <div class="n n-mdl" id="rl-dqn">🧬 DQN 选股<span class="d">100→8</span></div>
+    <div class="n n-mdl" id="rl-ppo">🧬 PPO/SAC 权重<span class="d">Σ=1</span></div>
+    <div class="n n-mdl" id="rl-exit">🧬 FC 退出模型<span class="d">Phase 2</span></div>
+    <div class="n n-tr-core" id="tr-core" style="font-size:13px">🟣 训练 (周日 10:00)<span class="d" style="color:#cbd5e1">→ 产出 .pt → L4</span></div>
+  </div>
 
-    <!-- SEC EDGAR -->
-    <li>
-      <span class="n n-src n-shared">
-        <span class="icon">🏦</span> SEC EDGAR
-        <span class="d">10-K/Q, 8-K</span>
-        <div class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></div>
-      </span>
-      <ul>
-        <li>
-          <span class="n n-mdl">🤖 GPT-4.1<br><span class="d">60k tokens</span></span>
-          <ul>
-            <li>
-              <span class="n n-proc">财务指标 JSON</span>
-              <ul>
-                <li><span class="n n-mc">MC: 基本面<br>因子补充</span></li>
-                <li><span class="n n-fc">FC: 8-K<br>速报触发</span></li>
-              </ul>
-            </li>
-          </ul>
-        </li>
-      </ul>
-    </li>
+  <!-- LAYER 5: Decision LLM (CONVERGENCE POINT) -->
+  <div class="layer" data-label="L5 决策 LLM">
+    <div class="n n-decision n-mc-core" id="dec-mc">
+      🔵 MC 决策 LLM
+      <span class="d" style="color:#dbeafe">周度 (周五 16:00)<br>全量因子 + RL + Tilt + 持仓</span>
+    </div>
+    <div class="n n-decision n-fc-core" id="dec-fc">
+      🟡 FC 决策 LLM
+      <span class="d" style="color:#fef3c7">实时 (新闻/价格触发)<br>G2/G3 + 信号 + 持仓 + 退出模型</span>
+    </div>
+  </div>
 
-    <!-- News (3 sources merged) -->
-    <li>
-      <span class="n n-src n-shared">
-        <span class="icon">📰</span> NewsAPI +<br>Perplexity +<br>Nasdaq RSS
-        <span class="d">跨源去重</span>
-        <div class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span><span class="b b-tr">TR</span></div>
-      </span>
-      <ul>
-        <li>
-          <span class="n n-proc">G1 过滤<br><span class="d">&lt;1s, 95%淘汰</span></span>
-          <ul>
-            <li>
-              <span class="n n-store">💾 SQLite<br>news_events</span>
-              <ul>
-                <li><span class="n n-mc">MC: 周度<br>情绪聚合</span></li>
-                <li><span class="n n-tr">TR: 新闻-收益<br>训练集</span></li>
-              </ul>
-            </li>
-            <li>
-              <span class="n n-mdl">🧠 G2 FinBERT<br><span class="d">本地, &lt;5s, $0</span></span>
-              <ul>
-                <li>
-                  <span class="n n-mdl">🤖 G3 Haiku<br><span class="d">≤10篇/天, &lt;$2</span></span>
-                  <ul>
-                    <li><span class="n n-proc">影响 ±X%<br>target/stop</span></li>
-                  </ul>
-                </li>
-                <li>
-                  <span class="n n-proc">信号评分<br><span class="d">情绪×重要×紧急</span></span>
-                  <ul>
-                    <li><span class="n n-fc">FC: Tier-1<br><span class="d">&gt;85 自动</span></span></li>
-                    <li><span class="n n-fc">FC: Tier-2<br><span class="d">60-85 审批</span></span></li>
-                    <li><span class="n n-fc">FC: Tier-3<br><span class="d">&lt;60 观察</span></span></li>
-                  </ul>
-                </li>
-              </ul>
-            </li>
-            <li>
-              <span class="n n-store">🕸️ 公司图<br><span class="d">100节点 500边</span></span>
-              <ul>
-                <li>
-                  <span class="n n-proc">传播引擎<br><span class="d">供应链/竞争/同业</span></span>
-                  <ul>
-                    <li><span class="n n-mc">MC: propagation<br>因子</span></li>
-                    <li><span class="n n-fc">FC: 关联股<br>信号放大</span></li>
-                  </ul>
-                </li>
-              </ul>
-            </li>
-          </ul>
-        </li>
-      </ul>
-    </li>
-
-    <!-- FRED -->
-    <li>
-      <span class="n n-src n-shared">
-        <span class="icon">🏛️</span> FRED API
-        <span class="d">19指标, 8维度</span>
-        <div class="badges"><span class="b b-mc">MC</span><span class="b b-tr">TR</span></div>
-      </span>
-      <ul>
-        <li>
-          <span class="n n-store">💾 Parquet<br>+ SQLite</span>
-          <ul>
-            <li>
-              <span class="n n-proc">Z-score<br><span class="d">252日, [-3,+3]</span></span>
-              <ul>
-                <li><span class="n n-proc">经济周期<br><span class="d">5种制度</span></span></li>
-                <li><span class="n n-tr">TR: reward<br>shaping</span></li>
-              </ul>
-            </li>
-            <li>
-              <span class="n n-mdl">MacroTilt<br>Engine<br><span class="d">11GICS × 19指标</span></span>
-              <ul>
-                <li>
-                  <span class="n n-proc">sector_tilt ±3%<br>style_tilt V/G</span>
-                  <ul>
-                    <li><span class="n n-mc">MC: 宏观<br>覆盖层</span></li>
-                  </ul>
-                </li>
-              </ul>
-            </li>
-            <li>
-              <span class="n n-store">🕸️ 宏观图<br><span class="d">30节点 70边</span></span>
-              <ul>
-                <li>
-                  <span class="n n-proc">冲击传播<br><span class="d">Z&gt;1.0触发</span></span>
-                  <ul>
-                    <li><span class="n n-mc">MC: Tilt<br>融合</span></li>
-                  </ul>
-                </li>
-              </ul>
-            </li>
-          </ul>
-        </li>
-      </ul>
-    </li>
-
-    <!-- Polymarket -->
-    <li>
-      <span class="n n-src">
-        <span class="icon">🎰</span> Polymarket
-        <span class="d">top30事件, 免费</span>
-        <div class="badges"><span class="b b-mc">MC</span></div>
-      </span>
-      <ul>
-        <li>
-          <span class="n n-proc">概率 delta<br><span class="d">突变检测</span></span>
-          <ul>
-            <li><span class="n n-mc">MC: MacroTilt<br>补充因子</span></li>
-          </ul>
-        </li>
-      </ul>
-    </li>
-
-    <!-- 持仓 -->
-    <li>
-      <span class="n n-src n-shared">
-        <span class="icon">💼</span> 当前持仓
-        <span class="d">Alpaca 账户</span>
-        <div class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></div>
-      </span>
-      <ul>
-        <li>
-          <span class="n n-proc">持仓快照<br><span class="d">ticker weight pnl</span></span>
-          <ul>
-            <li><span class="n n-mc">MC: 约束<br>检查</span></li>
-            <li><span class="n n-fc">FC: 退出<br>管理</span></li>
-          </ul>
-        </li>
-      </ul>
-    </li>
-
-    <!-- 交易记录 -->
-    <li>
-      <span class="n n-src">
-        <span class="icon">📋</span> 交易记录
-        <span class="d">历史 trades</span>
-        <div class="badges"><span class="b b-tr">TR</span></div>
-      </span>
-      <ul>
-        <li>
-          <span class="n n-store">💾 SQLite<br>trades</span>
-          <ul>
-            <li><span class="n n-tr">TR: RL reward</span></li>
-            <li><span class="n n-tr">TR: 退出模型<br>训练</span></li>
-          </ul>
-        </li>
-      </ul>
-    </li>
-
-    <!-- 模型权重 -->
-    <li>
-      <span class="n n-src n-shared">
-        <span class="icon">🧬</span> 模型权重
-        <span class="d">.pt 周日产出</span>
-        <div class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></div>
-      </span>
-      <ul>
-        <li><span class="n n-mc">MC: RL 推理<br><span class="d">选股+权重</span></span></li>
-        <li><span class="n n-fc">FC: 退出模型<br><span class="d">Phase 2</span></span></li>
-      </ul>
-    </li>
-
-  </ul>
-</li></ul>
+  <!-- LAYER 6: Output -->
+  <div class="layer" data-label="L6 输出">
+    <div class="n n-out" id="out-mc">
+      📦 MC 输出<br>
+      <span style="font-size:11px; font-weight:400">8L+1S 组合 + 权重</span>
+      <span class="d">→ Victor 审批 → Alpaca 周一开盘</span>
+    </div>
+    <div class="n n-out" id="out-fc">
+      ⚡ FC 输出<br>
+      <span style="font-size:11px; font-weight:400">买/卖/调仓 (U100, ≤5%单笔, ≤15%总量)</span>
+      <span class="d">Tier-1 自动 / Tier-2 15min 审批</span>
+    </div>
+    <div class="n n-out" id="out-guard" style="border-color:#ef4444; color:#fca5a5">
+      🚨 防守平仓<br>
+      <span style="font-size:11px; font-weight:400">MC/FC 均适用, 无需审批</span>
+    </div>
+  </div>
 </div>
 
-<!-- MC↔FC -->
 <div class="interact">
-  <h2>MC ↔ FC 交互规则</h2>
+  <h2>MC ↔ FC 交互</h2>
   <ul>
     <li>FC 新仓被 MC 选中 → 并入 MC, TTL/target/stop 取消</li>
-    <li>FC 新仓未被选中 → 按 FC 退出策略 (TTL 到期 / target-stop)</li>
+    <li>FC 新仓未被选中 → 按 FC 退出策略 (TTL 3天 / target-stop)</li>
     <li>FC 调仓 MC 持仓 → MC 下周重算归位</li>
-    <li class="warn">⚠ 3σ 防守触发 → 立即平仓 (MC/FC 均适用, 优先级最高)</li>
+    <li class="warn">⚠ 3σ 防守 → 立即平仓 (优先级最高, 覆盖一切)</li>
   </ul>
 </div>
 
 <script>
-// Draw horizontal connector bars between sibling nodes
-function drawBars() {
-  document.querySelectorAll('.htree ul').forEach(ul => {
-    const kids = Array.from(ul.children).filter(c => c.tagName === 'LI');
-    if (kids.length < 2) return;
-    const first = kids[0], last = kids[kids.length - 1];
-    const ulRect = ul.getBoundingClientRect();
-    const fRect = first.getBoundingClientRect();
-    const lRect = last.getBoundingClientRect();
-    const left = fRect.left + fRect.width / 2 - ulRect.left;
-    const right = lRect.left + lRect.width / 2 - ulRect.left;
-    ul.style.setProperty('--bar-left', left + 'px');
-    ul.style.setProperty('--bar-right', (ulRect.width - right) + 'px');
+// Connections: [from-id, to-id, color?]
+const WIRES = [
+  // Source → L2
+  ['src-ohlcv', 'p-alpha', '#059669'],
+  ['src-ohlcv', 'p-3sig', '#059669'],
+  ['src-univ', 'p-funnel', '#059669'],
+  ['src-poly', 'p-fund', '#059669'],
+  ['src-sec', 'p-sec', '#059669'],
+  ['src-news', 'p-g1', '#059669'],
+  ['src-fred', 'p-zscore', '#059669'],
+  ['src-fred', 'p-tilt', '#059669'],
+  ['src-fred', 'p-mgraph', '#059669'],
+  ['src-poly2', 'p-delta', '#059669'],
+  // L2 internal
+  ['p-g1', 'p-g2', '#64748b'],
+  ['p-g2', 'p-g3', '#64748b'],
+  ['p-g2', 'p-cgraph', '#64748b'],
+  ['p-zscore', 'p-tilt', '#64748b'],
+  // L2 → L3 features
+  ['p-alpha', 'f-tech', '#3b82f6'],
+  ['p-funnel', 'f-u100', '#10b981'],
+  ['p-fund', 'f-fund', '#3b82f6'],
+  ['p-sec', 'f-sec', '#10b981'],
+  ['p-g2', 'f-signal', '#f59e0b'],
+  ['p-g3', 'f-signal', '#f59e0b'],
+  ['p-g1', 'f-news', '#3b82f6'],
+  ['p-cgraph', 'f-prop', '#10b981'],
+  ['p-tilt', 'f-tilt', '#3b82f6'],
+  ['p-zscore', 'f-cycle', '#3b82f6'],
+  ['p-mgraph', 'f-tilt', '#3b82f6'],
+  ['p-delta', 'f-proba', '#3b82f6'],
+  ['src-pos', 'f-pos', '#10b981'],
+  ['p-3sig', 'f-guard', '#f59e0b'],
+  ['src-ohlcv', 'f-price', '#f59e0b'],
+  ['src-trades', 'f-reward', '#8b5cf6'],
+  // L3 → L4 (RL uses features)
+  ['f-tech', 'rl-dqn', '#d97706'],
+  ['f-fund', 'rl-dqn', '#d97706'],
+  ['f-u100', 'rl-dqn', '#d97706'],
+  ['f-prop', 'rl-dqn', '#d97706'],
+  ['f-tilt', 'rl-ppo', '#d97706'],
+  ['f-tech', 'rl-ppo', '#d97706'],
+  ['f-signal', 'rl-exit', '#d97706'],
+  ['f-news', 'rl-exit', '#d97706'],
+  ['f-reward', 'tr-core', '#8b5cf6'],
+  ['tr-core', 'rl-dqn', '#8b5cf6'],
+  ['tr-core', 'rl-ppo', '#8b5cf6'],
+  ['tr-core', 'rl-exit', '#8b5cf6'],
+  // L3 + L4 → L5 MC Decision LLM
+  ['rl-dqn', 'dec-mc', '#3b82f6'],
+  ['rl-ppo', 'dec-mc', '#3b82f6'],
+  ['f-tech', 'dec-mc', '#3b82f6'],
+  ['f-fund', 'dec-mc', '#3b82f6'],
+  ['f-u100', 'dec-mc', '#3b82f6'],
+  ['f-news', 'dec-mc', '#3b82f6'],
+  ['f-tilt', 'dec-mc', '#3b82f6'],
+  ['f-cycle', 'dec-mc', '#3b82f6'],
+  ['f-proba', 'dec-mc', '#3b82f6'],
+  ['f-sec', 'dec-mc', '#3b82f6'],
+  ['f-prop', 'dec-mc', '#3b82f6'],
+  ['f-pos', 'dec-mc', '#3b82f6'],
+  // L3 + L4 → L5 FC Decision LLM
+  ['f-signal', 'dec-fc', '#f59e0b'],
+  ['f-sec', 'dec-fc', '#f59e0b'],
+  ['f-u100', 'dec-fc', '#f59e0b'],
+  ['f-prop', 'dec-fc', '#f59e0b'],
+  ['f-price', 'dec-fc', '#f59e0b'],
+  ['f-pos', 'dec-fc', '#f59e0b'],
+  ['rl-exit', 'dec-fc', '#f59e0b'],
+  // L5 → L6
+  ['dec-mc', 'out-mc', '#3b82f6'],
+  ['dec-fc', 'out-fc', '#f59e0b'],
+  ['f-guard', 'out-guard', '#ef4444'],
+];
+
+function drawWires() {
+  const svg = document.getElementById('wires');
+  const canvas = document.getElementById('canvas');
+  const rect = canvas.getBoundingClientRect();
+  svg.setAttribute('width', rect.width);
+  svg.setAttribute('height', rect.height);
+  svg.innerHTML = '';
+
+  WIRES.forEach(([from, to, color = '#475569']) => {
+    const a = document.getElementById(from);
+    const b = document.getElementById(to);
+    if (!a || !b) return;
+    const ar = a.getBoundingClientRect();
+    const br = b.getBoundingClientRect();
+    const x1 = ar.left + ar.width / 2 - rect.left;
+    const y1 = ar.bottom - rect.top;
+    const x2 = br.left + br.width / 2 - rect.left;
+    const y2 = br.top - rect.top;
+    const midY = (y1 + y2) / 2;
+    const path = `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+    const el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    el.setAttribute('d', path);
+    el.setAttribute('stroke', color);
+    el.setAttribute('stroke-width', '1');
+    el.setAttribute('fill', 'none');
+    el.setAttribute('opacity', '0.55');
+    svg.appendChild(el);
   });
 }
 
-// Override the ::after for precise bar positioning
-const style = document.createElement('style');
-style.textContent = `.htree ul::after { left: var(--bar-left, 0); right: var(--bar-right, 0); }`;
-document.head.appendChild(style);
+// Layer labels
+document.querySelectorAll('.layer').forEach(l => {
+  const label = l.dataset.label;
+  if (label) {
+    const el = document.createElement('div');
+    el.className = 'layer-label';
+    el.textContent = label;
+    l.style.position = 'relative';
+    l.appendChild(el);
+  }
+});
 
-drawBars();
-window.addEventListener('resize', drawBars);
+requestAnimationFrame(drawWires);
+window.addEventListener('resize', drawWires);
 </script>
 
 </body>
