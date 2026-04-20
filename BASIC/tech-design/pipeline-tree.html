@@ -93,6 +93,42 @@
 
   .n-shared { border-style: dashed; }
 
+  /* Interactive states */
+  .n { cursor: pointer; transition: all 0.2s; }
+  .n:hover { transform: translateY(-1px); box-shadow: 0 0 12px rgba(255,255,255,0.15); }
+
+  body.has-selection .n { opacity: 0.25; }
+  body.has-selection .n.hl { opacity: 1; box-shadow: 0 0 14px currentColor; }
+  body.has-selection .n.hl-root {
+    opacity: 1;
+    outline: 2px solid #fbbf24;
+    outline-offset: 2px;
+  }
+
+  body.has-selection svg.wires path { opacity: 0.08 !important; }
+  body.has-selection svg.wires path.hl { opacity: 0.95 !important; stroke-width: 2.2 !important; }
+
+  .reset-btn {
+    position: fixed; top: 16px; right: 16px;
+    padding: 6px 12px; font-size: 11px; font-weight: 600;
+    background: #1e293b; color: #e2e8f0; border: 1px solid #475569;
+    border-radius: 6px; cursor: pointer; z-index: 10;
+    display: none;
+  }
+  body.has-selection .reset-btn { display: block; }
+  .reset-btn:hover { background: #334155; }
+
+  .mode-toggle {
+    display: flex; gap: 6px; justify-content: center; margin-bottom: 16px;
+    font-size: 11px;
+  }
+  .mode-btn {
+    padding: 4px 10px; border-radius: 4px; cursor: pointer;
+    background: #1e293b; color: #94a3b8; border: 1px solid #334155;
+    font-size: 11px; font-weight: 500;
+  }
+  .mode-btn.active { background: #475569; color: #f8fafc; border-color: #64748b; }
+
   .badges { display: flex; gap: 3px; margin-top: 3px; }
   .b { font-size: 8px; font-weight: 800; padding: 1px 4px; border-radius: 2px; }
   .b-mc { background: #3b82f6; color: #fff; }
@@ -113,8 +149,16 @@
 </head>
 <body>
 
+<button class="reset-btn" id="reset-btn">✕ 取消高亮</button>
+
 <h1>Stockbee Data Pipeline</h1>
-<p class="subtitle">所有数据源 → 处理 → 特征 → 汇聚到 MC / FC 决策 LLM → 交易指令</p>
+<p class="subtitle">点击任一节点 → 高亮完整上下游链路 (上游来源 + 下游影响)</p>
+
+<div class="mode-toggle">
+  <span class="mode-btn active" data-mode="both">上下游全部</span>
+  <span class="mode-btn" data-mode="up">仅上游 (来源)</span>
+  <span class="mode-btn" data-mode="down">仅下游 (影响)</span>
+</div>
 
 <div class="legend">
   <div class="legend-item"><div class="legend-dot" style="background:#059669"></div>数据源</div>
@@ -328,9 +372,76 @@ function drawWires() {
     el.setAttribute('stroke-width', '1');
     el.setAttribute('fill', 'none');
     el.setAttribute('opacity', '0.55');
+    el.dataset.from = from;
+    el.dataset.to = to;
     svg.appendChild(el);
   });
 }
+
+// ── Interactive highlighting ──
+const upstream = {}, downstream = {};
+WIRES.forEach(([f, t]) => {
+  (downstream[f] = downstream[f] || []).push(t);
+  (upstream[t] = upstream[t] || []).push(f);
+});
+
+function walk(id, dir, visited) {
+  if (visited.has(id)) return;
+  visited.add(id);
+  const map = dir === 'up' ? upstream : downstream;
+  (map[id] || []).forEach(n => walk(n, dir, visited));
+}
+
+let mode = 'both';
+let selectedId = null;
+
+function applyHighlight() {
+  document.body.classList.remove('has-selection');
+  document.querySelectorAll('.n').forEach(n => n.classList.remove('hl', 'hl-root'));
+  document.querySelectorAll('svg.wires path').forEach(p => p.classList.remove('hl'));
+
+  if (!selectedId) return;
+
+  const nodes = new Set([selectedId]);
+  if (mode === 'up' || mode === 'both') walk(selectedId, 'up', nodes);
+  if (mode === 'down' || mode === 'both') walk(selectedId, 'down', nodes);
+
+  document.body.classList.add('has-selection');
+  nodes.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add(id === selectedId ? 'hl-root' : 'hl');
+    if (id === selectedId && el) el.classList.add('hl');
+  });
+
+  document.querySelectorAll('svg.wires path').forEach(p => {
+    if (nodes.has(p.dataset.from) && nodes.has(p.dataset.to)) {
+      p.classList.add('hl');
+    }
+  });
+}
+
+document.querySelectorAll('.n').forEach(n => {
+  if (!n.id) return;
+  n.addEventListener('click', e => {
+    e.stopPropagation();
+    selectedId = selectedId === n.id ? null : n.id;
+    applyHighlight();
+  });
+});
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  selectedId = null;
+  applyHighlight();
+});
+
+document.querySelectorAll('.mode-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.mode-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    mode = b.dataset.mode;
+    applyHighlight();
+  });
+});
 
 // Layer labels
 document.querySelectorAll('.layer').forEach(l => {
