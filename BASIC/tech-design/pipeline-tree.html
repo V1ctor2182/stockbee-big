@@ -208,74 +208,74 @@
 
   <!-- LAYER 2: Processing / Models -->
   <div class="layer" data-label="L2 处理 / 模型">
-    <div class="n n-store dt-num" id="p-alpha">🔢 ⚙️ Alpha158<br>表达式引擎</div>
-    <div class="n dt-sem" id="p-funnel">💬 🔽 四层漏斗<span class="d">ticker 筛选, 8000→100</span></div>
-    <div class="n n-store dt-num" id="p-fund">🔢 💾 Parquet<br>基本面</div>
-    <div class="n n-mdl dt-mix" id="p-sec">🔀 🤖 GPT-4.1<br><span class="d">文本→JSON数字</span></div>
-    <div class="n dt-sem" id="p-g1">💬 🔽 G1 过滤<span class="d">去重+实体, 95%淘汰</span></div>
-    <div class="n n-mdl dt-mix" id="p-g2">🔀 🧠 G2 FinBERT<span class="d">文本→情绪分数</span></div>
-    <div class="n n-mdl dt-mix" id="p-g3">🔀 🤖 G3 Haiku<span class="d">文本→影响数字</span></div>
-    <div class="n n-store dt-struct" id="p-cgraph">🕸 🕸️ 公司图<span class="d">100节点 500边</span></div>
-    <div class="n dt-num" id="p-zscore">🔢 📐 Z-score<span class="d">252日标准化</span></div>
-    <div class="n n-mdl dt-num" id="p-tilt">🔢 ⚙️ MacroTilt<br>Engine</div>
-    <div class="n n-store dt-struct" id="p-mgraph">🕸 🕸️ 宏观图<span class="d">30节点 70有向边</span></div>
-    <div class="n dt-num" id="p-delta">🔢 📐 delta<br>检测</div>
-    <div class="n dt-num" id="p-3sig">🔢 ⚡ 3σ 异常<span class="d">ATR×1.5</span></div>
+    <div class="n n-store dt-num" id="p-alpha">🔢 ⚙️ 提取量价信号<span class="d">趋势·动量·波动</span></div>
+    <div class="n dt-sem" id="p-funnel">💬 🔽 收缩选股池<span class="d">避免幸存者偏差</span></div>
+    <div class="n n-store dt-num" id="p-fund">🔢 💾 留存基本面<span class="d">评估公司质量</span></div>
+    <div class="n n-mdl dt-mix" id="p-sec">🔀 🤖 读懂财报<span class="d">从长文本抽关键数字</span></div>
+    <div class="n dt-sem" id="p-g1">💬 🔽 新闻去噪<span class="d">只留相关的</span></div>
+    <div class="n n-mdl dt-mix" id="p-g2">🔀 🧠 新闻定性<span class="d">算情绪+主题+紧急度</span></div>
+    <div class="n n-mdl dt-mix" id="p-g3">🔀 🤖 深读高价值新闻<span class="d">估算对持仓影响</span></div>
+    <div class="n n-store dt-struct" id="p-cgraph">🕸 🕸️ 公司关系图<span class="d">事件能传染同行</span></div>
+    <div class="n dt-num" id="p-zscore">🔢 📐 宏观指标归一化<span class="d">让不同指标可比</span></div>
+    <div class="n n-mdl dt-num" id="p-tilt">🔢 ⚙️ 宏观→行业<span class="d">看宏观环境偏哪些行业</span></div>
+    <div class="n n-store dt-struct" id="p-mgraph">🕸 🕸️ 宏观因果图<span class="d">一个指标动, 带动下游</span></div>
+    <div class="n dt-num" id="p-delta">🔢 📐 概率突变<span class="d">市场预期是否反转</span></div>
+    <div class="n dt-num" id="p-3sig">🔢 ⚡ 极端价格捕捉<span class="d">跌太猛直接救仓</span></div>
   </div>
 
   <!-- LAYER 3: Features -->
   <div class="layer" data-label="L3 特征">
-    <div class="n n-feat-mc dt-num" id="f-tech">🔢 158 技术因子 <span class="badges"><span class="b b-mc">MC</span><span class="b b-tr">TR</span></span></div>
-    <div class="n n-feat-both dt-sem" id="f-u100">💬 U100 候选池<span class="d">ticker 列表</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
-    <div class="n n-feat-mc dt-num" id="f-fund">🔢 基本面因子<span class="d">PE PB ROE</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
-    <div class="n n-feat-both dt-num" id="f-sec">🔢 财务指标 JSON<span class="d">从文本抽取</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
-    <div class="n n-feat-fc dt-num" id="f-signal">🔢 信号评分<span class="d">Tier-1/2/3 分数</span> <span class="badges"><span class="b b-fc">FC</span></span></div>
-    <div class="n n-feat-both dt-num" id="f-prop">🔢 propagation<br>score <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
-    <div class="n n-feat-mc dt-num" id="f-news">🔢 周度情绪聚合<span class="d">分数</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
-    <div class="n n-feat-mc dt-num" id="f-tilt">🔢 sector / style<br>tilt (±3%) <span class="badges"><span class="b b-mc">MC</span></span></div>
-    <div class="n n-feat-mc dt-sem" id="f-cycle">💬 经济周期<span class="d">5种制度标签</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
-    <div class="n n-feat-mc dt-num" id="f-proba">🔢 概率悬崖<span class="d">delta 数字</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
-    <div class="n n-feat-both dt-mix" id="f-pos">🔀 持仓快照<span class="d">ticker + 数字</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
-    <div class="n n-feat-fc dt-num" id="f-price">🔢 实时价格监控 <span class="badges"><span class="b b-fc">FC</span></span></div>
-    <div class="n n-feat-fc dt-num" id="f-guard">🔢 3σ 防守信号 <span class="badges"><span class="b b-fc">FC</span></span></div>
-    <div class="n n-feat-tr dt-num" id="f-reward">🔢 RL reward + 退出模型 <span class="badges"><span class="b b-tr">TR</span></span></div>
+    <div class="n n-feat-mc dt-num" id="f-tech">🔢 技术面分数<span class="d">走势强弱</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-tr">TR</span></span></div>
+    <div class="n n-feat-both dt-sem" id="f-u100">💬 候选股清单<span class="d">值得考虑的 100 只</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-mc dt-num" id="f-fund">🔢 基本面分数<span class="d">公司质量</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
+    <div class="n n-feat-both dt-num" id="f-sec">🔢 财报关键数字<span class="d">营收 利润 现金流</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-fc dt-num" id="f-signal">🔢 事件分级<span class="d">要不要立刻动手</span> <span class="badges"><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-both dt-num" id="f-prop">🔢 关联传染分数<span class="d">某股动, 同行跟着动</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-mc dt-num" id="f-news">🔢 本周情绪温度<span class="d">整体偏多/偏空</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
+    <div class="n n-feat-mc dt-num" id="f-tilt">🔢 行业偏好<span class="d">多加/少加哪些板块</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
+    <div class="n n-feat-mc dt-sem" id="f-cycle">💬 经济所处阶段<span class="d">扩张/过热/衰退...</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
+    <div class="n n-feat-mc dt-num" id="f-proba">🔢 市场预期变化<span class="d">突然转向要注意</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
+    <div class="n n-feat-both dt-mix" id="f-pos">🔀 当前仓位<span class="d">我现在持有什么</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-fc dt-num" id="f-price">🔢 实时盯盘<span class="d">持仓价格异动</span> <span class="badges"><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-fc dt-num" id="f-guard">🔢 止损信号<span class="d">跌太猛就跑</span> <span class="badges"><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-tr dt-num" id="f-reward">🔢 实盘反馈<span class="d">让模型越学越准</span> <span class="badges"><span class="b b-tr">TR</span></span></div>
   </div>
 
   <!-- LAYER 4: RL Inference (from trained weights) -->
   <div class="layer" data-label="L4 RL 推理">
-    <div class="n n-mdl dt-num" id="rl-dqn">🔢 🧬 DQN 选股<span class="d">100→8</span></div>
-    <div class="n n-mdl dt-num" id="rl-ppo">🔢 🧬 PPO/SAC 权重<span class="d">Σ=1</span></div>
-    <div class="n n-mdl dt-num" id="rl-exit">🔢 🧬 FC 退出模型<span class="d">Phase 2</span></div>
-    <div class="n n-tr-core dt-num" id="tr-core" style="font-size:13px">🔢 🟣 训练 (周日 10:00)<span class="d" style="color:#cbd5e1">→ 产出 .pt → L4</span></div>
+    <div class="n n-mdl dt-num" id="rl-dqn">🔢 🧬 AI 挑股<span class="d">从 100 里选 8</span></div>
+    <div class="n n-mdl dt-num" id="rl-ppo">🔢 🧬 AI 分配仓位<span class="d">每只买多少</span></div>
+    <div class="n n-mdl dt-num" id="rl-exit">🔢 🧬 AI 决定卖点<span class="d">啥时候该了结</span></div>
+    <div class="n n-tr-core dt-num" id="tr-core" style="font-size:13px">🔢 🟣 每周自我升级<span class="d" style="color:#cbd5e1">用新数据重练模型</span></div>
   </div>
 
   <!-- LAYER 5: Decision LLM (CONVERGENCE POINT) -->
   <div class="layer" data-label="L5 决策 LLM">
     <div class="n n-decision n-mc-core dt-mix" id="dec-mc">
-      🔀 🔵 MC 决策 LLM
-      <span class="d" style="color:#dbeafe">周度 (周五 16:00)<br>数字因子 + 语义持仓理由</span>
+      🔀 🔵 周度决策大脑
+      <span class="d" style="color:#dbeafe">每周五盘后<br>综合判断调整组合</span>
     </div>
     <div class="n n-decision n-fc-core dt-mix" id="dec-fc">
-      🔀 🟡 FC 决策 LLM
-      <span class="d" style="color:#fef3c7">实时 (新闻/价格触发)<br>数字信号 + 语义影响评估</span>
+      🔀 🟡 临场反应大脑
+      <span class="d" style="color:#fef3c7">突发新闻/价格<br>快速买卖应对</span>
     </div>
   </div>
 
   <!-- LAYER 6: Output -->
   <div class="layer" data-label="L6 输出">
     <div class="n n-out dt-mix" id="out-mc">
-      🔀 📦 MC 输出<br>
-      <span style="font-size:11px; font-weight:400">ticker + 权重 + 理由</span>
-      <span class="d">→ Victor 审批 → Alpaca 周一开盘</span>
+      🔀 📦 周度新组合<br>
+      <span style="font-size:11px; font-weight:400">买什么 + 各占多少 + 为什么</span>
+      <span class="d">Victor 审批后周一开盘执行</span>
     </div>
     <div class="n n-out dt-mix" id="out-fc">
-      🔀 ⚡ FC 输出<br>
-      <span style="font-size:11px; font-weight:400">ticker + 动作 + 金额</span>
-      <span class="d">Tier-1 自动 / Tier-2 15min 审批</span>
+      🔀 ⚡ 临场加减仓<br>
+      <span style="font-size:11px; font-weight:400">买/卖/调整, 单笔小额</span>
+      <span class="d">大事件自动, 中事件先审批</span>
     </div>
     <div class="n n-out dt-sem" id="out-guard" style="border-color:#ef4444; color:#fca5a5">
-      💬 🚨 防守平仓<br>
-      <span style="font-size:11px; font-weight:400">ticker 清单, MC/FC 均适用</span>
+      💬 🚨 紧急止损<br>
+      <span style="font-size:11px; font-weight:400">跌太猛立即跑, 不等人</span>
     </div>
   </div>
 </div>
