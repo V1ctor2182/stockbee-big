@@ -10,7 +10,7 @@
 
 第一层（广域宇宙，8000只）：每周从 Alpaca API 同步全部美股清单，包含流动性指标和融资可用性标志。用于监控市场变化。
 
-第二层（广泛宇宙，约4000只）：筛选条件为流动性>100万美元/日、平均价格>2美元、非 OTC 市场。存储在 SQLite 的 broad_universe 表中，字段包括 ticker、sector、market_cap、avg_volume、short_able。此层作为因子计算的基础集合。→ 参考：research-stock-data-storage.md §2-§3
+第二层（广泛宇宙，约4000只）：筛选条件为流动性>100万美元/日、平均价格>2美元、非 OTC 市场。存储在 SQLite 的 broad_universe 表中。元数据来源合并两个 API：**Alpaca `/v2/assets`** 提供 tradable / shortable / marginable 等"能否交易"标志，**Polygon `/v3/reference/tickers`** 提供 sector / market_cap / industry 等分类元数据。此层作为因子计算的基础集合。→ 参考：research-stock-data-storage.md §2-§3
 
 第三层（候选池，约500只）：从广泛宇宙按行业均衡和流动性顶部筛选。仅这一层及以上进行日线数据同步和因子计算。
 

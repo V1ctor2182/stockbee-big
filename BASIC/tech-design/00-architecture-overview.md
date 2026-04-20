@@ -92,7 +92,9 @@ Stockbee 是一个 AI 驱动的量化交易系统，核心特点是 **LLM Agent 
 
   ┌─── B. 股票池元数据 ──────────────────────────────────────────────────────┐
   │                                                                          │
-  │  Alpaca 全美股 ──► SQLite broad_universe ──► 四层漏斗筛选                │
+  │  股票池元数据 ──► SQLite broad_universe ──► 四层漏斗筛选                 │
+  │  (Alpaca 可交易                                                          │
+  │   + Polygon 分类)                                                        │
   │  (8000只)           (ticker, sector,          8000→4000→500→100          │
   │  每周同步             market_cap,                    │                    │
   │                       avg_volume,                    │                    │
