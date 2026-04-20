@@ -386,10 +386,12 @@ WIRES.forEach(([f, t]) => {
 });
 
 function walk(id, dir, visited) {
-  if (visited.has(id)) return;
-  visited.add(id);
   const map = dir === 'up' ? upstream : downstream;
-  (map[id] || []).forEach(n => walk(n, dir, visited));
+  (map[id] || []).forEach(n => {
+    if (visited.has(n)) return;
+    visited.add(n);
+    walk(n, dir, visited);
+  });
 }
 
 let mode = 'both';
