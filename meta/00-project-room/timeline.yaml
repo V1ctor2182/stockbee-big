@@ -171,9 +171,10 @@ timeline:
           target_start: "2026-05-05"
           target_end: "2026-05-12"
           estimated_days: 5
-          status: planning
-          completion: 0.0
+          status: completed
+          completion: 1.0
           depends_on: ["02-macro-scoring"]
+          note: "已完成 2026-04-17, 2 milestones, 24 tests"
 
         - room: "04-style-tilts"
           parent: "04-macro-analysis"
@@ -509,8 +510,8 @@ timeline:
     phase_1_rooms: 26
     phase_2_rooms: 11
     phase_3_rooms: 3
-    completed: 6
+    completed: 7
     in_progress: 0
-    planning: 21
+    planning: 20
     backlog: 14
     completion: 0.125

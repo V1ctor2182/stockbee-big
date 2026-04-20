@@ -9,6 +9,7 @@
 from .scorer import MacroScorer, MacroScore, RegimeType
 from .llm_analyst import LLMMacroAnalyst, MacroInsight
 from .provider import MacroScoringProvider
+from .sector_tilts import SectorTilter, GICS_SECTORS
 
 __all__ = [
     "MacroScorer",
@@ -17,4 +18,6 @@ __all__ = [
     "LLMMacroAnalyst",
     "MacroInsight",
     "MacroScoringProvider",
+    "SectorTilter",
+    "GICS_SECTORS",
 ]

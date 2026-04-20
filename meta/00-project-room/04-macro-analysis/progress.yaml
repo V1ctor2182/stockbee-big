@@ -1,5 +1,5 @@
 progress:
-  completion: 0.5
+  completion: 0.75
   milestones:
     - id: "m1-数据源接入"
       name: "数据源接入"
@@ -11,8 +11,9 @@ progress:
       completed_at: "2026-04-15"
     - id: "m3-行业风格-Tilt"
       name: "行业+风格 Tilt"
-      status: pending
+      status: in_progress
       completed_at: null
+      note: "sector-tilts ✅, style-tilts pending"
     - id: "m4-集成测试"
       name: "集成测试"
       status: pending
