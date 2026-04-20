@@ -187,6 +187,62 @@
     display: none !important;
   }
 
+  /* Room info panel */
+  .room-panel {
+    position: fixed; top: 80px; right: 20px;
+    width: 320px; padding: 16px 18px;
+    background: #1e293b; border: 1px solid #475569;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    z-index: 100;
+    display: none;
+    font-size: 12px; line-height: 1.6;
+  }
+  .room-panel.show { display: block; }
+  .room-panel .close-x {
+    position: absolute; top: 8px; right: 10px;
+    cursor: pointer; color: #64748b; font-size: 16px;
+  }
+  .room-panel .close-x:hover { color: #e2e8f0; }
+  .room-panel h3 {
+    font-size: 14px; margin-bottom: 4px; color: #f8fafc;
+    padding-right: 20px;
+  }
+  .room-panel .rp-desc {
+    color: #94a3b8; font-size: 11px; margin-bottom: 10px;
+  }
+  .room-panel .rp-row {
+    display: flex; gap: 8px; align-items: flex-start;
+    padding: 4px 0;
+  }
+  .room-panel .rp-label {
+    color: #64748b; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.5px; min-width: 60px; padding-top: 2px;
+  }
+  .room-panel .rp-val {
+    color: #e2e8f0; flex: 1;
+  }
+  .room-panel .rp-room {
+    font-family: 'SF Mono', Menlo, Monaco, monospace;
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 11px; color: #a5b4fc;
+    display: inline-block;
+  }
+  .room-panel .rp-status {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 10px; font-size: 10px;
+    font-weight: 700; letter-spacing: 0.5px;
+  }
+  .room-panel .rp-status.done {
+    background: rgba(16,185,129,0.2); color: #6ee7b7;
+  }
+  .room-panel .rp-status.planning {
+    background: rgba(251,146,60,0.2); color: #fdba74;
+  }
+  .room-panel .rp-status.phase2 {
+    background: rgba(139,92,246,0.2); color: #c4b5fd;
+  }
+
   .badges { display: flex; gap: 3px; margin-top: 3px; }
   .b { font-size: 8px; font-weight: 800; padding: 1px 4px; border-radius: 2px; }
   .b-mc { background: #3b82f6; color: #fff; }
@@ -208,6 +264,16 @@
 <body>
 
 <button class="reset-btn" id="reset-btn">✕ 取消高亮</button>
+
+<div class="room-panel" id="room-panel">
+  <div class="close-x" id="rp-close">✕</div>
+  <h3 id="rp-title">—</h3>
+  <div class="rp-desc" id="rp-desc">—</div>
+  <div class="rp-row"><div class="rp-label">状态</div><div class="rp-val" id="rp-status-wrap"></div></div>
+  <div class="rp-row"><div class="rp-label">Sprint</div><div class="rp-val" id="rp-sprint">—</div></div>
+  <div class="rp-row"><div class="rp-label">Room</div><div class="rp-val"><span class="rp-room" id="rp-room">—</span></div></div>
+  <div class="rp-row"><div class="rp-label">说明</div><div class="rp-val" id="rp-notes">—</div></div>
+</div>
 
 <h1>Stockbee Data Pipeline</h1>
 <p class="subtitle">点击任一节点 → 高亮完整上下游链路 (上游来源 + 下游影响)</p>
@@ -524,17 +590,116 @@ function applyHighlight() {
   });
 }
 
+// ── Room metadata map ──
+const ROOM_MAP = {
+  // L1 sources
+  'src-ohlcv':  { sprint: 'Sprint 1 — 数据基座', room: '01-data-architecture/01-stock-data', status: 'done',     notes: 'Alpaca REST 日线同步, Parquet 列存' },
+  'src-univ':   { sprint: 'Sprint 1 — 数据基座', room: '01-data-architecture/01-stock-data', status: 'done',     notes: '8000 只全美股, SQLite broad_universe' },
+  'src-poly':   { sprint: 'Sprint 1 — 数据基座', room: '01-data-architecture/04-factor-storage', status: 'planning', notes: '基本面数据通过 factor-storage 入库' },
+  'src-sec':    { sprint: '待安排',               room: '(后续 sprint)',                        status: 'planning', notes: 'SEC EDGAR 10-K/Q/8-K 解析' },
+  'src-news':   { sprint: 'Sprint 1 — 数据基座', room: '01-data-architecture/02-news-data',    status: 'done',     notes: 'NewsAPI + Perplexity + Nasdaq RSS, 跨源去重' },
+  'src-fred':   { sprint: 'Sprint 1 + 2',         room: '01-data-architecture/03-macro-data + 02-models/01-macro-sources', status: 'done', notes: 'FRED 19 个宏观指标, 日度同步' },
+  'src-poly2':  { sprint: '— (Phase 2)',          room: '—',                                     status: 'phase2',   notes: 'Polymarket 事件概率, Phase 2' },
+  'src-pos':    { sprint: 'Sprint 5',             room: '05-execution/03-trade-execution',      status: 'planning', notes: 'Alpaca 账户实时持仓快照' },
+  'src-trades': { sprint: 'Sprint 5',             room: '05-execution/03-trade-execution',      status: 'planning', notes: '历史成交记录' },
+
+  // L2 processing
+  'p-alpha':    { sprint: 'Sprint 2',             room: '02-models/04-alpha-mining',             status: 'planning', notes: 'Alpha158 表达式因子引擎' },
+  'p-funnel':   { sprint: 'Sprint 1',             room: '01-data-architecture/01-stock-data',    status: 'done',     notes: '四层漏斗 8000→4000→500→100' },
+  'p-fund':     { sprint: 'Sprint 1',             room: '01-data-architecture/04-factor-storage', status: 'planning', notes: '基本面因子存储' },
+  'p-sec':      { sprint: '待安排',               room: '(后续 sprint)',                          status: 'planning', notes: 'GPT-4.1 long context 解析财报' },
+  'p-g1':       { sprint: 'Sprint 1',             room: '01-data-architecture/02-news-data (m2)', status: 'done',     notes: 'G1 去重 + 实体识别 + 来源校验' },
+  'p-g2':       { sprint: 'Sprint 1',             room: '01-data-architecture/02-news-data (m3)', status: 'done',     notes: 'G2 FinBERT 情绪 + 主题 + 紧急度' },
+  'p-g3':       { sprint: 'Sprint 1',             room: '01-data-architecture/02-news-data (m4)', status: 'done',     notes: 'G3 Claude Haiku 深度分析, 日限 10 篇' },
+  'p-lgbm':     { sprint: 'Sprint 2',             room: '02-models/02-small-models',             status: 'planning', notes: 'LightGBM 收益预测' },
+  'p-xgb':      { sprint: 'Sprint 3',             room: '03-factor-scoring/01-multi-factor-fusion', status: 'planning', notes: 'XGBoost 多因子非线性融合' },
+  'p-cgraph':   { sprint: 'Sprint 3',             room: '03-factor-scoring/06-knowledge-graph',  status: 'planning', notes: '公司关系图 100 节点 500 边' },
+  'p-zscore':   { sprint: 'Sprint 2',             room: '02-models/02-macro-scoring',            status: 'done',     notes: 'Z-score 252 日标准化' },
+  'p-tilt':     { sprint: 'Sprint 2',             room: '02-models/03-sector-tilts',             status: 'done',     notes: 'MacroTiltEngine 11 GICS × 19 指标' },
+  'p-mgraph':   { sprint: 'Sprint 3',             room: '03-factor-scoring/06-knowledge-graph',  status: 'planning', notes: '宏观因果图 30 节点 70 有向边' },
+  'p-delta':    { sprint: '— (Phase 2)',          room: '—',                                      status: 'phase2',   notes: 'Polymarket 概率 delta 检测' },
+  'p-3sig':     { sprint: '— (Phase 2)',          room: '—',                                      status: 'phase2',   notes: 'FC 3σ 防守机制' },
+
+  // L3 features
+  'f-tech':      { sprint: 'Sprint 2',             room: '02-models/04-alpha-mining',            status: 'planning', notes: '158 技术因子向量' },
+  'f-pred':      { sprint: 'Sprint 2',             room: '02-models/02-small-models',            status: 'planning', notes: '未来 5 日收益预测' },
+  'f-composite': { sprint: 'Sprint 3',             room: '03-factor-scoring/01-multi-factor-fusion', status: 'planning', notes: '综合评分 (XGBoost 输出)' },
+  'f-u100':      { sprint: 'Sprint 1 + 4',         room: '01-data-architecture/01-stock-data → 04-portfolio/01-universe-mgmt', status: 'done', notes: 'U100 候选池, 已有基础版' },
+  'f-fund':      { sprint: 'Sprint 1',             room: '01-data-architecture/04-factor-storage', status: 'planning', notes: 'PE / PB / ROE 因子' },
+  'f-sec':       { sprint: '待安排',               room: '(后续 sprint)',                         status: 'planning', notes: '从财报抽取的财务数字' },
+  'f-signal':    { sprint: '— (Phase 2)',          room: '—',                                      status: 'phase2',   notes: 'FC Tier-1/2/3 信号分级' },
+  'f-prop':      { sprint: 'Sprint 3',             room: '03-factor-scoring/06-knowledge-graph',  status: 'planning', notes: 'propagation 传染分数' },
+  'f-news':      { sprint: 'Sprint 1',             room: '01-data-architecture/02-news-data',    status: 'done',     notes: '周度情绪聚合 (sentiment_score)' },
+  'f-tilt':      { sprint: 'Sprint 2',             room: '02-models/03-sector-tilts (+ 04-style-tilts)', status: 'done', notes: 'sector_tilt 完成, style_tilt 待建' },
+  'f-cycle':     { sprint: 'Sprint 2',             room: '02-models/02-macro-scoring',           status: 'done',     notes: '5 种经济周期标签' },
+  'f-proba':     { sprint: '— (Phase 2)',          room: '—',                                      status: 'phase2',   notes: 'Polymarket 概率悬崖特征' },
+  'f-pos':       { sprint: 'Sprint 5',             room: '05-execution/03-trade-execution',      status: 'planning', notes: '当前仓位快照' },
+  'f-price':     { sprint: '— (Phase 2)',          room: '—',                                      status: 'phase2',   notes: 'FC 实时价格监控' },
+  'f-guard':     { sprint: '— (Phase 2)',          room: '—',                                      status: 'phase2',   notes: 'FC 止损信号' },
+  'f-reward':    { sprint: 'Sprint 4/5',           room: '04-portfolio/02-portfolio-construction', status: 'planning', notes: 'RL reward 信号' },
+
+  // L4 RL
+  'rl-dqn':  { sprint: 'Sprint 4',             room: '04-portfolio/02-portfolio-construction', status: 'planning', notes: 'DQN 离散选股 100→8' },
+  'rl-ppo':  { sprint: 'Sprint 4',             room: '04-portfolio/02-portfolio-construction', status: 'planning', notes: 'PPO/SAC 连续权重分配' },
+  'rl-exit': { sprint: '— (Phase 2)',          room: '—',                                       status: 'phase2',   notes: 'FC 退出模型 (target/stop + RL)' },
+  'tr-core': { sprint: 'Sprint 5',             room: '05-execution/01-session-mgmt',           status: 'planning', notes: '周度训练调度' },
+
+  // L5 decision
+  'dec-mc': { sprint: 'Sprint 4',             room: '04-portfolio/01-decision-orchestration (+ 02-validation-layer, 03-decision-log, 04-approval-workflow)', status: 'planning', notes: 'MC 决策 LLM + 验证层 + 审批' },
+  'dec-fc': { sprint: '— (Phase 2)',          room: '—',                                       status: 'phase2',   notes: 'FC 实时决策 LLM' },
+
+  // L6 output
+  'out-mc':    { sprint: 'Sprint 5',             room: '05-execution/03-trade-execution',       status: 'planning', notes: '周度新组合 → Alpaca 周一开盘' },
+  'out-fc':    { sprint: '— (Phase 2)',          room: '—',                                      status: 'phase2',   notes: 'FC 临场买卖' },
+  'out-guard': { sprint: 'Sprint 5 + Phase 2',   room: '05-execution/04-risk-controls (+ Phase 2)', status: 'planning', notes: '紧急止损机制' },
+};
+
+const STATUS_LABEL = {
+  done:     { txt: '✓ 已完成', cls: 'done' },
+  planning: { txt: '🚧 规划中',  cls: 'planning' },
+  phase2:   { txt: '🔮 Phase 2', cls: 'phase2' },
+};
+
+function showRoomPanel(id) {
+  const meta = ROOM_MAP[id];
+  const panel = document.getElementById('room-panel');
+  if (!meta) { panel.classList.remove('show'); return; }
+  const el = document.getElementById(id);
+  const title = (el?.textContent || '').split('\n')[0].trim().slice(0, 50);
+  const descSpan = el?.querySelector('.d');
+  document.getElementById('rp-title').textContent = title;
+  document.getElementById('rp-desc').textContent = descSpan ? descSpan.textContent : '';
+  const s = STATUS_LABEL[meta.status] || STATUS_LABEL.planning;
+  document.getElementById('rp-status-wrap').innerHTML =
+    `<span class="rp-status ${s.cls}">${s.txt}</span>`;
+  document.getElementById('rp-sprint').textContent = meta.sprint;
+  document.getElementById('rp-room').textContent = meta.room;
+  document.getElementById('rp-notes').textContent = meta.notes;
+  panel.classList.add('show');
+}
+
+document.getElementById('rp-close').addEventListener('click', () => {
+  document.getElementById('room-panel').classList.remove('show');
+});
+
 document.querySelectorAll('.n').forEach(n => {
   if (!n.id) return;
   n.addEventListener('click', e => {
     e.stopPropagation();
-    selectedId = selectedId === n.id ? null : n.id;
+    if (selectedId === n.id) {
+      selectedId = null;
+      document.getElementById('room-panel').classList.remove('show');
+    } else {
+      selectedId = n.id;
+      showRoomPanel(n.id);
+    }
     applyHighlight();
   });
 });
 
 document.getElementById('reset-btn').addEventListener('click', () => {
   selectedId = null;
+  document.getElementById('room-panel').classList.remove('show');
   applyHighlight();
 });
 
