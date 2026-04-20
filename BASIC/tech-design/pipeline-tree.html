@@ -143,6 +143,35 @@
   }
   .mode-btn.active { background: #475569; color: #f8fafc; border-color: #64748b; }
 
+  /* MVP scope filter */
+  .scope-toggle {
+    display: flex; gap: 0; justify-content: center; margin-bottom: 14px;
+    background: #1e293b; padding: 3px; border-radius: 8px;
+    width: fit-content; margin-left: auto; margin-right: auto;
+    border: 1px solid #334155;
+  }
+  .scope-btn {
+    padding: 6px 16px; border-radius: 6px; cursor: pointer;
+    font-size: 12px; font-weight: 600; color: #94a3b8;
+    transition: all 0.15s;
+  }
+  .scope-btn.active {
+    background: #0ea5e9; color: #fff;
+  }
+  .scope-btn:not(.active):hover { color: #e2e8f0; }
+
+  body.mvp-only .n[data-mvp="false"] {
+    display: none !important;
+  }
+  body.mvp-only svg.wires path.phase2-wire {
+    display: none !important;
+  }
+  body.mvp-only .n-decision.n-fc-core,
+  body.mvp-only .n-out[id="out-fc"],
+  body.mvp-only .n-out[id="out-guard"] {
+    display: none !important;
+  }
+
   .badges { display: flex; gap: 3px; margin-top: 3px; }
   .b { font-size: 8px; font-weight: 800; padding: 1px 4px; border-radius: 2px; }
   .b-mc { background: #3b82f6; color: #fff; }
@@ -167,6 +196,11 @@
 
 <h1>Stockbee Data Pipeline</h1>
 <p class="subtitle">点击任一节点 → 高亮完整上下游链路 (上游来源 + 下游影响)</p>
+
+<div class="scope-toggle">
+  <div class="scope-btn active" data-scope="all">完整架构 (MVP + Phase 2)</div>
+  <div class="scope-btn" data-scope="mvp">仅 MVP — 完整交易流程</div>
+</div>
 
 <div class="mode-toggle">
   <span class="mode-btn active" data-mode="both">上下游全部</span>
@@ -195,67 +229,67 @@
 
   <!-- LAYER 1: Data Sources -->
   <div class="layer" data-label="L1 数据源">
-    <div class="n n-src dt-num" id="src-ohlcv">🔢 📊 Alpaca OHLCV<span class="d">价格数字</span></div>
-    <div class="n n-src dt-mix" id="src-univ">🔀 🏛️ Alpaca 全美股<span class="d">ticker + 流动性</span></div>
-    <div class="n n-src dt-num" id="src-poly">🔢 📈 Polygon / Yahoo<span class="d">基本面数字</span></div>
-    <div class="n n-src dt-sem" id="src-sec">💬 🏦 SEC EDGAR<span class="d">10-K/Q 全文</span></div>
-    <div class="n n-src dt-sem" id="src-news">💬 📰 NewsAPI + Perplexity<span class="d">+ Nasdaq RSS 文本</span></div>
-    <div class="n n-src dt-num" id="src-fred">🔢 🏛️ FRED API<span class="d">19指标时序</span></div>
-    <div class="n n-src dt-mix" id="src-poly2">🔀 🎰 Polymarket<span class="d">事件名 + 概率</span></div>
-    <div class="n n-src dt-mix" id="src-pos">🔀 💼 当前持仓<span class="d">ticker + 权重</span></div>
-    <div class="n n-src dt-mix" id="src-trades">🔀 📋 交易记录<span class="d">order + signal</span></div>
+    <div class="n n-src dt-num" data-mvp="true" id="src-ohlcv">🔢 📊 Alpaca OHLCV<span class="d">价格数字</span></div>
+    <div class="n n-src dt-mix" data-mvp="true" id="src-univ">🔀 🏛️ Alpaca 全美股<span class="d">ticker + 流动性</span></div>
+    <div class="n n-src dt-num" data-mvp="true" id="src-poly">🔢 📈 Polygon / Yahoo<span class="d">基本面数字</span></div>
+    <div class="n n-src dt-sem" data-mvp="true" id="src-sec">💬 🏦 SEC EDGAR<span class="d">10-K/Q 全文</span></div>
+    <div class="n n-src dt-sem" data-mvp="true" id="src-news">💬 📰 NewsAPI + Perplexity<span class="d">+ Nasdaq RSS 文本</span></div>
+    <div class="n n-src dt-num" data-mvp="true" id="src-fred">🔢 🏛️ FRED API<span class="d">19指标时序</span></div>
+    <div class="n n-src dt-mix" data-mvp="false" id="src-poly2">🔀 🎰 Polymarket<span class="d">事件名 + 概率</span></div>
+    <div class="n n-src dt-mix" data-mvp="true" id="src-pos">🔀 💼 当前持仓<span class="d">ticker + 权重</span></div>
+    <div class="n n-src dt-mix" data-mvp="true" id="src-trades">🔀 📋 交易记录<span class="d">order + signal</span></div>
   </div>
 
   <!-- LAYER 2: Processing / Models -->
   <div class="layer" data-label="L2 处理 / 模型">
-    <div class="n n-store dt-num" id="p-alpha">🔢 ⚙️ 提取量价信号<span class="d">趋势·动量·波动</span></div>
-    <div class="n dt-sem" id="p-funnel">💬 🔽 收缩选股池<span class="d">避免幸存者偏差</span></div>
-    <div class="n n-store dt-num" id="p-fund">🔢 💾 留存基本面<span class="d">评估公司质量</span></div>
-    <div class="n n-mdl dt-mix" id="p-sec">🔀 🤖 读懂财报<span class="d">从长文本抽关键数字</span></div>
-    <div class="n dt-sem" id="p-g1">💬 🔽 新闻去噪<span class="d">只留相关的</span></div>
-    <div class="n n-mdl dt-mix" id="p-g2">🔀 🧠 新闻定性<span class="d">算情绪+主题+紧急度</span></div>
-    <div class="n n-mdl dt-mix" id="p-g3">🔀 🤖 深读高价值新闻<span class="d">估算对持仓影响</span></div>
-    <div class="n n-store dt-struct" id="p-cgraph">🕸 🕸️ 公司关系图<span class="d">事件能传染同行</span></div>
-    <div class="n dt-num" id="p-zscore">🔢 📐 宏观指标归一化<span class="d">让不同指标可比</span></div>
-    <div class="n n-mdl dt-num" id="p-tilt">🔢 ⚙️ 宏观→行业<span class="d">看宏观环境偏哪些行业</span></div>
-    <div class="n n-store dt-struct" id="p-mgraph">🕸 🕸️ 宏观因果图<span class="d">一个指标动, 带动下游</span></div>
-    <div class="n dt-num" id="p-delta">🔢 📐 概率突变<span class="d">市场预期是否反转</span></div>
-    <div class="n dt-num" id="p-3sig">🔢 ⚡ 极端价格捕捉<span class="d">跌太猛直接救仓</span></div>
+    <div class="n n-store dt-num" data-mvp="true" id="p-alpha">🔢 ⚙️ 提取量价信号<span class="d">趋势·动量·波动</span></div>
+    <div class="n dt-sem" data-mvp="true" id="p-funnel">💬 🔽 收缩选股池<span class="d">避免幸存者偏差</span></div>
+    <div class="n n-store dt-num" data-mvp="true" id="p-fund">🔢 💾 留存基本面<span class="d">评估公司质量</span></div>
+    <div class="n n-mdl dt-mix" data-mvp="true" id="p-sec">🔀 🤖 读懂财报<span class="d">从长文本抽关键数字</span></div>
+    <div class="n dt-sem" data-mvp="true" id="p-g1">💬 🔽 新闻去噪<span class="d">只留相关的</span></div>
+    <div class="n n-mdl dt-mix" data-mvp="true" id="p-g2">🔀 🧠 新闻定性<span class="d">算情绪+主题+紧急度</span></div>
+    <div class="n n-mdl dt-mix" data-mvp="true" id="p-g3">🔀 🤖 深读高价值新闻<span class="d">估算对持仓影响</span></div>
+    <div class="n n-store dt-struct" data-mvp="true" id="p-cgraph">🕸 🕸️ 公司关系图<span class="d">事件能传染同行</span></div>
+    <div class="n dt-num" data-mvp="true" id="p-zscore">🔢 📐 宏观指标归一化<span class="d">让不同指标可比</span></div>
+    <div class="n n-mdl dt-num" data-mvp="true" id="p-tilt">🔢 ⚙️ 宏观→行业<span class="d">看宏观环境偏哪些行业</span></div>
+    <div class="n n-store dt-struct" data-mvp="true" id="p-mgraph">🕸 🕸️ 宏观因果图<span class="d">一个指标动, 带动下游</span></div>
+    <div class="n dt-num" data-mvp="false" id="p-delta">🔢 📐 概率突变<span class="d">市场预期是否反转</span></div>
+    <div class="n dt-num" data-mvp="false" id="p-3sig">🔢 ⚡ 极端价格捕捉<span class="d">跌太猛直接救仓</span></div>
   </div>
 
   <!-- LAYER 3: Features -->
   <div class="layer" data-label="L3 特征">
-    <div class="n n-feat-mc dt-num" id="f-tech">🔢 技术面分数<span class="d">走势强弱</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-tr">TR</span></span></div>
-    <div class="n n-feat-both dt-sem" id="f-u100">💬 候选股清单<span class="d">值得考虑的 100 只</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
-    <div class="n n-feat-mc dt-num" id="f-fund">🔢 基本面分数<span class="d">公司质量</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
-    <div class="n n-feat-both dt-num" id="f-sec">🔢 财报关键数字<span class="d">营收 利润 现金流</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
-    <div class="n n-feat-fc dt-num" id="f-signal">🔢 事件分级<span class="d">要不要立刻动手</span> <span class="badges"><span class="b b-fc">FC</span></span></div>
-    <div class="n n-feat-both dt-num" id="f-prop">🔢 关联传染分数<span class="d">某股动, 同行跟着动</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
-    <div class="n n-feat-mc dt-num" id="f-news">🔢 本周情绪温度<span class="d">整体偏多/偏空</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
-    <div class="n n-feat-mc dt-num" id="f-tilt">🔢 行业偏好<span class="d">多加/少加哪些板块</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
-    <div class="n n-feat-mc dt-sem" id="f-cycle">💬 经济所处阶段<span class="d">扩张/过热/衰退...</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
-    <div class="n n-feat-mc dt-num" id="f-proba">🔢 市场预期变化<span class="d">突然转向要注意</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
-    <div class="n n-feat-both dt-mix" id="f-pos">🔀 当前仓位<span class="d">我现在持有什么</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
-    <div class="n n-feat-fc dt-num" id="f-price">🔢 实时盯盘<span class="d">持仓价格异动</span> <span class="badges"><span class="b b-fc">FC</span></span></div>
-    <div class="n n-feat-fc dt-num" id="f-guard">🔢 止损信号<span class="d">跌太猛就跑</span> <span class="badges"><span class="b b-fc">FC</span></span></div>
-    <div class="n n-feat-tr dt-num" id="f-reward">🔢 实盘反馈<span class="d">让模型越学越准</span> <span class="badges"><span class="b b-tr">TR</span></span></div>
+    <div class="n n-feat-mc dt-num" data-mvp="true" id="f-tech">🔢 技术面分数<span class="d">走势强弱</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-tr">TR</span></span></div>
+    <div class="n n-feat-both dt-sem" data-mvp="true" id="f-u100">💬 候选股清单<span class="d">值得考虑的 100 只</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-mc dt-num" data-mvp="true" id="f-fund">🔢 基本面分数<span class="d">公司质量</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
+    <div class="n n-feat-both dt-num" data-mvp="true" id="f-sec">🔢 财报关键数字<span class="d">营收 利润 现金流</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-fc dt-num" data-mvp="false" id="f-signal">🔢 事件分级<span class="d">要不要立刻动手</span> <span class="badges"><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-both dt-num" data-mvp="true" id="f-prop">🔢 关联传染分数<span class="d">某股动, 同行跟着动</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-mc dt-num" data-mvp="true" id="f-news">🔢 本周情绪温度<span class="d">整体偏多/偏空</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
+    <div class="n n-feat-mc dt-num" data-mvp="true" id="f-tilt">🔢 行业偏好<span class="d">多加/少加哪些板块</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
+    <div class="n n-feat-mc dt-sem" data-mvp="true" id="f-cycle">💬 经济所处阶段<span class="d">扩张/过热/衰退...</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
+    <div class="n n-feat-mc dt-num" data-mvp="false" id="f-proba">🔢 市场预期变化<span class="d">突然转向要注意</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
+    <div class="n n-feat-both dt-mix" data-mvp="true" id="f-pos">🔀 当前仓位<span class="d">我现在持有什么</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-fc dt-num" data-mvp="false" id="f-price">🔢 实时盯盘<span class="d">持仓价格异动</span> <span class="badges"><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-fc dt-num" data-mvp="false" id="f-guard">🔢 止损信号<span class="d">跌太猛就跑</span> <span class="badges"><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-tr dt-num" data-mvp="true" id="f-reward">🔢 实盘反馈<span class="d">让模型越学越准</span> <span class="badges"><span class="b b-tr">TR</span></span></div>
   </div>
 
   <!-- LAYER 4: RL Inference (from trained weights) -->
   <div class="layer" data-label="L4 RL 推理">
-    <div class="n n-mdl dt-num" id="rl-dqn">🔢 🧬 AI 挑股<span class="d">从 100 里选 8</span></div>
-    <div class="n n-mdl dt-num" id="rl-ppo">🔢 🧬 AI 分配仓位<span class="d">每只买多少</span></div>
-    <div class="n n-mdl dt-num" id="rl-exit">🔢 🧬 AI 决定卖点<span class="d">啥时候该了结</span></div>
-    <div class="n n-tr-core dt-num" id="tr-core" style="font-size:13px">🔢 🟣 每周自我升级<span class="d" style="color:#cbd5e1">用新数据重练模型</span></div>
+    <div class="n n-mdl dt-num" data-mvp="true" id="rl-dqn">🔢 🧬 AI 挑股<span class="d">从 100 里选 8</span></div>
+    <div class="n n-mdl dt-num" data-mvp="true" id="rl-ppo">🔢 🧬 AI 分配仓位<span class="d">每只买多少</span></div>
+    <div class="n n-mdl dt-num" data-mvp="false" id="rl-exit">🔢 🧬 AI 决定卖点<span class="d">啥时候该了结</span></div>
+    <div class="n n-tr-core dt-num" data-mvp="true" id="tr-core" style="font-size:13px">🔢 🟣 每周自我升级<span class="d" style="color:#cbd5e1">用新数据重练模型</span></div>
   </div>
 
   <!-- LAYER 5: Decision LLM (CONVERGENCE POINT) -->
   <div class="layer" data-label="L5 决策 LLM">
-    <div class="n n-decision n-mc-core dt-mix" id="dec-mc">
+    <div class="n n-decision n-mc-core dt-mix" data-mvp="true" id="dec-mc">
       🔀 🔵 周度决策大脑
       <span class="d" style="color:#dbeafe">每周五盘后<br>综合判断调整组合</span>
     </div>
-    <div class="n n-decision n-fc-core dt-mix" id="dec-fc">
+    <div class="n n-decision n-fc-core dt-mix" data-mvp="false" id="dec-fc">
       🔀 🟡 临场反应大脑
       <span class="d" style="color:#fef3c7">突发新闻/价格<br>快速买卖应对</span>
     </div>
@@ -263,17 +297,17 @@
 
   <!-- LAYER 6: Output -->
   <div class="layer" data-label="L6 输出">
-    <div class="n n-out dt-mix" id="out-mc">
+    <div class="n n-out dt-mix" data-mvp="true" id="out-mc">
       🔀 📦 周度新组合<br>
       <span style="font-size:11px; font-weight:400">买什么 + 各占多少 + 为什么</span>
       <span class="d">Victor 审批后周一开盘执行</span>
     </div>
-    <div class="n n-out dt-mix" id="out-fc">
+    <div class="n n-out dt-mix" data-mvp="false" id="out-fc">
       🔀 ⚡ 临场加减仓<br>
       <span style="font-size:11px; font-weight:400">买/卖/调整, 单笔小额</span>
       <span class="d">大事件自动, 中事件先审批</span>
     </div>
-    <div class="n n-out dt-sem" id="out-guard" style="border-color:#ef4444; color:#fca5a5">
+    <div class="n n-out dt-sem" data-mvp="false" id="out-guard" style="border-color:#ef4444; color:#fca5a5">
       💬 🚨 紧急止损<br>
       <span style="font-size:11px; font-weight:400">跌太猛立即跑, 不等人</span>
     </div>
@@ -378,6 +412,10 @@ function drawWires() {
     const a = document.getElementById(from);
     const b = document.getElementById(to);
     if (!a || !b) return;
+    // Hide wire if either endpoint is hidden by MVP filter
+    const aVisible = a.offsetParent !== null;
+    const bVisible = b.offsetParent !== null;
+    if (!aVisible || !bVisible) return;
     const ar = a.getBoundingClientRect();
     const br = b.getBoundingClientRect();
     const x1 = ar.left + ar.width / 2 - rect.left;
@@ -397,6 +435,22 @@ function drawWires() {
     svg.appendChild(el);
   });
 }
+
+// ── MVP scope toggle ──
+document.querySelectorAll('.scope-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.scope-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    if (b.dataset.scope === 'mvp') {
+      document.body.classList.add('mvp-only');
+    } else {
+      document.body.classList.remove('mvp-only');
+    }
+    selectedId = null;
+    applyHighlight();
+    requestAnimationFrame(drawWires);
+  });
+});
 
 // ── Interactive highlighting ──
 const upstream = {}, downstream = {};
