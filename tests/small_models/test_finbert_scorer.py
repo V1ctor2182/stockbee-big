@@ -235,7 +235,11 @@ class TestSingleton:
 
 class TestImportFailure:
     """_ensure_loaded 的 import 失败路径都应 raise RuntimeError 明确提示,
-    不裸 ImportError。用户可参考消息装依赖或切 device='mock'。"""
+    不裸 ImportError。用户可参考消息装依赖或切 device='mock'。
+
+    注意: 两个测试都把 torch 和 transformers 同时 patch 为 None,避免真实加载
+    torch (macOS 上 torch 的 libomp 和 lightgbm 的 libomp 在同进程冲突会 abort)。
+    """
 
     def test_ensure_loaded_raises_when_both_missing(self):
         """torch + transformers 都缺 → RuntimeError 提示安装。"""
@@ -244,10 +248,10 @@ class TestImportFailure:
             with pytest.raises(RuntimeError, match="transformers"):
                 s._ensure_loaded()
 
-    def test_ensure_loaded_raises_when_only_transformers_missing(self):
-        """只缺 transformers 也走同一错误分支。"""
+    def test_ensure_loaded_raises_when_transformers_missing(self):
+        """transformers 缺失 → 同一错误分支 (torch 同样 patch 掉以防实际加载)。"""
         s = FinBERTScorer()
-        with patch.dict("sys.modules", {"transformers": None}):
+        with patch.dict("sys.modules", {"transformers": None, "torch": None}):
             with pytest.raises(RuntimeError, match="transformers"):
                 s._ensure_loaded()
 
