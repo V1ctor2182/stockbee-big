@@ -107,6 +107,21 @@
   }                                                    /* half/half = 混合 */
   .n.dt-struct::before { background: #84cc16; }       /* green = 结构/图 */
 
+  /* Completion status badge */
+  .n.done::after {
+    content: '✓';
+    position: absolute; top: -6px; right: -6px;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #10b981; color: #fff;
+    font-size: 10px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid #0f172a;
+    z-index: 3;
+  }
+  .n.done {
+    box-shadow: 0 0 0 1px rgba(16,185,129,0.4);
+  }
+
   /* Interactive states */
   .n { cursor: pointer; transition: all 0.2s; }
   .n:hover { transform: translateY(-1px); box-shadow: 0 0 12px rgba(255,255,255,0.15); }
@@ -222,6 +237,9 @@
   <div class="legend-item"><div class="legend-dot" style="background:#ec4899"></div>💬 语义数据</div>
   <div class="legend-item"><div class="legend-dot" style="background:linear-gradient(180deg,#ec4899 50%,#06b6d4 50%)"></div>🔀 混合</div>
   <div class="legend-item"><div class="legend-dot" style="background:#84cc16"></div>🕸 结构/图</div>
+  <div class="legend-item" style="margin-left:16px; border-left:1px solid #334155; padding-left:16px">
+    <div class="legend-dot" style="background:#10b981"></div>✓ 已完成
+  </div>
 </div>
 
 <div class="canvas" id="canvas">
@@ -229,12 +247,12 @@
 
   <!-- LAYER 1: Data Sources -->
   <div class="layer" data-label="L1 数据源">
-    <div class="n n-src dt-num" data-mvp="true" id="src-ohlcv">🔢 📊 Alpaca OHLCV<span class="d">价格数字</span></div>
-    <div class="n n-src dt-mix" data-mvp="true" id="src-univ">🔀 🏛️ Alpaca 全美股<span class="d">ticker + 流动性</span></div>
-    <div class="n n-src dt-num" data-mvp="true" id="src-poly">🔢 📈 Polygon / Yahoo<span class="d">基本面数字</span></div>
-    <div class="n n-src dt-sem" data-mvp="true" id="src-sec">💬 🏦 SEC EDGAR<span class="d">10-K/Q 全文</span></div>
-    <div class="n n-src dt-sem" data-mvp="true" id="src-news">💬 📰 NewsAPI + Perplexity<span class="d">+ Nasdaq RSS 文本</span></div>
-    <div class="n n-src dt-num" data-mvp="true" id="src-fred">🔢 🏛️ FRED API<span class="d">19指标时序</span></div>
+    <div class="n n-src dt-num done" data-mvp="true" id="src-ohlcv" title="Sprint 1 / 01-stock-data">🔢 📊 Alpaca OHLCV<span class="d">价格数字</span></div>
+    <div class="n n-src dt-mix done" data-mvp="true" id="src-univ" title="Sprint 1 / 01-stock-data">🔀 🏛️ Alpaca 全美股<span class="d">ticker + 流动性</span></div>
+    <div class="n n-src dt-num" data-mvp="true" id="src-poly" title="待 Sprint 1 / 04-factor-storage">🔢 📈 Polygon / Yahoo<span class="d">基本面数字</span></div>
+    <div class="n n-src dt-sem" data-mvp="true" id="src-sec" title="待后续 sprint">💬 🏦 SEC EDGAR<span class="d">10-K/Q 全文</span></div>
+    <div class="n n-src dt-sem done" data-mvp="true" id="src-news" title="Sprint 1 / 02-news-data">💬 📰 NewsAPI + Perplexity<span class="d">+ Nasdaq RSS 文本</span></div>
+    <div class="n n-src dt-num done" data-mvp="true" id="src-fred" title="Sprint 1 / 03-macro-data + Sprint 2 / 01-macro-sources">🔢 🏛️ FRED API<span class="d">19指标时序</span></div>
     <div class="n n-src dt-mix" data-mvp="false" id="src-poly2">🔀 🎰 Polymarket<span class="d">事件名 + 概率</span></div>
     <div class="n n-src dt-mix" data-mvp="true" id="src-pos">🔀 💼 当前持仓<span class="d">ticker + 权重</span></div>
     <div class="n n-src dt-mix" data-mvp="true" id="src-trades">🔀 📋 交易记录<span class="d">order + signal</span></div>
@@ -242,19 +260,19 @@
 
   <!-- LAYER 2: Processing / Models -->
   <div class="layer" data-label="L2 处理 / 模型">
-    <div class="n n-store dt-num" data-mvp="true" id="p-alpha">🔢 ⚙️ 提取量价信号<span class="d">趋势·动量·波动</span></div>
-    <div class="n dt-sem" data-mvp="true" id="p-funnel">💬 🔽 收缩选股池<span class="d">避免幸存者偏差</span></div>
-    <div class="n n-store dt-num" data-mvp="true" id="p-fund">🔢 💾 留存基本面<span class="d">评估公司质量</span></div>
-    <div class="n n-mdl dt-mix" data-mvp="true" id="p-sec">🔀 🤖 读懂财报<span class="d">从长文本抽关键数字</span></div>
-    <div class="n dt-sem" data-mvp="true" id="p-g1">💬 🔽 新闻去噪<span class="d">只留相关的</span></div>
-    <div class="n n-mdl dt-mix" data-mvp="true" id="p-g2">🔀 🧠 新闻定性<span class="d">算情绪+主题+紧急度</span></div>
-    <div class="n n-mdl dt-mix" data-mvp="true" id="p-g3">🔀 🤖 深读高价值新闻<span class="d">估算对持仓影响</span></div>
-    <div class="n n-mdl dt-num" data-mvp="true" id="p-lgbm">🔢 🧪 LightGBM 预测<span class="d">算每只股未来收益</span></div>
-    <div class="n n-mdl dt-num" data-mvp="true" id="p-xgb">🔢 🧪 XGBoost 融合<span class="d">把各类分数合一</span></div>
-    <div class="n n-store dt-struct" data-mvp="true" id="p-cgraph">🕸 🕸️ 公司关系图<span class="d">事件能传染同行</span></div>
-    <div class="n dt-num" data-mvp="true" id="p-zscore">🔢 📐 宏观指标归一化<span class="d">让不同指标可比</span></div>
-    <div class="n n-mdl dt-num" data-mvp="true" id="p-tilt">🔢 ⚙️ 宏观→行业<span class="d">看宏观环境偏哪些行业</span></div>
-    <div class="n n-store dt-struct" data-mvp="true" id="p-mgraph">🕸 🕸️ 宏观因果图<span class="d">一个指标动, 带动下游</span></div>
+    <div class="n n-store dt-num" data-mvp="true" id="p-alpha" title="待 Sprint 2 / 04-alpha-mining">🔢 ⚙️ 提取量价信号<span class="d">趋势·动量·波动</span></div>
+    <div class="n dt-sem done" data-mvp="true" id="p-funnel" title="Sprint 1 / 01-stock-data">💬 🔽 收缩选股池<span class="d">避免幸存者偏差</span></div>
+    <div class="n n-store dt-num" data-mvp="true" id="p-fund" title="待 Sprint 1 / 04-factor-storage">🔢 💾 留存基本面<span class="d">评估公司质量</span></div>
+    <div class="n n-mdl dt-mix" data-mvp="true" id="p-sec" title="待后续 sprint">🔀 🤖 读懂财报<span class="d">从长文本抽关键数字</span></div>
+    <div class="n dt-sem done" data-mvp="true" id="p-g1" title="Sprint 1 / 02-news-data (m2)">💬 🔽 新闻去噪<span class="d">只留相关的</span></div>
+    <div class="n n-mdl dt-mix done" data-mvp="true" id="p-g2" title="Sprint 1 / 02-news-data (m3 FinBERT)">🔀 🧠 新闻定性<span class="d">算情绪+主题+紧急度</span></div>
+    <div class="n n-mdl dt-mix done" data-mvp="true" id="p-g3" title="Sprint 1 / 02-news-data (m4 Haiku)">🔀 🤖 深读高价值新闻<span class="d">估算对持仓影响</span></div>
+    <div class="n n-mdl dt-num" data-mvp="true" id="p-lgbm" title="待 Sprint 2 / 02-small-models">🔢 🧪 LightGBM 预测<span class="d">算每只股未来收益</span></div>
+    <div class="n n-mdl dt-num" data-mvp="true" id="p-xgb" title="待 Sprint 3 / 01-multi-factor-fusion">🔢 🧪 XGBoost 融合<span class="d">把各类分数合一</span></div>
+    <div class="n n-store dt-struct" data-mvp="true" id="p-cgraph" title="待 Sprint 3 / 06-knowledge-graph">🕸 🕸️ 公司关系图<span class="d">事件能传染同行</span></div>
+    <div class="n dt-num done" data-mvp="true" id="p-zscore" title="Sprint 2 / 02-macro-scoring">🔢 📐 宏观指标归一化<span class="d">让不同指标可比</span></div>
+    <div class="n n-mdl dt-num done" data-mvp="true" id="p-tilt" title="Sprint 2 / 03-sector-tilts">🔢 ⚙️ 宏观→行业<span class="d">看宏观环境偏哪些行业</span></div>
+    <div class="n n-store dt-struct" data-mvp="true" id="p-mgraph" title="待 Sprint 3 / 06-knowledge-graph">🕸 🕸️ 宏观因果图<span class="d">一个指标动, 带动下游</span></div>
     <div class="n dt-num" data-mvp="false" id="p-delta">🔢 📐 概率突变<span class="d">市场预期是否反转</span></div>
     <div class="n dt-num" data-mvp="false" id="p-3sig">🔢 ⚡ 极端价格捕捉<span class="d">跌太猛直接救仓</span></div>
   </div>
@@ -264,14 +282,14 @@
     <div class="n n-feat-mc dt-num" data-mvp="true" id="f-tech">🔢 技术面分数<span class="d">走势强弱</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-tr">TR</span></span></div>
     <div class="n n-feat-mc dt-num" data-mvp="true" id="f-pred">🔢 收益预测<span class="d">未来 5 日涨跌</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
     <div class="n n-feat-mc dt-num" data-mvp="true" id="f-composite">🔢 综合评分<span class="d">融合所有因子</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
-    <div class="n n-feat-both dt-sem" data-mvp="true" id="f-u100">💬 候选股清单<span class="d">值得考虑的 100 只</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
+    <div class="n n-feat-both dt-sem done" data-mvp="true" id="f-u100" title="Sprint 1 / 01-stock-data">💬 候选股清单<span class="d">值得考虑的 100 只</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
     <div class="n n-feat-mc dt-num" data-mvp="true" id="f-fund">🔢 基本面分数<span class="d">公司质量</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
     <div class="n n-feat-both dt-num" data-mvp="true" id="f-sec">🔢 财报关键数字<span class="d">营收 利润 现金流</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
     <div class="n n-feat-fc dt-num" data-mvp="false" id="f-signal">🔢 事件分级<span class="d">要不要立刻动手</span> <span class="badges"><span class="b b-fc">FC</span></span></div>
     <div class="n n-feat-both dt-num" data-mvp="true" id="f-prop">🔢 关联传染分数<span class="d">某股动, 同行跟着动</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
-    <div class="n n-feat-mc dt-num" data-mvp="true" id="f-news">🔢 本周情绪温度<span class="d">整体偏多/偏空</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
-    <div class="n n-feat-mc dt-num" data-mvp="true" id="f-tilt">🔢 行业偏好<span class="d">多加/少加哪些板块</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
-    <div class="n n-feat-mc dt-sem" data-mvp="true" id="f-cycle">💬 经济所处阶段<span class="d">扩张/过热/衰退...</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
+    <div class="n n-feat-mc dt-num done" data-mvp="true" id="f-news" title="Sprint 1 / 02-news-data">🔢 本周情绪温度<span class="d">整体偏多/偏空</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
+    <div class="n n-feat-mc dt-num done" data-mvp="true" id="f-tilt" title="Sprint 2 / 03-sector-tilts">🔢 行业偏好<span class="d">多加/少加哪些板块</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
+    <div class="n n-feat-mc dt-sem done" data-mvp="true" id="f-cycle" title="Sprint 2 / 02-macro-scoring">💬 经济所处阶段<span class="d">扩张/过热/衰退...</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
     <div class="n n-feat-mc dt-num" data-mvp="false" id="f-proba">🔢 市场预期变化<span class="d">突然转向要注意</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
     <div class="n n-feat-both dt-mix" data-mvp="true" id="f-pos">🔀 当前仓位<span class="d">我现在持有什么</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
     <div class="n n-feat-fc dt-num" data-mvp="false" id="f-price">🔢 实时盯盘<span class="d">持仓价格异动</span> <span class="badges"><span class="b b-fc">FC</span></span></div>
