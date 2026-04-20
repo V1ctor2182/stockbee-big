@@ -1,5 +1,5 @@
 progress:
-  completion: 0.143  # 1/7 milestones
+  completion: 0.286  # 2/7 milestones
   # 7 milestones，参考 04-factor-storage 的 8-milestone 分法（m1a/m1b 拆、m7 集成测试独立）
   # 设计原则：
   #   - 每个 milestone 自带单元测试，可独立验收，不依赖下一个 milestone
@@ -78,8 +78,8 @@ progress:
 
     - id: "m2a-finbert-scorer"
       name: "FinBERT Scorer (纯推理 + 性能 gate)"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-20"
       estimated_files:
         - "src/stockbee/small_models/finbert_scorer.py"
         - "src/stockbee/small_models/__init__.py"
@@ -430,4 +430,10 @@ progress:
 
         验收：所有 case pass + 全量回归 (m1-m6 + factor-storage 基线 665) 全绿。
 
-  commits: []
+  commits:
+    - hash: "83ed83d"
+      date: "2026-04-20"
+      message: "[02-small-models] feat: m2a FinBERTScorer (纯推理 + mock + singleton)"
+      files_changed: 5
+      milestones_affected:
+        - "m2a-finbert-scorer (→ completed)"
