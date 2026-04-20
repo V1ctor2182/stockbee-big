@@ -333,6 +333,9 @@ class SqliteNewsProvider(NewsProvider):
         reliability_score: float | None = None,
         g_level: int = 0,
         analysis: str | None = None,
+        finbert_negative: float | None = None,
+        finbert_neutral: float | None = None,
+        finbert_confidence: float | None = None,
     ) -> int | None:
         """插入一条新闻事件，自动去重。
 
@@ -361,12 +364,14 @@ class SqliteNewsProvider(NewsProvider):
                     """INSERT INTO news_events
                        (timestamp, source, source_url, headline, snippet,
                         sentiment_score, importance_score, reliability_score,
-                        g_level, analysis, created_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        g_level, analysis, created_at,
+                        finbert_negative, finbert_neutral, finbert_confidence)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         ts_normalized, source, source_url,
                         headline, snippet, sentiment_score, importance_score,
                         reliability_score, g_level, analysis, now,
+                        finbert_negative, finbert_neutral, finbert_confidence,
                     ),
                 )
             except sqlite3.IntegrityError:
@@ -414,13 +419,17 @@ class SqliteNewsProvider(NewsProvider):
                         """INSERT INTO news_events
                            (timestamp, source, source_url, headline, snippet,
                             sentiment_score, importance_score, reliability_score,
-                            g_level, analysis, created_at)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            g_level, analysis, created_at,
+                            finbert_negative, finbert_neutral, finbert_confidence)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (
                             ts, source, event.get("source_url"),
                             headline, snippet, event.get("sentiment_score"),
                             event.get("importance_score"), event.get("reliability_score"),
                             event.get("g_level", 0), event.get("analysis"), now,
+                            event.get("finbert_negative"),
+                            event.get("finbert_neutral"),
+                            event.get("finbert_confidence"),
                         ),
                     )
                     row_id = cur.lastrowid
@@ -464,13 +473,17 @@ class SqliteNewsProvider(NewsProvider):
                         """INSERT INTO news_events
                            (timestamp, source, source_url, headline, snippet,
                             sentiment_score, importance_score, reliability_score,
-                            g_level, analysis, created_at)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            g_level, analysis, created_at,
+                            finbert_negative, finbert_neutral, finbert_confidence)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (
                             ts, source, event.get("source_url"),
                             headline, snippet, event.get("sentiment_score"),
                             event.get("importance_score"), event.get("reliability_score"),
                             event.get("g_level", 0), event.get("analysis"), now,
+                            event.get("finbert_negative"),
+                            event.get("finbert_neutral"),
+                            event.get("finbert_confidence"),
                         ),
                     )
                     row_id = cur.lastrowid
@@ -498,8 +511,15 @@ class SqliteNewsProvider(NewsProvider):
         importance_score: float | None = None,
         reliability_score: float | None = None,
         analysis: str | None = None,
+        finbert_negative: float | None = None,
+        finbert_neutral: float | None = None,
+        finbert_confidence: float | None = None,
     ) -> bool:
-        """更新新闻的 G 级别和评分（G2/G3 处理后回写）。"""
+        """更新新闻的 G 级别和评分（G2/G3 处理后回写）。
+
+        m2b 扩展: g2_classifier 重构后同时写入 3-way FinBERT softmax
+        (finbert_negative / finbert_neutral / finbert_confidence)。
+        """
         sets: list[str] = ["g_level = ?"]
         params: list[Any] = [g_level]
 
@@ -515,6 +535,15 @@ class SqliteNewsProvider(NewsProvider):
         if analysis is not None:
             sets.append("analysis = ?")
             params.append(analysis)
+        if finbert_negative is not None:
+            sets.append("finbert_negative = ?")
+            params.append(finbert_negative)
+        if finbert_neutral is not None:
+            sets.append("finbert_neutral = ?")
+            params.append(finbert_neutral)
+        if finbert_confidence is not None:
+            sets.append("finbert_confidence = ?")
+            params.append(finbert_confidence)
 
         params.append(news_id)
 

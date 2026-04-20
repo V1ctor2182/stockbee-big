@@ -793,12 +793,43 @@ def g2_rules() -> G2Classifier:
 
 
 def _mock_finbert_pipeline(label: str = "positive", score: float = 0.92):
-    """构造一个 mock FinBERT pipeline，单条和批量都返回固定结果。"""
+    """m2b 前的 mock 保留 (未使用,保留签名防下游意外 import)。"""
     def pipeline_fn(text_or_texts, **kwargs):
         if isinstance(text_or_texts, list):
             return [{"label": label, "score": score}] * len(text_or_texts)
         return [{"label": label, "score": score}]
     return pipeline_fn
+
+
+class _MockFinBERTScorer:
+    """模拟 m2a FinBERTScorer.score_texts → list[dict(3-way softmax + confidence)]。
+
+    P3 重构后 g2 经 _scorer.score_texts 拿 softmax,测试用这个 mock 避免加载 HF。
+    """
+
+    def __init__(self, label: str = "positive", score: float = 0.92, raise_on_call: bool = False):
+        self._label = label
+        self._score = score
+        self._raise = raise_on_call
+        # 另一个类别分 (1 - score) / 2, 保证 3 项 sum ≈ 1
+        self._other = max(0.0, (1.0 - score) / 2.0)
+
+    def score_texts(self, texts, batch_size: int = 32):
+        if self._raise:
+            raise RuntimeError("mock scorer failure")
+        out = []
+        for _ in texts:
+            probs = {"positive": self._other, "negative": self._other, "neutral": self._other}
+            probs[self._label] = self._score
+            probs["confidence"] = max(probs["positive"], probs["negative"], probs["neutral"])
+            out.append(probs)
+        return out
+
+
+def _attach_mock_scorer(g2, mock_scorer):
+    """把 mock scorer 直接注入 g2 实例,跳过 lazy load 分支。"""
+    g2._scorer = mock_scorer
+    g2._scorer_available = True
 
 
 # =========================================================================
@@ -980,56 +1011,57 @@ class TestG2Urgency:
 class TestG2FinBERT:
 
     def test_finbert_positive(self):
+        """P3 重构后: sentiment_score = FinBERT positive softmax, 不再 0.5+conf/2。"""
         g2 = G2Classifier(G2Config(use_finbert=True))
-        g2._pipeline = _mock_finbert_pipeline("positive", 0.92)
-        g2._finbert_available = True
+        _attach_mock_scorer(g2, _MockFinBERTScorer("positive", 0.92))
         r = g2.classify("Apple beats earnings expectations by wide margin")
         assert r.sentiment == "positive"
         assert r.used_finbert
-        assert r.confidence == 0.92
-        # score = 0.5 + 0.92/2 = 0.96
-        assert r.sentiment_score == pytest.approx(0.96, abs=0.01)
+        assert r.confidence == pytest.approx(0.92, abs=1e-6)
+        assert r.sentiment_score == pytest.approx(0.92, abs=1e-6)
+        # 3-way softmax 可读
+        assert r.finbert_negative is not None
+        assert r.finbert_neutral is not None
 
     def test_finbert_negative(self):
         g2 = G2Classifier(G2Config(use_finbert=True))
-        g2._pipeline = _mock_finbert_pipeline("negative", 0.85)
-        g2._finbert_available = True
+        _attach_mock_scorer(g2, _MockFinBERTScorer("negative", 0.85))
         r = g2.classify("Company reports massive quarterly loss today")
         assert r.sentiment == "negative"
         assert r.used_finbert
-        # score = 0.5 - 0.85/2 = 0.075
-        assert r.sentiment_score < 0.5
+        # P3: sentiment_score = positive softmax 很小
+        assert r.sentiment_score < 0.2
+        assert r.finbert_negative == pytest.approx(0.85, abs=1e-6)
 
     def test_finbert_neutral(self):
         g2 = G2Classifier(G2Config(use_finbert=True))
-        g2._pipeline = _mock_finbert_pipeline("neutral", 0.70)
-        g2._finbert_available = True
+        _attach_mock_scorer(g2, _MockFinBERTScorer("neutral", 0.70))
         r = g2.classify("Company announces quarterly results review")
         assert r.sentiment == "neutral"
-        assert r.sentiment_score == 0.5
+        assert r.finbert_neutral == pytest.approx(0.70, abs=1e-6)
 
     def test_finbert_fallback_on_failure(self):
-        """FinBERT 推理异常时降级到规则引擎。"""
+        """FinBERTScorer 推理异常时降级到规则引擎。"""
         g2 = G2Classifier(G2Config(use_finbert=True))
-        g2._finbert_available = True
-        g2._pipeline = MagicMock(side_effect=RuntimeError("model error"))
+        _attach_mock_scorer(g2, _MockFinBERTScorer(raise_on_call=True))
         r = g2.classify("Stock surge and profit growth reported")
         assert not r.used_finbert  # fell back to rules
         assert r.sentiment == "positive"
+        assert r.finbert_negative is None
 
     def test_finbert_skipped_for_non_english(self):
-        """非英语文本跳过 FinBERT，直接返回 neutral。"""
+        """非英语文本跳过 FinBERT,直接返回 neutral。"""
         g2 = G2Classifier(G2Config(use_finbert=True))
-        g2._pipeline = _mock_finbert_pipeline("positive", 0.99)
-        g2._finbert_available = True
+        _attach_mock_scorer(g2, _MockFinBERTScorer("positive", 0.99))
         r = g2.classify("苹果公司公布第四季度财报超预期增长数据")
         assert not r.used_finbert
         assert r.sentiment == "neutral"
 
     def test_finbert_not_available_uses_rules(self):
-        """transformers/torch 未安装时使用规则引擎。"""
+        """scorer 不可用时使用规则引擎 (模拟 transformers/torch 未装场景)。"""
         g2 = G2Classifier(G2Config(use_finbert=True))
-        g2._finbert_available = False
+        g2._scorer = None
+        g2._scorer_available = False  # 显式禁用
         r = g2.classify("Stock crash and decline continues for market")
         assert not r.used_finbert
         assert r.sentiment == "negative"
@@ -1074,10 +1106,9 @@ class TestG2Batch:
         assert results[1].topic == "earnings"
 
     def test_batch_finbert_mock(self):
-        """批量 FinBERT 推理 mock。"""
+        """批量 FinBERT 推理 mock (P3 重构: 用 FinBERTScorer mock)。"""
         g2 = G2Classifier(G2Config(use_finbert=True))
-        g2._pipeline = _mock_finbert_pipeline("positive", 0.88)
-        g2._finbert_available = True
+        _attach_mock_scorer(g2, _MockFinBERTScorer("positive", 0.88))
         items = [
             {"headline": "Apple beats earnings expectations"},
             {"headline": "Tesla surges on strong demand"},
@@ -1086,12 +1117,13 @@ class TestG2Batch:
         assert len(results) == 2
         assert all(r.used_finbert for r in results)
         assert all(r.sentiment == "positive" for r in results)
+        # 3-way softmax 写入 G2Result
+        assert all(r.finbert_negative is not None for r in results)
 
     def test_batch_finbert_mixed_classifiable(self):
         """批量中混合可分类和不可分类文本。"""
         g2 = G2Classifier(G2Config(use_finbert=True))
-        g2._pipeline = _mock_finbert_pipeline("negative", 0.80)
-        g2._finbert_available = True
+        _attach_mock_scorer(g2, _MockFinBERTScorer("negative", 0.80))
         items = [
             {"headline": "Stock crash amid loss reported"},
             {"headline": "苹果公司公布财报超预期增长"},  # non-English
@@ -1106,8 +1138,7 @@ class TestG2Batch:
     def test_batch_finbert_fallback_on_error(self):
         """批量 FinBERT 异常时整体降级到规则引擎。"""
         g2 = G2Classifier(G2Config(use_finbert=True))
-        g2._finbert_available = True
-        g2._pipeline = MagicMock(side_effect=RuntimeError("batch error"))
+        _attach_mock_scorer(g2, _MockFinBERTScorer(raise_on_call=True))
         items = [
             {"headline": "Stock surge and profit growth"},
             {"headline": "Market crash and loss decline"},

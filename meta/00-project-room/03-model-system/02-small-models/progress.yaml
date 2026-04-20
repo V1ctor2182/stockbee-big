@@ -1,5 +1,5 @@
 progress:
-  completion: 0.571  # 4/7 milestones
+  completion: 0.714  # 5/7 milestones
   # 7 milestones，参考 04-factor-storage 的 8-milestone 分法（m1a/m1b 拆、m7 集成测试独立）
   # 设计原则：
   #   - 每个 milestone 自带单元测试，可独立验收，不依赖下一个 milestone
@@ -122,8 +122,8 @@ progress:
 
     - id: "m2b-local-sentiment-provider"
       name: "LocalSentimentProvider + g2 重构 + DB 回写"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-20"
       estimated_files:
         - "src/stockbee/small_models/local_sentiment_provider.py"
         - "src/stockbee/news_data/g2_classifier.py"           # P3 重构：复用 m2a scorer singleton
@@ -443,9 +443,15 @@ progress:
       files_changed: 6
       milestones_affected:
         - "m3-lightgbm-trainer (→ completed)"
-    - hash: "4fd670f"
+    - hash: "c2c96f4"
       date: "2026-04-20"
       message: "[02-small-models] feat: m5 Fin-E5 embedding + baseline importance"
       files_changed: 5
       milestones_affected:
         - "m5-fine5-embedding-infra (→ completed)"
+    - hash: "8b63beb"
+      date: "2026-04-20"
+      message: "[02-small-models] feat: m2b LocalSentimentProvider + g2 P3 refactor"
+      files_changed: 8
+      milestones_affected:
+        - "m2b-local-sentiment-provider (→ completed)"

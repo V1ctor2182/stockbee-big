@@ -7,6 +7,7 @@
 - m2a: FinBERTScorer, get_default_scorer, reset_default_scorer (纯推理 + singleton)
 - m3: forward_return_5d (B3 label) + train_lightgbm + train_and_save + walk_forward_splits
 - m5: FinE5Scorer (encode + cosine_sim + cosine_dedup) + baseline_importance + backfill_importance
+- m2b: LocalSentimentProvider (SentimentProvider 实现 + g2 P3 重构)
 """
 
 from .fine5_scorer import FinE5Scorer
@@ -16,6 +17,7 @@ from .finbert_scorer import (
     reset_default_scorer,
 )
 from .importance_baseline import backfill_importance, baseline_importance
+from .local_sentiment_provider import LocalSentimentProvider
 from .label_utils import LABEL_NAME, forward_return_5d
 from .lightgbm_trainer import (
     DEFAULT_PARAMS,
@@ -40,6 +42,7 @@ __all__ = [
     "FinE5Scorer",
     "InvalidArtifactError",
     "LABEL_NAME",
+    "LocalSentimentProvider",
     "ML_SCORE_PARQUET",
     "MODEL_ROOT",
     "NotFoundError",

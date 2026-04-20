@@ -205,10 +205,16 @@ class NewsDataSyncer:
         g2_results = self._g2.classify_batch(batch_input)
 
         for (event, news_id), g2r in zip(items, g2_results):
+            # P3 (m2b): g2 同时写 3-way FinBERT softmax,供 LocalSentimentProvider
+            # get_ticker_sentiment 加权聚合 + backfill 填缺。规则降级路径 fb_neg/neu
+            # 为 None,update_g_level 内部会跳过对应列。
             self._store.update_g_level(
                 news_id, g_level=2,
                 sentiment_score=g2r.sentiment_score,
                 importance_score=g2r.importance_score,
+                finbert_negative=g2r.finbert_negative,
+                finbert_neutral=g2r.finbert_neutral,
+                finbert_confidence=(g2r.confidence if g2r.used_finbert else None),
             )
             results.append((event, news_id, g2r))
         return results

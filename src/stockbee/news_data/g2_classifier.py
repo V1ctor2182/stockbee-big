@@ -26,6 +26,21 @@ def _build_keyword_patterns(keywords: list[str]) -> list[re.Pattern]:
     return [re.compile(r"\b" + re.escape(kw) + r"\b") for kw in keywords]
 
 
+def _label_from_softmax(
+    row: dict[str, float],
+) -> tuple[str, float, float, float, float]:
+    """从 FinBERTScorer 3-way softmax dict 取 (label, positive, negative, neutral, conf)。
+
+    argmax 决定 sentiment 标签;conf = row["confidence"] = max 三项。
+    """
+    pos = float(row["positive"])
+    neg = float(row["negative"])
+    neu = float(row["neutral"])
+    conf = float(row.get("confidence", max(pos, neg, neu)))
+    pair = max(("positive", pos), ("negative", neg), ("neutral", neu), key=lambda x: x[1])
+    return pair[0], pos, neg, neu, conf
+
+
 def _count_keyword_hits(text_lower: str, patterns: list[re.Pattern]) -> int:
     """统计文本中匹配的关键词数量。"""
     return sum(1 for p in patterns if p.search(text_lower))
@@ -116,22 +131,34 @@ _URGENCY_MEDIUM_PATTERNS = _build_keyword_patterns(_URGENCY_MEDIUM_KEYWORDS)
 
 @dataclass
 class G2Result:
-    """G2 分类结果。"""
+    """G2 分类结果。
+
+    P3 重构 (m2b): sentiment_score 语义切换为 FinBERT positive softmax 概率 (0-1)。
+    新增 finbert_negative / finbert_neutral 两列,方便下游直接读到 3-way softmax
+    而无需再跑一次推理。规则引擎降级路径保留旧语义 (0-1 线性 score),
+    finbert_negative / finbert_neutral 在规则降级路径为 None。
+    """
     sentiment: str = "neutral"       # positive / neutral / negative
-    sentiment_score: float = 0.5     # 0.0 (most negative) to 1.0 (most positive)
-    confidence: float = 0.0          # FinBERT 置信度 0-1
+    sentiment_score: float = 0.5     # FinBERT positive softmax (used_finbert=True) 或 规则 score (False)
+    confidence: float = 0.0          # max 三项 softmax (FinBERT) / heuristic conf (rules)
     topic: str = "other"             # earnings / regulatory / merger / litigation / policy / product / other
     importance_score: float = 0.5    # 0.0 to 1.0
     urgency: str = "low"             # high / medium / low
     used_finbert: bool = False       # 是否使用了 FinBERT（vs 降级为规则）
+    finbert_negative: float | None = None  # P3: FinBERT negative softmax,规则降级为 None
+    finbert_neutral: float | None = None   # P3: FinBERT neutral softmax
 
 
 @dataclass
 class G2Config:
-    """G2 分类器配置。"""
+    """G2 分类器配置。
+
+    P3 重构后,FinBERT 推理经 m2a `FinBERTScorer` singleton,不再在 g2 本地加载;
+    finbert_model / device 字段保留兼容老调用方,但实际推理由 singleton 管理。
+    """
     use_finbert: bool = True         # 是否使用 FinBERT（False 时纯规则引擎）
     finbert_model: str = FINBERT_MODEL
-    device: str = "auto"             # auto / cpu / cuda / mps
+    device: str = "auto"             # 保留兼容,实际 device 由 FinBERTScorer singleton 决定
     batch_size: int = 16
 
 
@@ -148,8 +175,9 @@ class G2Classifier:
 
     def __init__(self, config: G2Config | None = None) -> None:
         self._config = config or G2Config()
-        self._pipeline: Any = None
-        self._finbert_available: bool | None = None  # None = 未检测
+        # P3: 复用 m2a FinBERTScorer singleton,消除同一进程多次加载 ProsusAI/finbert
+        self._scorer: Any = None
+        self._scorer_available: bool | None = None
 
     def classify(self, headline: str, snippet: str | None = None) -> G2Result:
         """对单条新闻进行 G2 分类。"""
@@ -158,7 +186,14 @@ class G2Classifier:
             return G2Result()
 
         # 1. 情绪分类
-        sentiment, score, confidence, used_finbert = self._classify_sentiment(text)
+        (
+            sentiment,
+            score,
+            confidence,
+            used_finbert,
+            fb_neg,
+            fb_neu,
+        ) = self._classify_sentiment(text)
 
         # 2. 主题分类
         topic = self._classify_topic(text)
@@ -177,6 +212,8 @@ class G2Classifier:
             importance_score=round(importance, 3),
             urgency=urgency,
             used_finbert=used_finbert,
+            finbert_negative=fb_neg,
+            finbert_neutral=fb_neu,
         )
 
     def classify_batch(self, items: list[dict[str, str]]) -> list[G2Result]:
@@ -193,7 +230,8 @@ class G2Classifier:
         sentiments = self._classify_sentiment_batch(texts)
 
         results = []
-        for text, (sentiment, score, confidence, used_finbert) in zip(texts, sentiments):
+        for text, sent_tuple in zip(texts, sentiments):
+            sentiment, score, confidence, used_finbert, fb_neg, fb_neu = sent_tuple
             if not text:
                 results.append(G2Result())
                 continue
@@ -208,6 +246,12 @@ class G2Classifier:
                 importance_score=round(importance, 3),
                 urgency=urgency,
                 used_finbert=used_finbert,
+                finbert_negative=(
+                    round(fb_neg, 3) if fb_neg is not None else None
+                ),
+                finbert_neutral=(
+                    round(fb_neu, 3) if fb_neu is not None else None
+                ),
             ))
         return results
 
@@ -243,121 +287,130 @@ class G2Classifier:
 
     # ------ 情绪分类 ------
 
-    def _classify_sentiment(self, text: str) -> tuple[str, float, float, bool]:
-        """单条情绪分类。返回 (sentiment, score, confidence, used_finbert)。"""
-        if not text:
-            return ("neutral", 0.5, 0.0, False)
+    # P3 重构: 复用 m2a FinBERTScorer singleton。返回 tuple 扩展为 6 元素:
+    # (sentiment, score, confidence, used_finbert, finbert_negative, finbert_neutral)
+    #   - used_finbert=True 时: score = FinBERT positive softmax, fb_neg/fb_neu 有值
+    #   - used_finbert=False 时 (规则降级或不可分类): fb_neg/fb_neu = None
 
+    _NEUTRAL_TUPLE = ("neutral", 0.5, 0.0, False, None, None)
+    _NEUTRAL_LOWCONF = ("neutral", 0.5, 0.1, False, None, None)
+
+    def _classify_sentiment(
+        self, text: str
+    ) -> tuple[str, float, float, bool, float | None, float | None]:
+        """单条情绪分类。"""
+        if not text:
+            return self._NEUTRAL_TUPLE
         if not self._is_classifiable(text):
-            return ("neutral", 0.5, 0.1, False)
+            return self._NEUTRAL_LOWCONF
 
         if self._config.use_finbert:
-            result = self._finbert_classify(text)
-            if result is not None:
-                return result
+            result = self._scorer_classify([text])
+            if result:
+                return result[0]
 
-        # 降级：规则引擎
-        return self._rule_sentiment(text)
+        rule = self._rule_sentiment(text)
+        # 扩展旧 4 元组到新 6 元组
+        return (rule[0], rule[1], rule[2], rule[3], None, None)
 
     def _classify_sentiment_batch(
         self, texts: list[str]
-    ) -> list[tuple[str, float, float, bool]]:
+    ) -> list[tuple[str, float, float, bool, float | None, float | None]]:
         """批量情绪分类。"""
         if not texts:
             return []
 
-        if self._config.use_finbert and self._ensure_finbert():
+        if self._config.use_finbert and self._ensure_scorer():
+            valid_pairs = [
+                (i, t) for i, t in enumerate(texts) if t and self._is_classifiable(t)
+            ]
+            results: list[
+                tuple[str, float, float, bool, float | None, float | None]
+            ] = [self._NEUTRAL_TUPLE] * len(texts)
+            if not valid_pairs:
+                # 全部不可分类,填 low-conf neutral
+                return [
+                    self._NEUTRAL_LOWCONF if t else self._NEUTRAL_TUPLE
+                    for t in texts
+                ]
+            valid_texts = [t for _, t in valid_pairs]
             try:
-                valid = [(i, t) for i, t in enumerate(texts) if t and self._is_classifiable(t)]
-                if not valid:
-                    return [("neutral", 0.5, 0.0, False)] * len(texts)
-
-                valid_texts = [t for _, t in valid]
-                pipe_results = self._pipeline(
-                    valid_texts,
-                    batch_size=self._config.batch_size,
-                    truncation=True,
-                    max_length=FINBERT_MAX_LENGTH,
+                scored = self._scorer.score_texts(
+                    valid_texts, batch_size=self._config.batch_size
                 )
-
-                results: list[tuple[str, float, float, bool]] = [
-                    ("neutral", 0.5, 0.0, False)
-                ] * len(texts)
-
-                for (orig_idx, _), pipe_res in zip(valid, pipe_results):
-                    label = pipe_res["label"].lower()
-                    conf = pipe_res["score"]
-                    score = {"positive": 0.5 + conf / 2, "negative": 0.5 - conf / 2}.get(label, 0.5)
-                    results[orig_idx] = (label, score, conf, True)
-
-                return results
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning("FinBERT batch failed, falling back to rules: %s", e)
+                return self._rule_batch(texts)
 
-        return [
-            ("neutral", 0.5, 0.1, False) if not self._is_classifiable(t)
-            else self._rule_sentiment(t)
-            for t in texts
-        ]
+            # 把 valid 结果填回原位置
+            for (orig_idx, _text), score in zip(valid_pairs, scored):
+                label, pos, neg, neu, conf = _label_from_softmax(score)
+                results[orig_idx] = (label, pos, conf, True, neg, neu)
+            # 其余非 valid 位置按文本状态填 neutral 或 low-conf
+            for i, t in enumerate(texts):
+                if results[i] is self._NEUTRAL_TUPLE:
+                    if not t:
+                        results[i] = self._NEUTRAL_TUPLE
+                    elif not self._is_classifiable(t):
+                        results[i] = self._NEUTRAL_LOWCONF
+            return results
 
-    def _finbert_classify(self, text: str) -> tuple[str, float, float, bool] | None:
-        """FinBERT 单条推理。失败返回 None。"""
-        if not self._ensure_finbert():
+        return self._rule_batch(texts)
+
+    def _rule_batch(
+        self, texts: list[str]
+    ) -> list[tuple[str, float, float, bool, float | None, float | None]]:
+        out: list[tuple[str, float, float, bool, float | None, float | None]] = []
+        for t in texts:
+            if not t:
+                out.append(self._NEUTRAL_TUPLE)
+            elif not self._is_classifiable(t):
+                out.append(self._NEUTRAL_LOWCONF)
+            else:
+                r = self._rule_sentiment(t)
+                out.append((r[0], r[1], r[2], r[3], None, None))
+        return out
+
+    def _scorer_classify(
+        self, texts: list[str]
+    ) -> list[tuple[str, float, float, bool, float | None, float | None]] | None:
+        """使用 m2a singleton 推理;失败返回 None 以触发规则降级。"""
+        if not self._ensure_scorer():
             return None
         try:
-            result = self._pipeline(
-                text, truncation=True, max_length=FINBERT_MAX_LENGTH
+            scored = self._scorer.score_texts(
+                texts, batch_size=self._config.batch_size
             )
-            label = result[0]["label"].lower()
-            conf = result[0]["score"]
-            score = {"positive": 0.5 + conf / 2, "negative": 0.5 - conf / 2}.get(label, 0.5)
-            return (label, score, conf, True)
-        except Exception as e:
-            logger.warning("FinBERT inference failed: %s", e)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("FinBERTScorer inference failed: %s", e)
             return None
+        out: list[tuple[str, float, float, bool, float | None, float | None]] = []
+        for row in scored:
+            label, pos, neg, neu, conf = _label_from_softmax(row)
+            out.append((label, pos, conf, True, neg, neu))
+        return out
 
-    def _ensure_finbert(self) -> bool:
-        """Lazy init FinBERT pipeline。返回是否可用。"""
-        if self._finbert_available is False:
+    def _ensure_scorer(self) -> bool:
+        """Lazy 取 m2a FinBERTScorer singleton。"""
+        if self._scorer_available is False:
             return False
-        if self._pipeline is not None:
+        if self._scorer is not None:
             return True
         try:
-            from transformers import pipeline as hf_pipeline
-            import torch
+            from stockbee.small_models.finbert_scorer import get_default_scorer
 
-            if self._config.device == "auto":
-                if torch.cuda.is_available():
-                    device = 0
-                elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-                    device = "mps"
-                else:
-                    device = -1  # CPU
-            elif self._config.device == "cpu":
-                device = -1
-            elif self._config.device == "cuda":
-                device = 0
-            elif self._config.device == "mps":
-                device = "mps"
-            else:
-                device = -1
-
-            logger.info("Loading FinBERT model: %s (device=%s)", self._config.finbert_model, device)
-            self._pipeline = hf_pipeline(
-                "sentiment-analysis",
-                model=self._config.finbert_model,
-                device=device,
-            )
-            self._finbert_available = True
-            logger.info("FinBERT loaded successfully")
+            self._scorer = get_default_scorer()
+            self._scorer_available = True
             return True
         except ImportError:
-            logger.info("transformers/torch not installed, using rule-based sentiment")
-            self._finbert_available = False
+            logger.info(
+                "stockbee.small_models not available, using rule-based sentiment"
+            )
+            self._scorer_available = False
             return False
-        except Exception as e:
-            logger.warning("FinBERT load failed: %s, using rule-based sentiment", e)
-            self._finbert_available = False
+        except Exception as e:  # noqa: BLE001
+            logger.warning("FinBERTScorer init failed: %s, using rule-based", e)
+            self._scorer_available = False
             return False
 
     # 预编译情绪关键词（类级别，所有实例共享）
