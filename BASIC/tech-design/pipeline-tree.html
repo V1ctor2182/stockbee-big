@@ -249,6 +249,8 @@
     <div class="n dt-sem" data-mvp="true" id="p-g1">💬 🔽 新闻去噪<span class="d">只留相关的</span></div>
     <div class="n n-mdl dt-mix" data-mvp="true" id="p-g2">🔀 🧠 新闻定性<span class="d">算情绪+主题+紧急度</span></div>
     <div class="n n-mdl dt-mix" data-mvp="true" id="p-g3">🔀 🤖 深读高价值新闻<span class="d">估算对持仓影响</span></div>
+    <div class="n n-mdl dt-num" data-mvp="true" id="p-lgbm">🔢 🧪 LightGBM 预测<span class="d">算每只股未来收益</span></div>
+    <div class="n n-mdl dt-num" data-mvp="true" id="p-xgb">🔢 🧪 XGBoost 融合<span class="d">把各类分数合一</span></div>
     <div class="n n-store dt-struct" data-mvp="true" id="p-cgraph">🕸 🕸️ 公司关系图<span class="d">事件能传染同行</span></div>
     <div class="n dt-num" data-mvp="true" id="p-zscore">🔢 📐 宏观指标归一化<span class="d">让不同指标可比</span></div>
     <div class="n n-mdl dt-num" data-mvp="true" id="p-tilt">🔢 ⚙️ 宏观→行业<span class="d">看宏观环境偏哪些行业</span></div>
@@ -260,6 +262,8 @@
   <!-- LAYER 3: Features -->
   <div class="layer" data-label="L3 特征">
     <div class="n n-feat-mc dt-num" data-mvp="true" id="f-tech">🔢 技术面分数<span class="d">走势强弱</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-tr">TR</span></span></div>
+    <div class="n n-feat-mc dt-num" data-mvp="true" id="f-pred">🔢 收益预测<span class="d">未来 5 日涨跌</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
+    <div class="n n-feat-mc dt-num" data-mvp="true" id="f-composite">🔢 综合评分<span class="d">融合所有因子</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
     <div class="n n-feat-both dt-sem" data-mvp="true" id="f-u100">💬 候选股清单<span class="d">值得考虑的 100 只</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
     <div class="n n-feat-mc dt-num" data-mvp="true" id="f-fund">🔢 基本面分数<span class="d">公司质量</span> <span class="badges"><span class="b b-mc">MC</span></span></div>
     <div class="n n-feat-both dt-num" data-mvp="true" id="f-sec">🔢 财报关键数字<span class="d">营收 利润 现金流</span> <span class="badges"><span class="b b-mc">MC</span><span class="b b-fc">FC</span></span></div>
@@ -360,13 +364,22 @@ const WIRES = [
   ['p-3sig', 'f-guard', '#f59e0b'],
   ['src-ohlcv', 'f-price', '#f59e0b'],
   ['src-trades', 'f-reward', '#8b5cf6'],
-  // L3 → L4 (RL uses features)
-  ['f-tech', 'rl-dqn', '#d97706'],
-  ['f-fund', 'rl-dqn', '#d97706'],
+  // Small models: LightGBM (returns) + XGBoost (fusion)
+  ['p-alpha', 'p-lgbm', '#64748b'],
+  ['p-fund', 'p-lgbm', '#64748b'],
+  ['p-lgbm', 'f-pred', '#3b82f6'],
+  ['f-tech', 'p-xgb', '#64748b'],
+  ['f-fund', 'p-xgb', '#64748b'],
+  ['f-news', 'p-xgb', '#64748b'],
+  ['f-tilt', 'p-xgb', '#64748b'],
+  ['f-prop', 'p-xgb', '#64748b'],
+  ['f-pred', 'p-xgb', '#64748b'],
+  ['p-xgb', 'f-composite', '#3b82f6'],
+  // L3 → L4 (RL uses composite score primarily)
+  ['f-composite', 'rl-dqn', '#d97706'],
   ['f-u100', 'rl-dqn', '#d97706'],
-  ['f-prop', 'rl-dqn', '#d97706'],
+  ['f-composite', 'rl-ppo', '#d97706'],
   ['f-tilt', 'rl-ppo', '#d97706'],
-  ['f-tech', 'rl-ppo', '#d97706'],
   ['f-signal', 'rl-exit', '#d97706'],
   ['f-news', 'rl-exit', '#d97706'],
   ['f-reward', 'tr-core', '#8b5cf6'],
@@ -376,15 +389,12 @@ const WIRES = [
   // L3 + L4 → L5 MC Decision LLM
   ['rl-dqn', 'dec-mc', '#3b82f6'],
   ['rl-ppo', 'dec-mc', '#3b82f6'],
-  ['f-tech', 'dec-mc', '#3b82f6'],
-  ['f-fund', 'dec-mc', '#3b82f6'],
+  ['f-composite', 'dec-mc', '#3b82f6'],
+  ['f-pred', 'dec-mc', '#3b82f6'],
   ['f-u100', 'dec-mc', '#3b82f6'],
-  ['f-news', 'dec-mc', '#3b82f6'],
-  ['f-tilt', 'dec-mc', '#3b82f6'],
   ['f-cycle', 'dec-mc', '#3b82f6'],
   ['f-proba', 'dec-mc', '#3b82f6'],
   ['f-sec', 'dec-mc', '#3b82f6'],
-  ['f-prop', 'dec-mc', '#3b82f6'],
   ['f-pos', 'dec-mc', '#3b82f6'],
   // L3 + L4 → L5 FC Decision LLM
   ['f-signal', 'dec-fc', '#f59e0b'],
