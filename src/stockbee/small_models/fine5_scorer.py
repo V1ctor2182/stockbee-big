@@ -98,7 +98,11 @@ class FinE5Scorer:
             raise ValueError(f"max_length must be >= 1, got {max_length}")
 
         if not texts:
-            dim = self.embedding_dim if self._mock or self._model else 1
+            # review L1: 空输入短路,但返回形状必须与后续真实 encode 一致 ——
+            # 此前未加载阶段返回 (0, 1),真实模型加载后变 (0, hidden_size),
+            # 让 shape 依赖调用顺序,调试困难。此处统一用缓存的 _hidden_size,
+            # 未缓存则回退到默认模型 (e5-large-v2 = 1024),不触发 load。
+            dim = self._hidden_size if self._hidden_size is not None else 1024
             return np.zeros((0, dim), dtype=np.float32)
 
         if self._mock:

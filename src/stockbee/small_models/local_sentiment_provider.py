@@ -158,15 +158,20 @@ class LocalSentimentProvider(SentimentProvider):
         since: str | datetime | None = None,
         limit: int = 1000,
     ) -> int:
-        """补齐 finbert_confidence IS NULL 的行; 批量 scorer.score_texts 后 UPDATE。
+        """补齐任一情绪字段为 NULL 的行; 批量 scorer.score_texts 后 UPDATE。
 
         Args:
             since: 仅处理 timestamp >= since 的行 (None = 全量)
             limit: 单次 LIMIT 上限 (分页调用时传不同值)
 
         Returns:
-            实际写入的行数。**不修改** sentiment_score (g2 所有)。
+            实际写入的行数。sentiment_score 仅在当前为 NULL 时由 scorer 的
+            positive 概率填入 (COALESCE);若 g2 已写入,保持不动。
         """
+        # review H6: 只按 finbert_confidence IS NULL 选行会永久冻结 sentiment_score
+        # 仍 NULL 但 finbert_* 已填的"部分 G1 / 部分 backfill"行 —
+        # get_ticker_sentiment 因 positive IS NULL 跳过,backfill 又不再命中。
+        # 改为任一字段 NULL 即候选,并用 COALESCE 保留 g2 写入的 positive。
         self._require_initialized()
         self._require_news_store()
         if limit < 1:
@@ -180,7 +185,12 @@ class LocalSentimentProvider(SentimentProvider):
             params.append(_normalize_since(since))
         sql = f"""
             SELECT id, headline, snippet FROM news_events
-            WHERE finbert_confidence IS NULL
+            WHERE (
+                      finbert_confidence IS NULL
+                   OR finbert_negative IS NULL
+                   OR finbert_neutral IS NULL
+                   OR sentiment_score IS NULL
+                  )
                   {where_since}
             ORDER BY timestamp
             LIMIT ?
@@ -199,11 +209,18 @@ class LocalSentimentProvider(SentimentProvider):
             for (row_id, _h, _s), sc in zip(rows, scored):
                 cur.execute(
                     """UPDATE news_events
-                       SET finbert_negative = ?,
-                           finbert_neutral = ?,
-                           finbert_confidence = ?
-                       WHERE id = ? AND finbert_confidence IS NULL""",
+                       SET sentiment_score = COALESCE(sentiment_score, ?),
+                           finbert_negative = COALESCE(finbert_negative, ?),
+                           finbert_neutral = COALESCE(finbert_neutral, ?),
+                           finbert_confidence = COALESCE(finbert_confidence, ?)
+                       WHERE id = ? AND (
+                                 finbert_confidence IS NULL
+                              OR finbert_negative IS NULL
+                              OR finbert_neutral IS NULL
+                              OR sentiment_score IS NULL
+                             )""",
                     (
+                        float(sc["positive"]),
                         float(sc["negative"]),
                         float(sc["neutral"]),
                         float(sc["confidence"]),
