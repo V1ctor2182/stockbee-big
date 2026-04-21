@@ -1,6 +1,6 @@
 spec_id: "constraint-02-small-models-002"
 type: constraint
-state: draft
+state: active
 intent:
   summary: "LightGBM 预测 IC > 0.03"
   detail: ""

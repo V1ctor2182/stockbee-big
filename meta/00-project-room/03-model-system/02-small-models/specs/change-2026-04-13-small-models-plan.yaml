@@ -1,0 +1,118 @@
+spec_id: "change-2026-04-13-small-models-plan"
+type: change
+state: active
+intent:
+  summary: "02-small-models milestone 首次规划：7 milestone，契约提前锁定 + 训推分拆 + 独立 unit test + 末段集成测试（经两轮 plan-eng review 定稿）"
+  detail: |
+    为 02-small-models Room 完成首次 milestone 拆分与跨模块契约锁定。
+    计划经两轮独立 plan-eng subagent review 迭代定稿。
+
+    === 7 个 milestones（参考 04-factor-storage 的 8-milestone 模式）===
+
+    - m1-contracts-fixtures-io: Contract 锁定 + shared fixtures + model_io + SQLite 扩列 (non-test ~140)
+    - m2a-finbert-scorer: FinBERT 纯推理 + <100ms 性能 gate (non-test ~200)
+    - m2b-local-sentiment-provider: 实现 SentimentProvider + P3 g2 重构 + DB 回写 (non-test ~280)
+    - m3-lightgbm-trainer: label_utils (B3) + walk-forward 训练 CLI (non-test ~280)
+    - m4-lightgbm-inference: 批推理 → ml_score Parquet + 独立 evaluate_ml_score (D2) (non-test ~200)
+    - m5-fine5-embedding-infra: Fin-E5 embedding + cosine 去重 + rule baseline importance (non-test ~260)
+    - m6-integration-tests: 7 组 16-18 跨模块 case (纯测试 ~520)
+
+    === 设计原则 ===
+      - 每个 milestone 非测试代码目标 ~250 行（m2b/m3/m5 略超至 260-280，权衡分拆成本）
+      - 每个 milestone 自带单元测试，独立可验收
+      - 末段 m6 做跨模块集成测试（参考 factor-storage m7 模式，18 cases 512 行）
+      - 拓扑：m1 → {m2a→m2b, m3→m4, m5} 可并行 → m6
+
+    === 关键决策 ===
+
+    **A1→P3 (FinBERT 部署策略)**：
+      发现 g2_classifier 已在用 ProsusAI/finbert（第二轮 review blocker）。
+      A1 "新列并存 + g2 保留" 会导致同一条新闻跑两遍 FinBERT。
+      最终 P3：g2 重构为复用 m2a FinBERTScorer singleton (get_default_scorer)；
+      新列 `finbert_negative / finbert_neutral / finbert_confidence` 由 g2 写；
+      `sentiment_score` 保留 = FinBERT positive softmax (g2 原语义)。
+
+    **B3 (LightGBM label 公式)**：
+      `mean(next_5_days_daily_returns)` 基于 adj_close。
+      原因：贴 PRD §3.3 原文"未来 5 日平均收益率"；均值比端点 return 噪声小。
+
+    **D2 (m4 IC 评估策略)**：
+      第二轮 review 发现 `LocalFactorProvider.get_ic_report` 硬编码 `_IC_SHIFT=1`（line 32）。
+      C1 原方案"重用 get_ic_report 传 shift=5"不可行。
+      最终 D2：m4 新增独立 `evaluate_ml_score(shift=5)`，直接调 `ic_evaluator.compute(shift=5)`，
+      不修改 factor-storage 已 freeze 的 `get_ic_report`（避免破坏回归测试）。
+
+    **Model IO 归属**：
+      第二轮 review 发现 m2a 吞 model_io 导致 m3/m4/m5 反向依赖 m2a，违反并行声明。
+      最终：model_io 上移到 m1，作为跨模块基础设施。
+
+    === Scope 推迟（防 scope creep）===
+      - XGBoost 因子融合 → 04-alpha-mining
+      - 周度 refit CLI / APScheduler → Phase 2
+      - FinBERT / Fin-E5 fine-tune → Phase 2（只用预训练，ProsusAI/finbert ≥85% 已过 PRD 80% gate）
+      - Fin-E5 精准 importance → 04-alpha-mining（本 room 用 rule baseline 占位）
+
+    === 估算修正历程 ===
+      - v1 (6 milestone, 2200 行): 第一轮 review 判定 SPLIT+REWORK
+      - v2 (7 milestone, ~3100 行): 第二轮 review 判定 CONDITIONAL GO
+      - v3 (最终，7 milestone, ~3380 行):
+          m1: 180 → 300 行（加 model_io + 4 列 schema ALTER）
+          m2a: 550 → 450 行（移除 model_io）
+          m2b: 380 → 550 行（吸收 P3 g2 重构 + news_store 扩写）
+          m3: 560 (不变)
+          m4: 450 → 470 行（加 evaluate_ml_score）
+          m5: 530 (不变)
+          m6: 450 → 520 行（对齐 factor-storage m7 的 512/18 比例 + G/F 组精度调整）
+          总计：3380 行（non-test ~1260 + test ~2120）
+      - 参考基线：04-factor-storage 实际 4400 行 / 8 milestone ≈ 550 行/milestone
+
+    === Review 历史 ===
+
+    **第一轮 plan-eng review (判定 SPLIT+REWORK)**：
+      - m1 被指为 kitchen sink → 改 m1 = 纯契约+fixtures
+      - m5 "embedding × 5日涨幅相似度" 无法离线 validate → 降级为 embedding infra + rule baseline
+      - m2 FinBERT 需拆 scorer vs provider → 拆 m2a/m2b
+      - 缺失性能基准 → 加 m2a/m4 单元测试 hard gate
+      - 缺失跨模块 contract 锁定 → 集中到 m1
+      - 列冲突（g2 已写 sentiment_score/importance_score）未解决 → 原定 A1
+
+    **第二轮 plan-eng review (判定 CONDITIONAL GO, 3 blockers)**：
+      Blocker 1: model_io 归属错位
+        fix: model_io 上移到 m1（+80 非测试 + 100 测试到 m1）
+      Blocker 2: C1 决策与 LocalFactorProvider `_IC_SHIFT=1` 硬编码矛盾
+        fix: D2 方案，m4 独立 evaluate_ml_score，不改 get_ic_report
+      Blocker 3: g2 已跑 FinBERT，A1 会导致重复推理
+        fix: P3 方案，g2 重构为复用 m2a FinBERTScorer singleton
+      Nice-to-have (全部采纳):
+        - m1 估算 180→300 行；m6 450→520 行
+        - 新增 Decisions: get_ticker_sentiment 加权公式 / Fin-E5 embedding dim 参数化 /
+          `__init__.py` 增量导出约定 / LocalSentimentProvider Registry 注册位置 /
+          cosine_dedup 传递闭包语义 / GPU OOM fallback 测试策略
+        - m4 显式交付 list_factors() 返回 ml_score 断言
+        - m6 G 组 GPU OOM 降级为 "assert fallback path invoked"（mock 无法验 CPU 等价）
+        - m6 F 组性能测试 @pytest.mark.perf 隔离（CI skip 避免 flakiness）
+        - m6 新增 m2b backfill chunked commit performance smoke case
+
+constraints: []
+indexing:
+  type: change
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["planning", "small-models", "finbert", "fine5", "lightgbm", "milestone-plan", "contracts", "two-round-review"]
+provenance:
+  source_type: planning_session
+  confidence: 1.0
+  source_ref: "planning session 2026-04-13 with two rounds of plan-eng-review subagent"
+relations:
+  - { type: refines, target: "intent-02-small-models-001", reason: "将 Room epic intent 拆分为可执行 milestones + 锁跨模块 contract" }
+anchors:
+  - { file: "meta/00-project-room/03-model-system/02-small-models/progress.yaml", type: planning }
+  - { file: "meta/00-project-room/03-model-system/02-small-models/spec.md", type: docs }
+  - { file: "meta/00-project-room/03-model-system/02-small-models/room.yaml", type: config }
+  - { file: "src/stockbee/providers/interfaces.py", type: contract, reason: "SentimentProvider 接口，m2b 实现" }
+  - { file: "src/stockbee/factor_data/local_provider.py", type: contract, reason: "m4 ml_score 走 precomputed 自动发现；_IC_SHIFT 硬编码触发 D2 决策" }
+  - { file: "src/stockbee/factor_data/parquet_factor.py", type: contract, reason: "ml_score.parquet 复用 ParquetFactorStore merge-write" }
+  - { file: "src/stockbee/factor_data/ic_evaluator.py", type: contract, reason: "m4 evaluate_ml_score 直接调 compute_ic(shift=5)" }
+  - { file: "src/stockbee/news_data/news_store.py", type: migration, reason: "m1 扩 schema: +finbert_negative/neutral/confidence + fine5_importance" }
+  - { file: "src/stockbee/news_data/g2_classifier.py", type: refactor, reason: "P3 重构：私有 FinBERT → 共享 m2a FinBERTScorer singleton" }

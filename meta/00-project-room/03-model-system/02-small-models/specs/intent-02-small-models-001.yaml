@@ -1,6 +1,6 @@
 spec_id: "intent-02-small-models-001"
 type: intent
-state: draft
+state: active
 intent:
   summary: "FinBERT 情绪 + Fin-E5 重要性 + LightGBM 收益预测"
   detail: |

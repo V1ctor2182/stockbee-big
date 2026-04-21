@@ -156,7 +156,10 @@ description: >
       LOW（要 defer？）: · [L1] list_factors schema 不统一 → TypedDict / ...
     修复并重跑测试？(y/n/选择性)
     ```
-
+   修复展示格式:
+  每条: "[级别] [文件:行号] — 改了什么（一句话）— 为什么（一句话）"
+  如需看完整改动: 用户说 "展开 C1" 才展示那一段 diff
+  禁止: 用自然语言段落描述修改过程
 16. 修复后重跑全量测试，必须全绿才进 Phase 4。
 
 ### Phase 4: 调用Commit-Sync skill（内置 commit-sync 逻辑）

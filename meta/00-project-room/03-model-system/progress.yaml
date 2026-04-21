@@ -1,5 +1,6 @@
 progress:
-  completion: 0.0
+  # 父 epic 进度按子 feature room 平均: 02-small-models 100% / 其余 3 个 0% → 25%
+  completion: 0.25
   milestones:
     - id: "m1-LLM-路由"
       name: "LLM 路由"
@@ -7,8 +8,9 @@ progress:
       completed_at: null
     - id: "m2-小模型部署"
       name: "小模型部署"
-      status: pending
-      completed_at: null
+      status: completed
+      completed_at: "2026-04-20"
+      note: "02-small-models 7/7 milestone 全部完成 (2026-04-13 → 2026-04-20)"
     - id: "m3-RL-训练"
       name: "RL 训练"
       status: pending
