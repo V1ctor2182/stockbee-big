@@ -467,3 +467,10 @@ progress:
       files_changed: 2
       milestones_affected:
         - "m6-integration-tests (→ completed)"
+    - hash: "92b9f55"
+      date: "2026-04-20"
+      message: "[02-small-models] fix: PR #33 review 三处修复"
+      files_changed: 3
+      specs_affected:
+        - "change-2026-04-20-pr33-review-fixes (created)"
+      milestones_affected: []   # post-completion fix,不动 milestone 状态

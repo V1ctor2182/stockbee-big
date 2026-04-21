@@ -1,0 +1,71 @@
+spec_id: "change-2026-04-20-pr33-review-fixes"
+type: change
+state: active
+intent:
+  summary: "PR #33 post-merge review 三处修复:lazy import / backfill COALESCE / encode([]) 形状"
+  detail: |
+    PR #33 (feature/factor-storage, 含 04-factor-storage + 02-small-models)
+    merge 后 review 发现三处问题,针对 02-small-models 的已完成代码做修复。
+    Room 已 100% completion,本次为 post-completion patch,不新增 milestone。
+
+    === 修复 1 (high): small_models/__init__.py lazy import ===
+      问题:`from stockbee.small_models.fine5_scorer import FinE5Scorer` 会触发
+           package 级 __init__.py 的全量 re-export,其中 `from .lightgbm_scorer`
+           会经 `from stockbee.factor_data.ic_evaluator import ...` 拉起
+           `stockbee/factor_data/__init__.py`,后者 eager import local_provider
+           → pyarrow 变成无关 scorer 的硬依赖。
+      复现:PYTHONPATH=src python3 -c "from stockbee.small_models.fine5_scorer
+           import FinE5Scorer" → ModuleNotFoundError: No module named 'pyarrow'
+      修复:__init__.py 改 PEP 562 __getattr__ lazy loading。`_LAZY_MAP` 声明
+           每个 re-export 符号对应的子模块,首次访问时 importlib 按需加载。
+           `TYPE_CHECKING` 块保留类型提示。
+      验证:import fine5_scorer 后 sys.modules 中只有 stockbee.small_models
+           + stockbee.small_models.fine5_scorer,无 lightgbm_scorer / factor_data。
+
+    === 修复 2 (medium): LocalSentimentProvider.backfill 部分 NULL 行冻结 ===
+      问题:backfill WHERE 只认 `finbert_confidence IS NULL`,且仅 UPDATE
+           finbert_negative/neutral/confidence。
+           get_ticker_sentiment 跳过任一字段 NULL 的行。
+           → "G1 写 sentiment_score 但 finbert_* NULL" 的行,backfill 补全
+           finbert_* 后,若 sentiment_score 本身为 NULL 就再也不会被处理:
+           aggregation 跳过 + backfill WHERE 也不命中 → 永久冻结。
+      修复:
+        a. WHERE 改为任一情绪字段 NULL 即候选 (sentiment_score /
+           finbert_negative / finbert_neutral / finbert_confidence)
+        b. UPDATE 用 COALESCE(col, ?) 逐列 guard,写入仅在列当前为 NULL 时生效
+        c. 新增 scorer sc["positive"] → sentiment_score 的填充(仅当 NULL)
+      语义变化:
+        - 旧:backfill 绝不触碰 sentiment_score(g2 所有)
+        - 新:backfill 仅在 sentiment_score 为 NULL 时填入 FinBERT positive 概率;
+             g2 已写入的值仍不被覆盖(COALESCE 保证)
+        - progress.yaml 中 "不覆盖 sentiment_score" 的约束依然满足,只是
+          "不写 sentiment_score" 被放松为 "不覆盖已有 sentiment_score"
+      回归:test_does_not_touch_sentiment_score 继续绿 (预置 0.42 保留)。
+           test_only_writes_null_rows 继续绿 (COALESCE 对已有值 no-op)。
+
+    === 修复 3 (low): FinE5Scorer.encode([]) 形状依赖调用顺序 ===
+      问题:`if not texts: dim = embedding_dim if self._mock or self._model else 1`
+           真实 scorer 未加载时返回 (0, 1);首次真实 encode 触发 load 后返回
+           (0, hidden_size)。同一 scorer 对空输入的列数依赖调用顺序。
+      修复:`dim = self._hidden_size if self._hidden_size is not None else 1024`
+           未加载时用 e5-large-v2 默认 hidden_size (1024),与 mock 路径一致;
+           加载后用真实 hidden_size。仍不触发 load (保留既有短路性能)。
+      测试:test_encode_empty_returns_empty_no_load (模型未加载断言) 仍绿。
+
+constraints: []
+indexing:
+  type: change
+  priority: medium
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["pr-review", "post-merge-fix", "lazy-import", "backfill", "pep-562"]
+provenance:
+  source_type: code_review
+  confidence: 1.0
+  source_ref: "PR #33 feature/factor-storage review (three findings: high / medium / low)"
+relations:
+  - { type: refines, target: "change-2026-04-13-small-models-plan", reason: "修订 m2b backfill 对部分 NULL 行的处理语义 + __init__.py 增量导出约定改为 lazy" }
+anchors:
+  - { file: "src/stockbee/small_models/__init__.py", type: refactor, reason: "PEP 562 lazy __getattr__ re-export" }
+  - { file: "src/stockbee/small_models/local_sentiment_provider.py", type: fix, reason: "backfill WHERE 放宽 + COALESCE 填列" }
+  - { file: "src/stockbee/small_models/fine5_scorer.py", type: fix, reason: "encode([]) 形状稳定 = (0, hidden_size or 1024)" }
