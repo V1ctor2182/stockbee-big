@@ -1,6 +1,6 @@
 spec_id: "intent-03-sector-tilts-001"
 type: intent
-state: draft
+state: active
 intent:
   summary: "11 个 GICS 行业动态加权"
   detail: |
@@ -20,4 +20,6 @@ provenance:
   confidence: 0.8
   source_ref: "PRD + Feature Hierarchy + Tech Design"
 relations: []
-anchors: []
+anchors:
+  - file: "src/stockbee/macro_scoring/sector_tilts.py"
+    symbols: ["SectorTilter", "GICS_SECTORS", "DEFAULT_SENSITIVITIES"]

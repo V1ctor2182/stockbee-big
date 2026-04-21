@@ -119,19 +119,22 @@ class ParquetMarketData(MarketDataProvider):
         self._data_path.mkdir(parents=True, exist_ok=True)
         path = self._ticker_path(ticker)
 
+        tmp_path = path.with_suffix(".parquet.tmp")
+        df.index = pd.to_datetime(df.index)
+
         if path.exists():
             existing = pd.read_parquet(path)
             existing.index = pd.to_datetime(existing.index)
-            df.index = pd.to_datetime(df.index)
             combined = pd.concat([existing, df])
             combined = combined[~combined.index.duplicated(keep="last")]
             combined.sort_index(inplace=True)
-            combined.to_parquet(path)
+            combined.to_parquet(tmp_path)
+            tmp_path.replace(path)  # cross-platform atomic replace
             logger.debug("Updated %s: %d rows", ticker, len(combined))
         else:
-            df.index = pd.to_datetime(df.index)
             df.sort_index(inplace=True)
-            df.to_parquet(path)
+            df.to_parquet(tmp_path)
+            tmp_path.replace(path)  # cross-platform atomic replace
             logger.debug("Created %s: %d rows", ticker, len(df))
 
     def list_tickers(self) -> list[str]:

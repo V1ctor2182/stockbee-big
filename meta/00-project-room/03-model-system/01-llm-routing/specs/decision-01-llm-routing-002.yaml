@@ -1,0 +1,33 @@
+spec_id: "decision-01-llm-routing-002"
+type: decision
+state: active
+intent:
+  summary: "Router task-agnostic vs 内置 G1/G2/G3 处理逻辑"
+  detail: |
+    决策：Router 只提供 route(task_type, prompt) 接口，不包含 G1/G2/G3 业务逻辑。
+
+    评估选项：
+    - Router 内置 G1/G2/G3 prompt 模板和后处理：方便但耦合严重
+    - Router task-agnostic：G1/G2/G3 的 prompt 和处理放在调用方（news-data）
+
+    决策理由：
+    - Router 是通用基础设施，不应和新闻处理逻辑耦合
+    - 其他模块（macro-analysis、sec-parse）也需要调 LLM，不涉及 G1/G2/G3
+    - 调用方只需选择 TaskType + 构建 prompt，Router 负责选模型+调API+降级
+    - 更容易测试：Router 测试不依赖新闻数据
+
+    代价：调用方需要自己管理 prompt 模板。
+constraints: []
+indexing:
+  type: decision
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["agnostic", "decoupling", "adr"]
+provenance:
+  source_type: implementation
+  confidence: 1.0
+  source_ref: "plan-milestones 讨论 2026-04-07"
+relations: []
+anchors:
+  - { file: "src/stockbee/llm_routing/router.py", type: implementation }

@@ -46,9 +46,9 @@ tree:
           priority: P0
           phase: 1
           children:
-            - { id: "01-macro-sources", type: feature, priority: P0, phase: 1, status: "待开发", note: "重新定义: Polymarket + 经济日历（原 FRED/BLS 已被 03-macro-data 覆盖）" }
-            - { id: "02-macro-scoring", type: feature, priority: P0, phase: 1, status: "待研究" }
-            - { id: "03-sector-tilts", type: feature, priority: P0, phase: 1, status: "待研究" }
+            - { id: "01-macro-sources", type: feature, priority: P0, phase: 1, status: "已完成", note: "Polymarket + 经济日历" }
+            - { id: "02-macro-scoring", type: feature, priority: P0, phase: 1, status: "已完成" }
+            - { id: "03-sector-tilts", type: feature, priority: P0, phase: 1, status: "已完成" }
             - { id: "04-style-tilts", type: feature, priority: P0, phase: 1, status: "待研究" }
 
         - id: "05-factor-scoring"

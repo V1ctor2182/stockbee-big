@@ -1,0 +1,26 @@
+spec_id: "change-2026-04-17-sector-tilts-complete"
+type: change
+state: active
+intent:
+  summary: "03-sector-tilts Room 完成 — 2 milestones, 24 tests"
+  detail: |
+    SectorTilter: 11 GICS 行业 × 宏观指标敏感度矩阵 (SQLite)。
+    compute_tilts() 基于 Z-scores 加权计算行业 tilt (±3% cap)。
+    Regime 调整: expansion 放大 cyclicals, recession 放大 defensives。
+    SQLite CRUD 支持运行时调参 (Phase 2 月度因子评审)。
+constraints: []
+indexing:
+  type: change
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["sector-tilts", "gics", "sensitivity-matrix"]
+provenance:
+  source_type: implementation
+  confidence: 1.0
+  source_ref: "feature/sector-tilts branch, commits 5ebb7ae..153f976"
+relations:
+  - { spec_id: "intent-03-sector-tilts-001", relation: "implements" }
+anchors:
+  - file: "src/stockbee/macro_scoring/sector_tilts.py"
+  - file: "tests/test_sector_tilts.py"

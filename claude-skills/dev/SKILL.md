@@ -2,8 +2,8 @@
 name: dev
 description: >
   一句话触发 milestone 级开发。自动 pull context → 开发 → commit-sync。
-  用户说 "做 news-data m1"、"开发 macro-data 的 Z-score 计算"、"下一个"、
-  "dev 01-stock-data/m3" 时触发。这是日常开发的主入口 skill。
+  用户说 "做 user-auth m1"、"开发 payment-flow 的 checkout 逻辑"、"下一个"、
+  "dev user-auth/m3" 时触发。这是日常开发的主入口 skill。
 ---
 
 # Dev — Milestone 级开发（context pull → 实现 → commit-sync）
@@ -18,7 +18,7 @@ description: >
 ## 前置条件
 
 - meta/ 目录已初始化，Room 和 milestones 已定义
-- Provider 架构已完成（07-provider-arch ✅）
+- Provider 架构已完成
 
 ## 执行步骤
 
@@ -162,7 +162,7 @@ description: >
   禁止: 用自然语言段落描述修改过程
 16. 修复后重跑全量测试，必须全绿才进 Phase 4。
 
-### Phase 4: Commit-Sync（内置 commit-sync 逻辑）
+### Phase 4: 调用Commit-Sync skill（内置 commit-sync 逻辑）
 
 17. 生成 commit：格式 `[room-id] type: milestone 描述`；只 stage 本 milestone 相关文件（Phase 0 发现的无关改动不 stage）；commit + push。
 

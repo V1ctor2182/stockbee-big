@@ -1,0 +1,49 @@
+spec_id: "change-01-macro-sources-001"
+type: change
+state: active
+intent:
+  summary: "01-macro-sources 实现 + bug fixes + Polymarket API 实测 (2026-04-06 ~ 2026-04-09)"
+  detail: |
+    新增文件：
+    - src/stockbee/macro_sources/__init__.py
+    - src/stockbee/macro_sources/polymarket.py — PolymarketFetcher
+    - src/stockbee/macro_sources/calendar.py — EconomicCalendar
+    - tests/test_macro_sources.py — 22 个测试
+
+    Git commits（feature/macro-sources 分支）：
+    - 222215a plan: 2 milestones
+    - 2ad071a feat: Polymarket event fetcher + FRED economic calendar
+    - 973bbf4 docs: Room completed
+    - 4a816c6 fix: atomic Parquet writes (multi-Room)
+    - 7b0933a fix: batch SQL inserts + read/write cursor split
+    - c45713c fix: API key sanitization, URL encoding, datetime deprecation
+    - 4d931e9 fix: cache key fields, MD5→SHA256, Z-score window, interface
+    - 18f8d8b docs: comprehensive spec update — 6 specs
+    - 4b46421 fix: User-Agent header + macro keyword filtering
+
+    实测验证（2026-04-09）：
+    - Polymarket Gamma API 连通（需 User-Agent 避免 403）
+    - 200 个热门市场过滤出 3 个真正的宏观事件:
+      * 联邦基金利率 5月会议预测 (1%)
+      * 墨西哥央行 5月利率决策 (78%)
+      * 阿根廷比索汇率预期 (18%)
+    - SQLite 存储 + 概率悬崖检测验证通过
+    - 22/22 测试通过
+
+    关键发现：
+    - Gamma API 不支持文本搜索/tag 过滤，只能客户端过滤
+    - 必须 User-Agent header（"StockBEE/1.0"），否则 403 Forbidden
+    - 完全免费，无 API key
+constraints: []
+indexing:
+  type: change
+  priority: high
+  layer: feature
+  domain: "quantitative-trading"
+  tags: ["changelog", "verification"]
+provenance:
+  source_type: git_history
+  confidence: 1.0
+  source_ref: "git log 222215a..4b46421"
+relations: []
+anchors: []
